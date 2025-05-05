@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SeungKang/blaj/internal/ini"
+	"github.com/SeungKang/memshonk/internal/ini"
 )
 
 const (

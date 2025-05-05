@@ -1,299 +1,485 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	_ "embed"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
-	"io"
+	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/commands"
 	"log"
-	"os"
 	"os/signal"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
-	"github.com/SeungKang/blaj/internal/appconfig"
-	"github.com/SeungKang/blaj/internal/progctl"
-	"github.com/getlantern/systray"
-	"github.com/stephen-fox/user32util"
-)
-
-const appName = "blaj"
-
-var (
-	//go:embed icons/shark_red.ico
-	systrayRedIco []byte
-
-	//go:embed icons/shark_blue.ico
-	systrayBlueIco []byte
-
-	//go:embed icons/shark_green.ico
-	systrayGreenIco []byte
-
-	//go:embed icons/shark_red_white.ico
-	statusErrorIcon []byte
-
-	//go:embed icons/shark_blue_white.ico
-	statusCheckingIcon []byte
-
-	//go:embed icons/shark_green_white.ico
-	statusRunningIcon []byte
-
-	version string
+	"github.com/desertbit/grumble"
 )
 
 func main() {
-	a := &app{}
-	systray.Run(a.ready, a.exit)
-}
+	log.SetFlags(0)
 
-type app struct {
-	errorLog *logUI
-}
-
-func (o *app) ready() {
-	systray.SetTitle(appName + " " + version)
-	systray.SetIcon(systrayBlueIco)
-
-	systray.AddMenuItem(appName+" "+version, "").Disable()
-	systray.AddSeparator()
-	o.errorLog = newLogUI("Error Log")
-	o.setChecking()
-
-	quit := systray.AddMenuItem("Quit", "Quit the application")
-	systray.AddSeparator()
-
-	ctx, cancelFn := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		select {
-		case <-quit.ClickedCh:
-		case <-ctx.Done():
-		}
-
-		cancelFn()
-		o.exit()
-	}()
-
-	go o.loop(ctx)
-}
-
-func (o *app) setChecking() {
-	systray.SetIcon(systrayBlueIco)
-}
-
-func (o *app) setRunning() {
-	systray.SetIcon(systrayGreenIco)
-}
-
-func (o *app) setError(err error) {
-	systray.SetIcon(systrayRedIco)
-}
-
-func (o *app) loop(ctx context.Context) {
-	for {
-		programCtx, cancelProgramCtxFn := context.WithCancel(ctx)
-		defer cancelProgramCtxFn()
-
-		programUIs, programErrors, err := startApp(programCtx, o)
-		if err != nil {
-			goto onProgramExit
-		}
-
-		select {
-		case <-ctx.Done():
-		case err = <-programErrors:
-		}
-
-	onProgramExit:
-		log.Printf("app loop error - %v", err)
-
-		cancelProgramCtxFn()
-
-		if err != nil {
-			o.setError(err)
-		}
-
-		select {
-		case <-ctx.Done():
-			log.Printf("app loop exited - %s", ctx.Err())
-			return
-		case <-time.After(5 * time.Second):
-			for _, ui := range programUIs {
-				ui.hide()
-			}
-
-			continue
-		}
-	}
-}
-
-func (o *app) exit() {
-	if log.Writer() != os.Stderr {
-		closer, ok := log.Writer().(io.Closer)
-		if ok {
-			closer.Close()
-		}
-	}
-
-	systray.Quit()
-}
-
-func newProgramUI(program *appconfig.ProgramConfig, parent *app) *programUI {
-	gui := &programUI{
-		app:         parent,
-		runningMenu: systray.AddMenuItem(program.General.ExeName, ""),
-		errorMenu:   systray.AddMenuItem(program.General.ExeName, ":c"),
-	}
-
-	gui.runningMenu.SetIcon(statusCheckingIcon)
-	gui.errorSubMenu = gui.errorMenu.AddSubMenuItem("", "")
-	gui.errorMenu.Hide()
-
-	return gui
-}
-
-type programUI struct {
-	app          *app
-	runningMenu  *systray.MenuItem
-	errorMenu    *systray.MenuItem
-	errorSubMenu *systray.MenuItem
-}
-
-func (o *programUI) ProgramStarted(exename string) {
-	log.Printf("connected to %s", exename)
-
-	o.app.setRunning()
-
-	o.runningMenu.SetIcon(statusRunningIcon)
-	o.runningMenu.Show()
-
-	o.errorMenu.Hide()
-}
-
-func (o *programUI) ProgramStopped(exename string, err error) {
-	log.Printf("disconnected from %s", exename)
-
+	err := mainWithError()
 	if err != nil {
-		o.app.setError(err)
-		o.app.errorLog.addEntry(exename + ": " + err.Error())
+		log.Fatalln("fatal:", err)
+	}
+}
 
-		o.runningMenu.Hide()
+func mainWithError() error {
+	ctx, cancelFn := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+	defer cancelFn()
+
+	proj := &app.Project{} // TODO parse arguments and create a project
+	application := app.NewApp(proj)
+	session := application.NewSession()
+	session.RunCommand(ctx, commands.NewAttachCommand())
+
+	grumbleApp := grumble.New(&grumble.Config{
+		Name:        "xmempg",
+		Description: "Wrapper for mempg",
+		Flags: func(f *grumble.Flags) {
+			f.String(
+				"E",
+				"mempg-exe",
+				"Path to mempg executable",
+				"mempg")
+
+			f.Bool(
+				"D",
+				"insecure-disable-sandbox",
+				false,
+				"Disable mempg sandbox")
+		},
+	})
+
+	grumbleApp.SetInterruptHandler(func(a *grumble.App, count int) {
+		a.Close()
+	})
+
+	sh := shell{
+		ga:  grumbleApp,
+		ctx: ctx,
+	}
+
+	grumbleApp.OnInit(sh.onInit)
+
+	grumbleApp.OnClose(func() error {
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name:    "seek",
+		Aliases: []string{"s"},
+		Help:    "set current address",
+		Args: func(a *grumble.Args) {
+			a.String("addr", "address to seek to")
+		},
+		Run: sh.seek,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name: "malloc",
+		Help: "malloc n sized chunks",
+		Flags: func(f *grumble.Flags) {
+			f.Bool("s", "seek", false, "seek to the chunk address")
+		},
+		Args: func(a *grumble.Args) {
+			a.Uint("size", "size of chunk", grumble.Default(uint(128)))
+			a.Uint("n", "number of chunks", grumble.Default(uint(1)))
+		},
+		Run: sh.malloc,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name:    "read",
+		Aliases: []string{"r"},
+		Help:    "read n bytes from addr",
+		Flags: func(f *grumble.Flags) {
+			f.String("e", "encoding", "hexdump", "output encoding format")
+		},
+		Args: func(a *grumble.Args) {
+			a.Uint("size", "number of bytes to read")
+			a.String("addr", "address to read from", grumble.Default(""))
+		},
+		Run: sh.read,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name:    "write",
+		Aliases: []string{"w"},
+		Help:    "write value to addr",
+		Flags: func(f *grumble.Flags) {
+			f.String("e", "encoding", "raw", "input encoding format")
+		},
+		Args: func(a *grumble.Args) {
+			a.String("data", "data to write")
+			a.String("addr", "address to write to", grumble.Default(""))
+		},
+		Run: sh.write,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name: "flag",
+		Help: "write the address of the flag function to stdout",
+		Run:  sh.flag,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name:    "call",
+		Aliases: []string{"c"},
+		Help:    "execute the data at addr",
+		Args: func(a *grumble.Args) {
+			a.String("addr", "address of the data", grumble.Default(""))
+		},
+		Run: sh.call,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name: "free",
+		Help: "free target addr",
+		Flags: func(f *grumble.Flags) {
+			f.Bool("a", "all", false, "free all allocated chunks")
+		},
+		Args: func(a *grumble.Args) {
+			a.String("addr", "address of the data", grumble.Default(""))
+		},
+		Run: sh.free,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name: "stack",
+		Help: "write the address of the stack to stdout",
+		Run:  sh.stack,
+	})
+
+	grumbleApp.AddCommand(&grumble.Command{
+		Name:    "heapstat",
+		Aliases: []string{"hs"},
+		Help:    "write a table of chunk stats",
+		Run:     sh.heapstat,
+	})
+
+	// TODO: Default to "info", and change pid to "dead" if process stopped
+	grumbleApp.AddCommand(&grumble.Command{
+		Name: "mempg",
+		Help: "mempg management commands",
+		Args: func(a *grumble.Args) {
+			a.String("manage", "manage the mempg process", grumble.Default(""))
+		},
+		Run: sh.mempg,
+	})
+
+	grumble.Main(grumbleApp)
+
+	return nil
+}
+
+type shell struct {
+	ga  *grumble.App
+	pg  *mempg.Mempg
+	fm  grumble.FlagMap
+	ctx context.Context
+}
+
+func (o *shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
+	if o.pg != nil {
+		// don't bother with this error
+		// if it is already dead an error will return
+		o.pg.Kill()
+	}
+
+	var mempgArgs []string
+	if flags.Bool("insecure-disable-sandbox") {
+		mempgArgs = append(mempgArgs, "--insecure-disable-sandbox")
+	}
+
+	pg, err := mempg.Start(o.ctx, flags.String("mempg-exe"), mempgArgs...)
+	if err != nil {
+		return err
+	}
+
+	o.pg = pg
+	o.fm = flags
+	o.setPrompt()
+
+	return nil
+}
+
+func (o *shell) seek(c *grumble.Context) error {
+	addr, err := strconv.ParseUint(strings.TrimPrefix(c.Args.String("addr"), "0x"), 16, 64)
+	if err != nil {
+		return err
+	}
+
+	err = o.pg.Seek(uintptr(addr))
+	if err != nil {
+		return err
+	}
+
+	o.setPrompt()
+
+	return nil
+}
+
+func (o *shell) malloc(c *grumble.Context) error {
+	sizeInt := int(c.Args.Uint("size"))
+	var lastMallocAddress uintptr
+	for range c.Args.Uint("n") {
+		chunkInfo, err := o.pg.Malloc(sizeInt)
+		if err != nil {
+			return err
+		}
+
+		lastMallocAddress = chunkInfo.Addr
+
+		o.ga.Printf("0x%x (%s), num times reused: %d\n",
+			chunkInfo.Addr,
+			chunkInfo.Status,
+			chunkInfo.NumAllocations-1)
+	}
+
+	if c.Flags.Bool("seek") {
+		err := o.pg.Seek(lastMallocAddress)
+		if err != nil {
+			return err
+		}
+
+		o.setPrompt()
+	}
+
+	return nil
+}
+
+func (o *shell) setPrompt() {
+	o.ga.SetPrompt(fmt.Sprintf("[0x%x] $ ", o.pg.CurrentSeekedAddr()))
+}
+
+func (o *shell) read(c *grumble.Context) error {
+	var fmtFn func([]byte) error
+
+	// TODO: Document encoding formats
+	encodingFormat := c.Flags.String("encoding")
+	switch encodingFormat {
+	case "hexdump":
+		fmtFn = func(b []byte) error {
+			o.ga.Print(hex.Dump(b))
+			return nil
+		}
+	case "hex":
+		fmtFn = func(b []byte) error {
+			o.ga.Println(hex.EncodeToString(b))
+			return nil
+		}
+	case "b64", "base64":
+		fmtFn = func(b []byte) error {
+			o.ga.Println(base64.StdEncoding.EncodeToString(b))
+			return nil
+		}
+	default:
+		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
+	}
+
+	addrStr := c.Args.String("addr")
+	var memory []byte
+	var err error
+	if addrStr == "" {
+		memory, err = o.pg.ReadMemoryAtSeekedAddr(c.Args.Uint("size"))
 	} else {
-		o.runningMenu.SetIcon(statusCheckingIcon)
-	}
-}
-
-func (o *programUI) hide() {
-	o.runningMenu.Hide()
-	o.errorMenu.Hide()
-	o.errorSubMenu.Hide()
-}
-
-func startApp(ctx context.Context, parent *app) ([]*programUI, <-chan error, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get user home dir - %w", err)
-	}
-
-	configDir := filepath.Join(homeDir, "."+appName)
-	err = os.MkdirAll(configDir, 0o700)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make config directory at '%s' - %w", configDir, err)
-	}
-
-	if log.Writer() == os.Stderr && version != "" {
-		logFile, err := os.OpenFile(
-			filepath.Join(configDir, appName+".log"),
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-			0o600)
+		var addr uint64
+		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to open log file - %w", err)
+			return err
 		}
 
-		log.SetOutput(logFile)
+		memory, err = o.pg.ReadMemoryAtAddr(c.Args.Uint("size"), uintptr(addr))
 	}
 
-	user32, err := user32util.LoadUser32DLL()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load user32.dll - %s", err.Error())
+		return err
 	}
 
-	pathInfos, err := os.ReadDir(configDir)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read config directory - %w", err)
-	}
-
-	var programConfigs []*appconfig.ProgramConfig
-	for _, pathInfo := range pathInfos {
-		if pathInfo.IsDir() {
-			continue
-		}
-
-		if strings.HasSuffix(pathInfo.Name(), ".conf") {
-			configPath := filepath.Join(configDir, pathInfo.Name())
-			programConfig, err := appconfig.ProgramConfigFromPath(configPath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create program config from path - %w", err)
-			}
-
-			if programConfig.General.Disabled {
-				log.Printf("%s set to disabled", pathInfo.Name())
-				continue
-			}
-
-			programConfigs = append(programConfigs, programConfig)
-		}
-	}
-
-	if len(programConfigs) == 0 {
-		return nil, nil, fmt.Errorf("no .conf files found in %s", configDir)
-	}
-
-	programUIs := make([]*programUI, len(programConfigs))
-	programRoutinesExited := make(chan error, len(programConfigs))
-
-	for i, program := range programConfigs {
-		program := program
-
-		programUIs[i] = newProgramUI(program, parent)
-
-		// TODO: write function that creates and starts program routine
-		programRoutine := &progctl.Routine{
-			Program: program,
-			User32:  user32,
-			Notif:   programUIs[i],
-		}
-
-		programRoutine.Start(ctx)
-
-		go func() {
-			<-programRoutine.Done()
-			programRoutinesExited <- fmt.Errorf("%s exited - %w",
-				program.General.ExeName, programRoutine.Err())
-		}()
-	}
-
-	return programUIs, programRoutinesExited, nil
+	return fmtFn(memory)
 }
 
-func newLogUI(menuItemName string) *logUI {
-	return &logUI{parent: systray.AddMenuItem(menuItemName, "")}
-}
+func (o *shell) write(c *grumble.Context) error {
+	dataStr := c.Args.String("data")
+	var data []byte
 
-type logUI struct {
-	parent  *systray.MenuItem
-	entries []*systray.MenuItem
-}
+	encodingFormat := c.Flags.String("encoding")
+	switch encodingFormat {
+	case "raw":
+		data = []byte(dataStr)
+	case "hexdump":
+		return errors.New("TODO: someday invert hexdump -C output into bytes")
+	case "hex":
+		var err error
+		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
+		if err != nil {
+			return fmt.Errorf("failed to hex decode string - %w", err)
+		}
+	case "b64", "base64":
+		var err error
+		data, err = base64.StdEncoding.DecodeString(dataStr)
+		if err != nil {
+			return fmt.Errorf("failed to base64 decode string - %w", err)
+		}
+	case "ptr", "pointer":
+		var err error
+		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
+		if err != nil {
+			return fmt.Errorf("failed to hex decode string - %w", err)
+		}
 
-func (o *logUI) addEntry(message string) {
-	// TODO: make more efficient
-	newEntry := o.parent.AddSubMenuItem(message, "")
-	if len(o.entries) == 5 {
-		o.entries[0].Hide()
-		o.entries = append(o.entries[1:], newEntry)
+		if len(data) > 8 {
+			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+		}
+
+		switch {
+		case len(data) > 8:
+			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+		case len(data) < 8:
+			data = append(bytes.Repeat([]byte{0}, 8-len(data)), data...)
+		}
+
+		binary.LittleEndian.PutUint64(data, binary.BigEndian.Uint64(data))
+	default:
+		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
+	}
+
+	addrStr := c.Args.String("addr")
+	var err error
+	if addrStr == "" {
+		err = o.pg.WriteMemoryAtSeekedAddr(data)
 	} else {
-		o.entries = append(o.entries, newEntry)
+		var addr uint64
+		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
+		if err != nil {
+			return err
+		}
+
+		err = o.pg.WriteMemoryAtAddr(data, uintptr(addr))
 	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *shell) flag(*grumble.Context) error {
+	addr, err := o.pg.Flag()
+	if err != nil {
+		return err
+	}
+
+	o.ga.Printf("0x%x\n", addr)
+
+	return nil
+}
+
+func (o *shell) call(c *grumble.Context) error {
+	addrStr := c.Args.String("addr")
+	var out []byte
+	var err error
+	if addrStr == "" {
+		out, err = o.pg.CallSeekedAddr()
+	} else {
+		var addr uint64
+		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
+		if err != nil {
+			return err
+		}
+
+		out, err = o.pg.CallAddr(uintptr(addr))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	o.ga.Print(string(out))
+
+	return nil
+}
+
+func (o *shell) free(c *grumble.Context) error {
+	if c.Flags.Bool("all") {
+		err := o.pg.FreeAll()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	addrStr := c.Args.String("addr")
+	var out []byte
+	var err error
+	if addrStr == "" {
+		err = o.pg.FreeSeekedAddr()
+	} else {
+		var addr uint64
+		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
+		if err != nil {
+			return err
+		}
+
+		err = o.pg.FreeAddr(uintptr(addr))
+	}
+
+	if err != nil {
+		return err
+	}
+
+	o.ga.Print(string(out))
+
+	return nil
+}
+
+func (o *shell) stack(c *grumble.Context) error {
+	addr, err := o.pg.StackAddr()
+	if err != nil {
+		return err
+	}
+
+	o.ga.Printf("0x%x\n", addr)
+
+	return nil
+}
+
+func (o *shell) heapstat(c *grumble.Context) error {
+	statTable, err := o.pg.HeapStat()
+	if err != nil {
+		return err
+	}
+
+	o.ga.Print(statTable)
+
+	return nil
+}
+
+func (o *shell) mempg(c *grumble.Context) error {
+	manageArg := c.Args.String("manage")
+	status, execCmd := o.pg.Info()
+	switch manageArg {
+	case "info":
+		o.ga.Printf("status: %s\n", status)
+		o.ga.Printf("pid: %d\n", execCmd.Process.Pid)
+	case "restart":
+		if status == "running" {
+			o.ga.Println("process is already running")
+			return nil
+		}
+
+		o.ga.Println("restarting...")
+		err := o.onInit(o.ga, o.fm)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

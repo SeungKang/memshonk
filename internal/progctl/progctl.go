@@ -4,18 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Andoryuuta/kiwi"
+	"github.com/SeungKang/memshonk/internal/appconfig"
+	"github.com/SeungKang/memshonk/internal/kernel32"
+	"github.com/mitchellh/go-ps"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
-
-	"github.com/Andoryuuta/kiwi"
-	"github.com/SeungKang/blaj/internal/appconfig"
-	"github.com/SeungKang/blaj/internal/kernel32"
-	"github.com/mitchellh/go-ps"
-	"github.com/stephen-fox/user32util"
 )
 
 var (
@@ -27,14 +24,33 @@ type Notifier interface {
 	ProgramStopped(exename string, err error)
 }
 
+func NewRoutine(ctx context.Context, config *appconfig.ProgramConfig) *Routine {
+	routine := &Routine{
+		Program: config,
+		Notif:   nil,
+		done:    make(chan struct{}),
+	}
+
+	go routine.loop(ctx)
+
+	return routine
+}
+
 type Routine struct {
-	Program *appconfig.ProgramConfig
-	User32  *user32util.User32DLL
-	Notif   Notifier
-	timer   *time.Timer
-	current *runningProgramRoutine
-	done    chan struct{}
-	err     error
+	Program  *appconfig.ProgramConfig
+	Notif    Notifier
+	doAttach chan *attachCallback
+	current  *runningProgramRoutine
+	done     chan struct{}
+	err      error
+}
+
+func (o *Routine) Read(b []byte) (int, error) {
+	// TODO
+}
+
+func (o *Routine) Write(b []byte) (int, error) {
+	// TODO
 }
 
 func (o *Routine) Done() <-chan struct{} {
@@ -43,13 +59,6 @@ func (o *Routine) Done() <-chan struct{} {
 
 func (o *Routine) Err() error {
 	return o.err
-}
-
-func (o *Routine) Start(ctx context.Context) {
-	o.done = make(chan struct{})
-	o.timer = time.NewTimer(time.Millisecond)
-
-	go o.loop(ctx)
 }
 
 func (o *Routine) loop(ctx context.Context) {
@@ -61,9 +70,36 @@ func (o *Routine) loop(ctx context.Context) {
 	close(o.done)
 }
 
+func (o *Routine) Attach(ctx context.Context) (int, error) {
+	cb := &attachCallback{done: make(chan struct{})}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-o.done:
+		return 0, o.err
+	case o.doAttach <- cb:
+		// keep going
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-o.done:
+		return 0, o.err
+	case <-cb.done:
+		return cb.pid, cb.err
+	}
+}
+
+type attachCallback struct {
+	done chan struct{}
+	err  error
+	pid  int
+}
+
 func (o *Routine) loopWithError(ctx context.Context) error {
 	defer func() {
-		o.timer.Stop()
 		if o.current != nil {
 			o.current.Stop()
 		}
@@ -75,14 +111,24 @@ func (o *Routine) loopWithError(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-o.timer.C:
+		case cb := <-o.doAttach:
+			if o.current != nil {
+				cb.pid = o.current.pid
+				close(cb.done)
+				continue
+			}
+
 			err := o.checkProgramRunning()
 			if err != nil {
-				return fmt.Errorf("failed to handle program startup for %s - %w", o.Program.General.ExeName, err)
+				cb.err = fmt.Errorf("failed to handle program startup - %w", err)
+				close(cb.done)
+				continue
 			}
+
+			cb.pid = o.current.pid
+			close(cb.done)
 		case <-o.current.Done():
 			log.Printf("%s routine exited - %s", o.Program.General.ExeName, o.current.Err())
-			o.timer.Reset(5 * time.Second)
 
 			if o.Notif != nil {
 				if errors.Is(o.current.Err(), programExitedNormallyErr) {
@@ -113,11 +159,10 @@ func (o *Routine) checkProgramRunning() error {
 	}
 
 	if possiblePID == -1 {
-		o.timer.Reset(5 * time.Second)
-		return nil
+		return errors.New("failed to find a matching process")
 	}
 
-	runningProgram, err := newRunningProgramRoutine(o.Program, possiblePID, o.User32)
+	runningProgram, err := newRunningProgramRoutine(o.Program, possiblePID)
 	if err != nil {
 		return fmt.Errorf("failed to create new running program routine - %w", err)
 	}
@@ -131,7 +176,7 @@ func (o *Routine) checkProgramRunning() error {
 }
 
 // TODO: make source file for running program stuff
-func newRunningProgramRoutine(program *appconfig.ProgramConfig, pid int, dll *user32util.User32DLL) (*runningProgramRoutine, error) {
+func newRunningProgramRoutine(program *appconfig.ProgramConfig, pid int) (*runningProgramRoutine, error) {
 	proc, err := kiwi.GetProcessByPID(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get process by PID - %w", err)
@@ -148,10 +193,10 @@ func newRunningProgramRoutine(program *appconfig.ProgramConfig, pid int, dll *us
 	}
 
 	runningProgram := &runningProgramRoutine{
-		program: program,
-		proc:    proc,
-		states:  programStates,
-		done:    make(chan struct{}),
+		pid:    pid,
+		proc:   proc,
+		states: programStates,
+		done:   make(chan struct{}),
 	}
 
 	modules, err := kernel32.ProcessModules(syscall.Handle(proc.Handle))
@@ -188,13 +233,6 @@ func newRunningProgramRoutine(program *appconfig.ProgramConfig, pid int, dll *us
 		}
 	}
 
-	listener, err := user32util.NewLowLevelKeyboardListener(runningProgram.handleKeyboardEvent, dll)
-	if err != nil {
-		runningProgram.Stop()
-		return nil, fmt.Errorf("failed to create listener - %s", err.Error())
-	}
-	runningProgram.ln = listener
-
 	process, err := os.FindProcess(int(proc.PID))
 	if err != nil {
 		runningProgram.Stop()
@@ -205,15 +243,6 @@ func newRunningProgramRoutine(program *appconfig.ProgramConfig, pid int, dll *us
 		_, err := process.Wait()
 		if err == nil {
 			err = programExitedNormallyErr
-		}
-
-		runningProgram.exited(err)
-	}()
-
-	go func() {
-		err := <-listener.OnDone()
-		if err == nil {
-			err = errors.New("listener exited without error")
 		}
 
 		runningProgram.exited(err)
@@ -259,17 +288,16 @@ func getRequiredModules(program *appconfig.ProgramConfig, modules []kernel32.Mod
 }
 
 type runningProgramRoutine struct {
-	program *appconfig.ProgramConfig
-	base    uintptr
-	is32b   bool
-	mods    map[string]kernel32.Module
-	addrFn  func(uintptr) (uintptr, error)
-	proc    kiwi.Process
-	states  map[string]*programState
-	once    sync.Once
-	ln      *user32util.LowLevelKeyboardEventListener
-	done    chan struct{}
-	err     error
+	base   uintptr
+	is32b  bool
+	mods   map[string]kernel32.Module
+	addrFn func(uintptr) (uintptr, error)
+	pid    int
+	proc   kiwi.Process
+	states map[string]*programState
+	once   sync.Once
+	done   chan struct{}
+	err    error
 }
 
 func (o *runningProgramRoutine) Stop() {
@@ -291,72 +319,9 @@ func (o *runningProgramRoutine) Err() error {
 func (o *runningProgramRoutine) exited(err error) {
 	o.once.Do(func() {
 		_ = syscall.CloseHandle(syscall.Handle(o.proc.Handle))
-		if o.ln != nil {
-			o.ln.Release()
-		}
 		o.err = err
 		close(o.done)
 	})
-}
-
-func (o *runningProgramRoutine) handleKeyboardEvent(event user32util.LowLevelKeyboardEvent) {
-	err := o.handleKeyboardEventWithError(event)
-	if err != nil {
-		o.exited(err)
-	}
-}
-
-func (o *runningProgramRoutine) handleKeyboardEventWithError(event user32util.LowLevelKeyboardEvent) error {
-	if event.KeyboardButtonAction() != user32util.WMKeyDown {
-		return nil
-	}
-
-	pressedKey := event.Struct.VirtualKeyCode()
-	sections, hasKeybind := o.program.Keybinds[pressedKey]
-	if !hasKeybind {
-		return nil
-	}
-
-	for _, section := range sections {
-		switch v := section.(type) {
-		case *appconfig.SaveRestore:
-			switch pressedKey {
-			case v.SaveState:
-				for _, pointer := range v.Pointers {
-					state, hasIt := o.states[pointer.Name]
-					if !hasIt {
-						continue
-					}
-					err := o.saveState(pointer.Name, state)
-					if err != nil {
-						return fmt.Errorf("failed to get %s state at %+#v to 0x%x",
-							pointer.Name, pointer, state.savedState)
-					}
-				}
-			case v.RestoreState:
-				for _, pointer := range v.Pointers {
-					state, hasIt := o.states[pointer.Name]
-					if !hasIt || !state.stateSet {
-						continue
-					}
-					err := o.restoreState(pointer.Name, state)
-					if err != nil {
-						return fmt.Errorf("failed to restore %s state at %+#v to 0x%x",
-							pointer.Name, state.pointer, state.savedState)
-					}
-				}
-			}
-		case *appconfig.Writer:
-			for _, pointer := range v.Pointers {
-				err := o.write(pointer)
-				if err != nil {
-					return fmt.Errorf("failed to write to %s - %w", pointer.Pointer.Name, err)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 func (o *runningProgramRoutine) saveState(name string, state *programState) error {

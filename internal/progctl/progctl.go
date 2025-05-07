@@ -45,14 +45,6 @@ type Routine struct {
 	err      error
 }
 
-func (o *Routine) Read(b []byte) (int, error) {
-	// TODO
-}
-
-func (o *Routine) Write(b []byte) (int, error) {
-	// TODO
-}
-
 func (o *Routine) Done() <-chan struct{} {
 	return o.done
 }
@@ -96,6 +88,18 @@ type attachCallback struct {
 	done chan struct{}
 	err  error
 	pid  int
+}
+
+func (o *Routine) ReadFromAddr(ctx context.Context, addr uint64, size uint) ([]byte, error) {
+	// TODO
+}
+
+func (o *Routine) WriteToAddr(ctx context.Context, p []byte, addr uint64) error {
+	// TODO
+}
+
+func (o *Routine) Detach(ctx context.Context) error {
+	// TODO
 }
 
 func (o *Routine) loopWithError(ctx context.Context) error {

@@ -3,6 +3,8 @@ package commands
 import (
 	"context"
 	"io"
+
+	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 type Command interface {
@@ -16,9 +18,9 @@ type Session interface {
 type Process interface {
 	Attach(ctx context.Context) (int, error)
 
-	ReadFromAddr(ctx context.Context, addr uint64, size uint) ([]byte, error)
+	ReadFromAddr(ctx context.Context, addr memory.Pointer, size uint) ([]byte, error)
 
-	WriteToAddr(ctx context.Context, p []byte, addr uint64) error
+	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
 
 	Detach(ctx context.Context) error
 }

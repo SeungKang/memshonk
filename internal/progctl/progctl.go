@@ -46,10 +46,15 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	defer o.rwMu.Unlock()
 
 	if o.current != nil {
-		return 0, fmt.Errorf("already attached to pid: %d", o.current.pid)
+		select {
+		case <-o.current.Done():
+			// Go ahead with reattach.
+		default:
+			return 0, fmt.Errorf("already attached to pid: %d", o.current.pid)
+		}
 	}
 
-	err := o.checkProgramRunning()
+	err := o.attach()
 	if err != nil {
 		return 0, err
 	}
@@ -78,7 +83,6 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) e
 	}
 
 	return o.current.write(data, to)
-
 }
 
 func (o *Ctl) Detach(ctx context.Context) error {
@@ -96,7 +100,7 @@ func (o *Ctl) Detach(ctx context.Context) error {
 	return nil
 }
 
-func (o *Ctl) checkProgramRunning() error {
+func (o *Ctl) attach() error {
 	processes, err := ps.Processes()
 	if err != nil {
 		return fmt.Errorf("failed to get active processes - %w", err)

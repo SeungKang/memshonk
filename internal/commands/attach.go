@@ -22,14 +22,14 @@ type AttachCommand struct {
 	args AttachCommandArgs
 }
 
-func (o AttachCommand) Run(ctx context.Context, inputOutput IO, s Session) error {
+func (o AttachCommand) Run(ctx context.Context, s Session) error {
 	// TODO: Support AttachCommandArgs
 	pid, err := s.Process().Attach(ctx)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(inputOutput.Stdout, "attached to pid: %d", pid)
+	fmt.Fprintf(s.CommandsIO().Stdout, "attached to pid: %d", pid)
 
 	return nil
 }

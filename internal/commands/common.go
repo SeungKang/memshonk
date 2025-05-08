@@ -8,11 +8,13 @@ import (
 )
 
 type Command interface {
-	Run(ctx context.Context, inputOutput IO, s Session) error
+	Run(ctx context.Context, s Session) error
 }
 
 type Session interface {
 	Process() Process
+
+	CommandsIO() IO
 }
 
 type Process interface {

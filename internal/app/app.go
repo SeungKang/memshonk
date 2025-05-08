@@ -2,15 +2,16 @@ package app
 
 import (
 	"context"
+	"sync"
+
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/progctl"
-	"sync"
 )
 
 func NewApp(project *Project) *App {
 	return &App{
 		project: project,
-		process: nil, // TODO
+		procCtl: nil, // TODO
 	}
 }
 
@@ -19,10 +20,14 @@ type App struct {
 	project       *Project
 	nextSessionId uint64
 	sessions      map[uint64]*Session
-	process       *progctl.Routine
+	procCtl       *progctl.Ctl
 }
 
-func (o *App) NewSession() *Session {
+func (o *App) ProcCtl() *progctl.Ctl {
+	return o.procCtl
+}
+
+func (o *App) NewSession(cmdIO commands.IO) *Session {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -33,7 +38,7 @@ func (o *App) NewSession() *Session {
 	id := o.nextSessionId
 	o.nextSessionId++
 
-	session := newSession(id, o.project, o.process)
+	session := newSession(id, o, cmdIO)
 	o.sessions[id] = session
 
 	return session
@@ -42,27 +47,31 @@ func (o *App) NewSession() *Session {
 type Project struct {
 }
 
-func newSession(id uint64, project *Project, process *progctl.Routine) *Session {
+func newSession(id uint64, app *App, cmdIO commands.IO) *Session {
 	return &Session{
-		id:      id,
-		project: project,
-		process: process,
+		id:  id,
+		app: app,
+		io:  cmdIO,
 	}
 }
 
 type Session struct {
-	id      uint64
-	cmdCtx  *CommandContext
-	project *Project
-	process *progctl.Routine
+	id     uint64
+	app    *App
+	cmdCtx *CommandContext
+	io     commands.IO
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
-	return cmd.Run(ctx, commands.IO{}, o)
+	return cmd.Run(ctx, o)
 }
 
 func (o *Session) Process() commands.Process {
-	return o.process
+	return o.app.ProcCtl()
+}
+
+func (o *Session) CommandsIO() commands.IO {
+	return o.io
 }
 
 type CommandContext struct {

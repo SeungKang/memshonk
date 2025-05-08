@@ -12,6 +12,10 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+var (
+	programExitedNormallyErr = errors.New("program exited without error")
+)
+
 func newProcess(exeName string, pid int) (*process, error) {
 	kiwiProc, err := kiwi.GetProcessByPID(pid)
 	if err != nil {
@@ -52,6 +56,8 @@ func newProcess(exeName string, pid int) (*process, error) {
 		}
 	}
 
+	// TODO: We will need to find an alternative on Unix-like systems.
+	// This will not work for non-child processes.
 	proc, err := os.FindProcess(int(kiwiProc.PID))
 	if err != nil {
 		runningProgram.Stop()

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SeungKang/memshonk/internal/appconfig"
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/mitchellh/go-ps"
 )
@@ -26,7 +25,6 @@ func NewCtl(ctx context.Context, exeName string) *Ctl {
 }
 
 type Ctl struct {
-	Program *appconfig.ProgramConfig
 	Notif   Notifier
 	exeName string
 	rwMu    sync.RWMutex
@@ -106,7 +104,7 @@ func (o *Ctl) checkProgramRunning() error {
 
 	possiblePID := -1
 	for _, process := range processes {
-		if strings.ToLower(process.Executable()) == o.Program.General.ExeName {
+		if strings.ToLower(process.Executable()) == strings.ToLower(o.exeName) {
 			possiblePID = process.Pid()
 			break
 		}
@@ -123,7 +121,7 @@ func (o *Ctl) checkProgramRunning() error {
 
 	o.current = proc
 	if o.Notif != nil {
-		o.Notif.ProgramStarted(o.Program.General.ExeName)
+		o.Notif.ProgramStarted(o.exeName)
 	}
 
 	return nil

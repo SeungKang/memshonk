@@ -8,15 +8,20 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/desertbit/grumble"
 )
 
 func NewShell(ctx context.Context, application *app.App) (*Shell, error) {
-	session := application.NewSession()
+	session := application.NewSession(commands.IO{
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	})
 
 	grumbleApp := grumble.New(&grumble.Config{
 		Name:        "xmempg",

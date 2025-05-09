@@ -11,16 +11,27 @@ import (
 	"github.com/mitchellh/go-ps"
 )
 
+var _ Process = (*Ctl)(nil)
+
 type Notifier interface {
 	ProgramStarted(exename string)
 	ProgramStopped(exename string, err error)
+}
+
+type Process interface {
+	Attach(ctx context.Context) (int, error)
+
+	ReadFromAddr(ctx context.Context, addr memory.Pointer, size uint) ([]byte, error)
+
+	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
+
+	Detach(ctx context.Context) error
 }
 
 func NewCtl(ctx context.Context, exeName string) *Ctl {
 	return &Ctl{
 		Notif:   nil,
 		exeName: exeName,
-		done:    make(chan struct{}),
 	}
 }
 
@@ -29,16 +40,6 @@ type Ctl struct {
 	exeName string
 	rwMu    sync.RWMutex
 	current *process
-	done    chan struct{}
-	err     error
-}
-
-func (o *Ctl) Done() <-chan struct{} {
-	return o.done
-}
-
-func (o *Ctl) Err() error {
-	return o.err
 }
 
 func (o *Ctl) Attach(ctx context.Context) (int, error) {

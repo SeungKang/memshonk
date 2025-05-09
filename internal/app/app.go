@@ -63,15 +63,12 @@ type Session struct {
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
-	return cmd.Run(ctx, o)
+	// TODO: Implement a RunCommandWithIO method to customize IO.
+	return cmd.Run(ctx, o.io, o)
 }
 
-func (o *Session) Process() commands.Process {
+func (o *Session) Process() progctl.Process {
 	return o.app.ProcCtl()
-}
-
-func (o *Session) CommandsIO() commands.IO {
-	return o.io
 }
 
 type CommandContext struct {

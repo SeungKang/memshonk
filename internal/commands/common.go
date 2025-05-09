@@ -4,27 +4,15 @@ import (
 	"context"
 	"io"
 
-	"github.com/SeungKang/memshonk/internal/memory"
+	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
 type Command interface {
-	Run(ctx context.Context, s Session) error
+	Run(context.Context, IO, Session) error
 }
 
 type Session interface {
-	Process() Process
-
-	CommandsIO() IO
-}
-
-type Process interface {
-	Attach(ctx context.Context) (int, error)
-
-	ReadFromAddr(ctx context.Context, addr memory.Pointer, size uint) ([]byte, error)
-
-	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
-
-	Detach(ctx context.Context) error
+	Process() progctl.Process
 }
 
 type IO struct {

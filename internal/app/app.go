@@ -11,7 +11,7 @@ import (
 func NewApp(project *Project) *App {
 	return &App{
 		project: project,
-		procCtl: nil, // TODO
+		procCtl: progctl.NewCtl(project.ExeName),
 	}
 }
 
@@ -45,6 +45,7 @@ func (o *App) NewSession(cmdIO commands.IO) *Session {
 }
 
 type Project struct {
+	ExeName string
 }
 
 func newSession(id uint64, app *App, cmdIO commands.IO) *Session {

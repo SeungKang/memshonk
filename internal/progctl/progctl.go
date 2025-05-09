@@ -28,7 +28,7 @@ type Process interface {
 	Detach(ctx context.Context) error
 }
 
-func NewCtl(ctx context.Context, exeName string) *Ctl {
+func NewCtl(exeName string) *Ctl {
 	return &Ctl{
 		Notif:   nil,
 		exeName: exeName,

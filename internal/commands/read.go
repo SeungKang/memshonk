@@ -14,7 +14,7 @@ var _ Command = (*ReadCommand)(nil)
 type ReadCommandArgs struct {
 	EncodingFormat string
 	AddrStr        string
-	Size           uint
+	SizeBytes      uint64
 }
 
 func NewReadCommand(args ReadCommandArgs) ReadCommand {
@@ -64,7 +64,7 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		}
 	}
 
-	data, err := s.Process().ReadFromAddr(ctx, ptr, o.args.Size)
+	data, err := s.Process().ReadFromAddr(ctx, ptr, o.args.SizeBytes)
 	if err != nil {
 		return err
 	}

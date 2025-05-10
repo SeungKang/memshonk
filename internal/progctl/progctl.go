@@ -21,7 +21,7 @@ type Notifier interface {
 type Process interface {
 	Attach(ctx context.Context) (int, error)
 
-	ReadFromAddr(ctx context.Context, addr memory.Pointer, size uint) ([]byte, error)
+	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, error)
 
 	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
 
@@ -64,7 +64,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 }
 
-func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, size uint) ([]byte, error) {
+func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -72,7 +72,7 @@ func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, size uint) 
 		return nil, errors.New("not attached")
 	}
 
-	return o.current.read(from, size)
+	return o.current.read(from, sizeBytes)
 }
 
 func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) error {

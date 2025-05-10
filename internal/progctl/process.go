@@ -119,7 +119,7 @@ type process struct {
 	err    error
 }
 
-func (o *process) read(pointer memory.Pointer, size uint) ([]byte, error) {
+func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
 	// TODO the first part of this can become common code
 	baseAddr := o.base
 	if pointer.OptModule != "" {

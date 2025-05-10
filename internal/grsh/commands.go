@@ -64,7 +64,7 @@ func NewReadCommand(session *app.Session) *grumble.Command {
 				commands.NewReadCommand(commands.ReadCommandArgs{
 					EncodingFormat: c.Flags.String("encoding"),
 					AddrStr:        c.Args.String("addr"),
-					Size:           c.Args.Uint("size"),
+					SizeBytes:      c.Args.Uint64("size"),
 				}))
 			if err != nil {
 				return err

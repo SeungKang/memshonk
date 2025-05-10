@@ -82,19 +82,29 @@ func getModules(exeName string, procHandle uintptr) (uintptr, map[string]kernel3
 		return 0, nil, fmt.Errorf("failed to get process modules - %w", err)
 	}
 
+	// some modules appear more than once, we are just going to use the first
+	// entry that has a non-zero base address :)
+	// TODO add option to log weird stuff we are seeing, attach -v
 	modulesMap := make(map[string]kernel32.Module, len(modules))
 	for _, module := range modules {
+		if module.BaseAddr == 0 {
+			continue
+		}
+
+		_, found := modulesMap[module.Filename]
+		if found {
+			continue
+		}
+
 		modulesMap[module.Filename] = module
 	}
 
-	var missing []string
-	for name, tmp := range modulesMap {
-		if tmp.BaseAddr == 0 {
-			missing = append(missing, name)
-		}
+	exeModule, found := modulesMap[exeName]
+	if !found {
+		return 0, nil, fmt.Errorf("failed to find exe module for: %q", exeName)
 	}
 
-	return modulesMap[exeName].BaseAddr, modulesMap, nil
+	return exeModule.BaseAddr, modulesMap, nil
 }
 
 type process struct {

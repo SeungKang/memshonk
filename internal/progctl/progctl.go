@@ -108,9 +108,11 @@ func (o *Ctl) attach() error {
 	}
 
 	possiblePID := -1
-	for _, process := range processes {
-		if strings.ToLower(process.Executable()) == strings.ToLower(o.exeName) {
-			possiblePID = process.Pid()
+	var exeName string
+	for _, psProc := range processes {
+		if strings.ToLower(psProc.Executable()) == strings.ToLower(o.exeName) {
+			possiblePID = psProc.Pid()
+			exeName = psProc.Executable()
 			break
 		}
 	}
@@ -119,7 +121,7 @@ func (o *Ctl) attach() error {
 		return errors.New("failed to find a matching process")
 	}
 
-	proc, err := newProcess(o.exeName, possiblePID)
+	proc, err := newProcess(exeName, possiblePID)
 	if err != nil {
 		return fmt.Errorf("failed to create new running program routine - %w", err)
 	}

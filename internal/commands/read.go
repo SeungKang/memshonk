@@ -6,9 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -55,26 +52,19 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
+	var ptr memory.Pointer
 	addrStr := o.args.AddrStr
-	var data []byte
 	var err error
 	if addrStr == "" {
 		return errors.New("TODO: implement seek address support")
 	} else {
-		var addr uint64
-		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
+		ptr, err = memory.CreatePointerFromString(addrStr)
 		if err != nil {
 			return err
 		}
-
-		// TODO: support specifying OptModule
-		data, err = s.Process().ReadFromAddr(ctx, memory.Pointer{
-			Name:      "",
-			Addrs:     []uintptr{uintptr(addr)},
-			OptModule: "",
-		}, o.args.Size)
 	}
 
+	data, err := s.Process().ReadFromAddr(ctx, ptr, o.args.Size)
 	if err != nil {
 		return err
 	}

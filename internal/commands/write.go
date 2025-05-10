@@ -1,0 +1,104 @@
+package commands
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/SeungKang/memshonk/internal/memory"
+)
+
+var _ Command = (*WriteCommand)(nil)
+
+type WriteCommandArgs struct {
+	DataStr        string
+	EncodingFormat string
+	AddrStr        string
+}
+
+func NewWriteCommand(args WriteCommandArgs) WriteCommand {
+	return WriteCommand{
+		args: args,
+	}
+}
+
+type WriteCommand struct {
+	args WriteCommandArgs
+}
+
+func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) error {
+	dataStr := o.args.DataStr
+	var data []byte
+
+	// TODO: Document encoding formats
+	encodingFormat := o.args.EncodingFormat
+	switch encodingFormat {
+	case "raw":
+		data = []byte(dataStr)
+	case "hexdump":
+		return errors.New("TODO: someday invert hexdump -C output into bytes")
+	case "hex":
+		var err error
+		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
+		if err != nil {
+			return fmt.Errorf("failed to hex decode string - %w", err)
+		}
+	case "b64", "base64":
+		var err error
+		data, err = base64.StdEncoding.DecodeString(dataStr)
+		if err != nil {
+			return fmt.Errorf("failed to base64 decode string - %w", err)
+		}
+	case "ptr", "pointer":
+		var err error
+		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
+		if err != nil {
+			return fmt.Errorf("failed to hex decode string - %w", err)
+		}
+
+		if len(data) > 8 {
+			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+		}
+
+		switch {
+		case len(data) > 8:
+			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+		case len(data) < 8:
+			data = append(bytes.Repeat([]byte{0}, 8-len(data)), data...)
+		}
+
+		binary.LittleEndian.PutUint64(data, binary.BigEndian.Uint64(data))
+	default:
+		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
+	}
+
+	addrStr := o.args.AddrStr
+	var err error
+	if addrStr == "" {
+		return errors.New("TODO: implement seek address support")
+	} else {
+		var addr uint64
+		addr, err = strconv.ParseUint(strings.TrimPrefix(addrStr, "0x"), 16, 64)
+		if err != nil {
+			return err
+		}
+
+		err = s.Process().WriteToAddr(ctx, data, memory.Pointer{
+			Name:      "",
+			Addrs:     []uintptr{uintptr(addr)},
+			OptModule: "",
+		})
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

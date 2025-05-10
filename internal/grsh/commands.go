@@ -2,6 +2,7 @@ package grsh
 
 import (
 	"context"
+
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/desertbit/grumble"
@@ -74,18 +75,32 @@ func NewReadCommand(session *app.Session) *grumble.Command {
 	}
 }
 
-//func NewWriteCommand(session *app.Session) *grumble.Command {
-//	return &grumble.Command{
-//		Name:    "write",
-//		Aliases: []string{"w"},
-//		Help:    "write value to addr",
-//		Flags: func(f *grumble.Flags) {
-//			f.String("e", "encoding", "raw", "input encoding format")
-//		},
-//		Args: func(a *grumble.Args) {
-//			a.String("data", "data to write")
-//			a.String("addr", "address to write to", grumble.Default(""))
-//		},
-//		Run: sh.write,
-//	}
-//}
+func NewWriteCommand(session *app.Session) *grumble.Command {
+	return &grumble.Command{
+		Name:    "write",
+		Aliases: []string{"w"},
+		Help:    "write value to addr",
+		Flags: func(f *grumble.Flags) {
+			f.String("e", "encoding", "hex", "input encoding format")
+		},
+		Args: func(a *grumble.Args) {
+			a.String("data", "data to write")
+			a.String("addr", "address to write to", grumble.Default(""))
+		},
+		Run: func(c *grumble.Context) error {
+			// TODO: Document encoding formats
+			err := session.RunCommand(
+				context.Background(),
+				commands.NewWriteCommand(commands.WriteCommandArgs{
+					DataStr:        c.Args.String("data"),
+					EncodingFormat: c.Flags.String("encoding"),
+					AddrStr:        c.Args.String("addr"),
+				}))
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}

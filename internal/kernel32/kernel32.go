@@ -35,16 +35,41 @@ type Module struct {
 	Size     uint64
 }
 
-// ProcessModules returns the target process's modules
+// ProcessModules returns the target process's modules.
 //
-// the process handle must be opened with
-// windows.PROCESS_VM_READ | windows.PROCESS_QUERY_INFORMATION
+// The process handle must be opened with:
+//
+//	PROCESS_VM_READ | PROCESS_QUERY_INFORMATION
 func ProcessModules(processHandle syscall.Handle) ([]Module, error) {
+	var modules []Module
+
+	err := IterProcessModules(processHandle, func(i int, total uint, mod Module) error {
+		if len(modules) == 0 {
+			modules = make([]Module, total)
+		}
+
+		modules[i] = mod
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return modules, nil
+}
+
+// IterProcessModules calls iterFn for each of the target process's modules.
+//
+// The process handle must be opened with:
+//
+//	PROCESS_VM_READ | PROCESS_QUERY_INFORMATION
+func IterProcessModules(processHandle syscall.Handle, iterFn func(i int, total uint, mod Module) error) error {
 	// TODO: handle more than 1024 (lookup maximum file handles and use that)
 	moduleHandles := make([]syscall.Handle, 1024)
 	numModuleHandles, err := EnumProcessModulesEx(processHandle, moduleHandles)
 	if err != nil {
-		return nil, fmt.Errorf("failed to enum process modules - %w", err)
+		return fmt.Errorf("failed to enum process modules - %w", err)
 	}
 	defer func() {
 		for _, handle := range moduleHandles[0:numModuleHandles] {
@@ -52,18 +77,21 @@ func ProcessModules(processHandle syscall.Handle) ([]Module, error) {
 		}
 	}()
 
-	modules := make([]Module, numModuleHandles)
+	total := uint(numModuleHandles)
 	for i, moduleHandle := range moduleHandles[0:numModuleHandles] {
 		module, err := lookupModuleInfo(processHandle, moduleHandle)
 		if err != nil {
-			return nil, fmt.Errorf("failed to lookup module info handle: %v - %w",
+			return fmt.Errorf("failed to lookup module info handle: %v - %w",
 				moduleHandle, err)
 		}
 
-		modules[i] = module
+		err = iterFn(i, total, module)
+		if err != nil {
+			return fmt.Errorf("failed to iterate over modules - %w", err)
+		}
 	}
 
-	return modules, nil
+	return nil
 }
 
 func lookupModuleInfo(processHandle syscall.Handle, moduleHandle syscall.Handle) (Module, error) {

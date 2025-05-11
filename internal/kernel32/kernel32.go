@@ -31,6 +31,8 @@ type Module struct {
 	Filepath string
 	Filename string
 	BaseAddr uintptr
+	EndAddr  uintptr
+	Size     uint64
 }
 
 // ProcessModules returns the target process's modules
@@ -80,6 +82,8 @@ func lookupModuleInfo(processHandle syscall.Handle, moduleHandle syscall.Handle)
 		Filepath: fileName,
 		Filename: filepath.Base(fileName),
 		BaseAddr: info.LpBaseOfDll,
+		EndAddr:  info.LpBaseOfDll + uintptr(info.SizeOfImage),
+		Size:     uint64(info.SizeOfImage),
 	}, nil
 }
 

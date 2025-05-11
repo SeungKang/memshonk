@@ -217,6 +217,7 @@ func (o *process) exited(err error) {
 
 func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
 	start := ptr.Addrs[0]
+	// treat as absolute address
 	if len(ptr.Addrs) == 1 {
 		return start, nil
 	}

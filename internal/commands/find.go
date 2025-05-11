@@ -38,7 +38,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return err
 	}
 
-	_, err = fmt.Fprintln(inOut.Stdout, "matches:", matches[0])
+	_, err = fmt.Fprintln(inOut.Stdout, "matches:", matches)
 	if err != nil {
 		return err
 	}

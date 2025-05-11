@@ -78,10 +78,10 @@ func NewReadCommand(session *app.Session) *grumble.Command {
 		Aliases: []string{"r"},
 		Help:    "read n bytes from addr",
 		Flags: func(f *grumble.Flags) {
-			f.String("e", "encoding", "hexdump", "output encoding format")
+			f.String("e", "encoding", "hexdump", "Optional: Specify output encoding format")
 		},
 		Args: func(a *grumble.Args) {
-			a.Uint("size", "number of bytes to read")
+			a.Uint64("size", "number of bytes to read")
 			a.String("addr", "address to read from", grumble.Default(""))
 		},
 		Run: func(c *grumble.Context) error {
@@ -108,7 +108,7 @@ func NewWriteCommand(session *app.Session) *grumble.Command {
 		Aliases: []string{"w"},
 		Help:    "write value to addr",
 		Flags: func(f *grumble.Flags) {
-			f.String("e", "encoding", "hex", "input encoding format")
+			f.String("e", "encoding", "hex", "Optional: Specify input encoding format")
 		},
 		Args: func(a *grumble.Args) {
 			a.String("data", "data to write")

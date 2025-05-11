@@ -33,6 +33,33 @@ func NewAttachCommand(session *app.Session) *grumble.Command {
 	}
 }
 
+func NewFindCommand(session *app.Session) *grumble.Command {
+	return &grumble.Command{
+		Name:    "find",
+		Aliases: []string{"f"},
+		Help:    "find a pattern in memory",
+		Flags: func(f *grumble.Flags) {
+		},
+		Args: func(a *grumble.Args) {
+			a.String("pattern", "byte pattern to search for")
+			a.String("start", "the address to start searching from")
+		},
+		Run: func(c *grumble.Context) error {
+			err := session.RunCommand(
+				context.Background(),
+				commands.NewFindCommand(commands.FindCommandArgs{
+					Pattern:   c.Args.String("pattern"),
+					StartAddr: c.Args.String("start"),
+				}))
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}
+
 //func NewSeekCommand(session *app.Session) *grumble.Command {
 //	return &grumble.Command{
 //		Name:    "seek",

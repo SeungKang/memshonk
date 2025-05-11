@@ -8,46 +8,20 @@ import (
 	"strings"
 )
 
-func FindAll(pattern string, data []byte) ([]int, error) {
-	parsedPattern, err := ParsePattern(pattern)
-	if err != nil {
-		return nil, nil
-	}
-
-	return FindAllParsed(parsedPattern, data)
-}
-
-func FindAllParsed(parsedPattern ParsedPattern, data []byte) ([]int, error) {
-	var matches []int
-	for i := 0; i <= len(data)-parsedPattern.Length; i++ {
-		if match(data, i, parsedPattern.Parts) {
-			matches = append(matches, i)
-		}
-	}
-
-	if len(matches) == 0 {
-		return nil, errors.New("pattern not found in data")
-	}
-
-	return matches, nil
-}
-
 func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 	parsedPattern, err := ParsePattern(pattern)
 	if err != nil {
 		return nil, err
 	}
 
-	needLength := uint64(parsedPattern.Length * 2)
-	reader.SetAdvanceBy(needLength - uint64(parsedPattern.Length))
+	needLength := uint64(parsedPattern.Length)
+	reader.SetAdvanceBy(1)
 
 	var matches []Pointer
 	for reader.Next(context.Background(), needLength) {
 		chunk := reader.Chunk()
-		for i := 0; i <= len(chunk.Data)-parsedPattern.Length; i++ {
-			if match(chunk.Data, i, parsedPattern.Parts) {
-				matches = append(matches, chunk.Addr.Advance(uint64(i)))
-			}
+		if match(chunk.Data, parsedPattern) {
+			matches = append(matches, chunk.Addr)
 		}
 	}
 
@@ -62,14 +36,14 @@ func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 	return nil, errors.New("pattern not found in data")
 }
 
-type PatternPart struct {
-	bytes     []byte
-	wildcards int
-}
-
 type ParsedPattern struct {
 	Parts  []PatternPart
 	Length int
+}
+
+type PatternPart struct {
+	bytes     []byte
+	wildcards int
 }
 
 func ParsePattern(pattern string) (ParsedPattern, error) {
@@ -110,13 +84,14 @@ func ParsePattern(pattern string) (ParsedPattern, error) {
 	}, nil
 }
 
-func match(data []byte, offset int, patternParts []PatternPart) bool {
-	pos := offset
-	for _, patternPart := range patternParts {
-		if !bytes.Equal(data[pos:pos+len(patternPart.bytes)], patternPart.bytes) {
+func match(data []byte, parsedPattern ParsedPattern) bool {
+	var pos int
+	for _, part := range parsedPattern.Parts {
+		if !bytes.Equal(data[pos:pos+len(part.bytes)], part.bytes) {
 			return false
 		}
-		pos += len(patternPart.bytes) + patternPart.wildcards
+
+		pos += len(part.bytes) + part.wildcards
 	}
 	return true
 }

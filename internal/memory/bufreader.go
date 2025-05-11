@@ -22,6 +22,7 @@ type BufferedReader struct {
 	start      Pointer
 	last       ReadChunk
 	buf        []byte
+	bufOffset  uint64
 	readerDone bool
 	readerOff  uint64
 	advanceBy  uint64
@@ -102,11 +103,15 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool
 		advanceBy = o.advanceBy
 	}
 
+	// TODO: we can get rid of this by storing the start address in the last
+	// field and incrementing that value
 	o.buf = o.buf[advanceBy:]
+	bufOffset := o.bufOffset
+	o.bufOffset += advanceBy
 
 	return ReadChunk{
 		Data: data,
-		Addr: o.start.Advance(advanceBy),
+		Addr: o.start.Advance(bufOffset),
 	}, len(o.buf) > 0, nil
 }
 

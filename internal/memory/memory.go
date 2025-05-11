@@ -26,11 +26,12 @@ func (o Pointer) Advance(by uint64) Pointer {
 		return o
 	}
 
-	last := o.Addrs[lastIndex]
+	cloned := o.Clone()
 
-	o.Addrs[lastIndex] = last + uintptr(by)
+	last := cloned.Addrs[lastIndex]
+	cloned.Addrs[lastIndex] = last + uintptr(by)
 
-	return o
+	return cloned
 }
 
 func (o Pointer) Offset(by int64) Pointer {
@@ -44,16 +45,30 @@ func (o Pointer) Offset(by int64) Pointer {
 		return o
 	}
 
-	last := o.Addrs[lastIndex]
+	cloned := o.Clone()
+
+	last := cloned.Addrs[lastIndex]
 
 	if by < 0 {
 		u := uintptr((by * -1))
-		o.Addrs[lastIndex] = last - u
+		cloned.Addrs[lastIndex] = last - u
 	} else {
-		o.Addrs[lastIndex] = last + uintptr(by)
+		cloned.Addrs[lastIndex] = last + uintptr(by)
 	}
 
-	return o
+	return cloned
+}
+
+func (o Pointer) Clone() Pointer {
+	cloned := Pointer{
+		Name:      o.Name,
+		Addrs:     make([]uintptr, len(o.Addrs)),
+		OptModule: o.OptModule,
+	}
+
+	copy(cloned.Addrs, o.Addrs)
+
+	return cloned
 }
 
 func (o Pointer) String() string {

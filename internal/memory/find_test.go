@@ -57,6 +57,10 @@ func TestFindAll_Reader(t *testing.T) {
 	if len(matches) != 1 {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
+
+	if matches[0].Addrs[0] != 69 {
+		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].Addrs[0])
+	}
 }
 
 type fakeReader struct {

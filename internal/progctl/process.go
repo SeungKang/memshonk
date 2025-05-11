@@ -77,36 +77,39 @@ func newProcess(exeName string, pid int) (*process, error) {
 }
 
 func getModules(exeName string, procHandle uintptr) (uintptr, memory.MappedObjects, error) {
-	modules, err := kernel32.ProcessModules(syscall.Handle(procHandle))
-	if err != nil {
-		return 0, memory.MappedObjects{}, fmt.Errorf("failed to get process modules - %w", err)
-	}
-
 	objs := memory.MappedObjects{}
 
 	// some modules appear more than once, we are just going to use the first
 	// entry that has a non-zero base address :)
 	// TODO add option to log weird stuff we are seeing, attach -v
-	for _, module := range modules {
-		if module.BaseAddr == 0 {
-			continue
-		}
+	err := kernel32.IterProcessModules(
+		syscall.Handle(procHandle),
+		func(_ int, _ uint, module kernel32.Module) error {
+			if module.BaseAddr == 0 {
+				return nil
+			}
 
-		_, alreadyPresent := objs.Has(module.Filename)
-		if alreadyPresent {
-			continue
-		}
+			_, alreadyPresent := objs.Has(module.Filename)
+			if alreadyPresent {
+				return nil
 
-		err := objs.Add(memory.MappedObject{
-			Filepath: module.Filepath,
-			Filename: module.Filename,
-			BaseAddr: module.BaseAddr,
-			EndAddr:  module.EndAddr,
-			Size:     module.Size,
+			}
+
+			err := objs.Add(memory.MappedObject{
+				Filepath: module.Filepath,
+				Filename: module.Filename,
+				BaseAddr: module.BaseAddr,
+				EndAddr:  module.EndAddr,
+				Size:     module.Size,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to add module to memory mapped objects list - %w", err)
+			}
+
+			return nil
 		})
-		if err != nil {
-			return 0, memory.MappedObjects{}, fmt.Errorf("failed to add module to memory mapped objects list - %w", err)
-		}
+	if err != nil {
+		return 0, memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
 	}
 
 	exeModule, found := objs.Has(exeName)

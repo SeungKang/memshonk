@@ -24,7 +24,6 @@ type BufferedReader struct {
 	buf        []byte
 	readerDone bool
 	readerOff  uint64
-	bufOffset  uint64
 	advanceBy  uint64
 	hasMore    bool
 	err        error
@@ -104,9 +103,6 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool
 	}
 
 	o.buf = o.buf[advanceBy:]
-
-	//bufOffset := o.bufOffset
-	//o.bufOffset += advanceBy
 
 	return ReadChunk{
 		Data: data,

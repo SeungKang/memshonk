@@ -11,8 +11,9 @@ type ReadFromAddr interface {
 
 func NewBufferedReader(readFrom ReadFromAddr, start Pointer) *BufferedReader {
 	return &BufferedReader{
-		reader: readFrom,
-		start:  start,
+		reader:  readFrom,
+		start:   start,
+		hasMore: true,
 	}
 }
 
@@ -24,6 +25,7 @@ type BufferedReader struct {
 	readerDone bool
 	readerOff  uint64
 	bufOffset  uint64
+	advanceBy  uint64
 	hasMore    bool
 	err        error
 }
@@ -45,6 +47,10 @@ func (o *BufferedReader) Err() error {
 // Chunk returns the last-read ReadChunk.
 func (o *BufferedReader) Chunk() ReadChunk {
 	return o.last
+}
+
+func (o *BufferedReader) SetAdvanceBy(by uint64) {
+	o.advanceBy = by
 }
 
 // Next reads the next ReadChunk.
@@ -79,23 +85,32 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool
 		return ReadChunk{}, false, nil
 	}
 
-	var upTo uint64
+	var dataSize uint64
 	if bufLen < need {
-		upTo = bufLen
+		dataSize = bufLen
 	} else {
-		upTo = need
+		dataSize = need
 	}
 
-	data := o.buf[0:upTo]
+	data := o.buf[0:dataSize]
 
-	o.buf = o.buf[upTo:]
+	var advanceBy uint64
+	if o.advanceBy == 0 {
+		advanceBy = dataSize
+	} else if o.advanceBy > bufLen {
+		advanceBy = bufLen
+	} else {
+		advanceBy = o.advanceBy
+	}
 
-	bufOffset := o.bufOffset
-	o.bufOffset += uint64(len(data))
+	o.buf = o.buf[advanceBy:]
+
+	//bufOffset := o.bufOffset
+	//o.bufOffset += advanceBy
 
 	return ReadChunk{
 		Data: data,
-		Addr: o.start.Advance(bufOffset),
+		Addr: o.start.Advance(advanceBy),
 	}, len(o.buf) > 0, nil
 }
 

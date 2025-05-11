@@ -218,7 +218,7 @@ func (o *process) exited(err error) {
 func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
 	start := ptr.Addrs[0]
 	if len(ptr.Addrs) == 1 {
-		return base + start, nil
+		return start, nil
 	}
 
 	addr, err := addrFn(base + start)

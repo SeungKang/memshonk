@@ -28,14 +28,14 @@ func newProcess(exeName string, pid int) (*process, error) {
 		done: make(chan struct{}),
 	}
 
-	baseAddr, requiredModules, err := getModules(exeName, uintptr(kiwiProc.Handle))
+	baseAddr, objects, err := getModules(exeName, uintptr(kiwiProc.Handle))
 	if err != nil {
 		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get required modules - %w", err)
 	}
 
 	runningProgram.base = baseAddr
-	runningProgram.mods = requiredModules
+	runningProgram.mods = objects
 
 	is32Bit, err := kernel32.IsProcess32Bit(syscall.Handle(kiwiProc.Handle))
 	if err != nil {
@@ -76,41 +76,51 @@ func newProcess(exeName string, pid int) (*process, error) {
 	return runningProgram, nil
 }
 
-func getModules(exeName string, procHandle uintptr) (uintptr, map[string]kernel32.Module, error) {
+func getModules(exeName string, procHandle uintptr) (uintptr, memory.MappedObjects, error) {
 	modules, err := kernel32.ProcessModules(syscall.Handle(procHandle))
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get process modules - %w", err)
+		return 0, memory.MappedObjects{}, fmt.Errorf("failed to get process modules - %w", err)
 	}
+
+	objs := memory.MappedObjects{}
 
 	// some modules appear more than once, we are just going to use the first
 	// entry that has a non-zero base address :)
 	// TODO add option to log weird stuff we are seeing, attach -v
-	modulesMap := make(map[string]kernel32.Module, len(modules))
 	for _, module := range modules {
 		if module.BaseAddr == 0 {
 			continue
 		}
 
-		_, found := modulesMap[module.Filename]
-		if found {
+		_, alreadyPresent := objs.Has(module.Filename)
+		if alreadyPresent {
 			continue
 		}
 
-		modulesMap[module.Filename] = module
+		err := objs.Add(memory.MappedObject{
+			Filepath: module.Filepath,
+			Filename: module.Filename,
+			BaseAddr: module.BaseAddr,
+			EndAddr:  module.EndAddr,
+			Size:     module.Size,
+		})
+		if err != nil {
+			return 0, memory.MappedObjects{}, fmt.Errorf("failed to add module to memory mapped objects list - %w", err)
+		}
 	}
 
-	exeModule, found := modulesMap[exeName]
+	exeModule, found := objs.Has(exeName)
 	if !found {
-		return 0, nil, fmt.Errorf("failed to find exe module for: %q", exeName)
+		return 0, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
 	}
 
-	return exeModule.BaseAddr, modulesMap, nil
+	return exeModule.BaseAddr, objs, nil
 }
 
 type process struct {
 	base   uintptr
 	is32b  bool
-	mods   map[string]kernel32.Module
+	mods   memory.MappedObjects
 	addrFn func(uintptr) (uintptr, error)
 	pid    int
 	proc   kiwi.Process
@@ -119,22 +129,15 @@ type process struct {
 	err    error
 }
 
+func (o *process) objects() memory.MappedObjects {
+	return o.mods
+}
+
 func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
-	// TODO the first part of this can become common code
-	baseAddr := o.base
-	if pointer.OptModule != "" {
-		module, hasIt := o.mods[pointer.OptModule]
-		if !hasIt {
-			return nil, fmt.Errorf("unknown module %q", pointer.OptModule)
-		}
-
-		baseAddr = module.BaseAddr
-	}
-
-	addr, err := lookupAddr(baseAddr, pointer, o.addrFn)
+	addr, err := o.resolvePointer(pointer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup address - %w",
-			err)
+		return nil, fmt.Errorf("failed to resolve pointer for read: %q - %w",
+			pointer.String(), err)
 	}
 
 	// TODO do something about this type conversion
@@ -148,21 +151,10 @@ func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
 }
 
 func (o *process) write(data []byte, pointer memory.Pointer) error {
-	// TODO the first part of this can become common code
-	baseAddr := o.base
-	if pointer.OptModule != "" {
-		module, hasIt := o.mods[pointer.OptModule]
-		if !hasIt {
-			return fmt.Errorf("unknown module %q", pointer.OptModule)
-		}
-
-		baseAddr = module.BaseAddr
-	}
-
-	addr, err := lookupAddr(baseAddr, pointer, o.addrFn)
+	addr, err := o.resolvePointer(pointer)
 	if err != nil {
-		return fmt.Errorf("failed to lookup address - %w",
-			err)
+		return fmt.Errorf("failed to resolve pointer for write: %q - %w",
+			pointer.String(), err)
 	}
 
 	err = o.proc.WriteBytes(addr, data)
@@ -172,6 +164,28 @@ func (o *process) write(data []byte, pointer memory.Pointer) error {
 	}
 
 	return nil
+}
+
+func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
+	baseAddr := o.base
+
+	if pointer.OptModule != "" {
+		module, hasIt := o.mods.Has(pointer.OptModule)
+		if !hasIt {
+			return 0, fmt.Errorf("unknown memory-mapped object: %q",
+				pointer.OptModule)
+		}
+
+		baseAddr = module.BaseAddr
+	}
+
+	addr, err := lookupAddr(baseAddr, pointer, o.addrFn)
+	if err != nil {
+		return 0, fmt.Errorf("failed to lookup address - %w",
+			err)
+	}
+
+	return addr, nil
 }
 
 func (o *process) Stop() {

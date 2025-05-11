@@ -13,6 +13,10 @@ import (
 
 var _ Process = (*Ctl)(nil)
 
+var (
+	ErrNotAttached = errors.New("not attached")
+)
+
 type Notifier interface {
 	ProgramStarted(exename string)
 	ProgramStopped(exename string, err error)
@@ -20,6 +24,10 @@ type Notifier interface {
 
 type Process interface {
 	Attach(ctx context.Context) (int, error)
+
+	MappedObjects(ctx context.Context) (memory.MappedObjects, error)
+
+	ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error)
 
 	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, error)
 
@@ -64,12 +72,34 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 }
 
+func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if o.current == nil {
+		return memory.MappedObjects{}, ErrNotAttached
+	}
+
+	return o.current.objects(), nil
+}
+
+func (o *Ctl) ResolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if o.current == nil {
+		return 0, ErrNotAttached
+	}
+
+	return o.current.resolvePointer(ptr)
+}
+
 func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return nil, errors.New("not attached")
+		return nil, ErrNotAttached
 	}
 
 	return o.current.read(from, sizeBytes)
@@ -80,7 +110,7 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) e
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return errors.New("not attached")
+		return ErrNotAttached
 	}
 
 	return o.current.write(data, to)

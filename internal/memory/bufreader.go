@@ -1,10 +1,14 @@
 package memory
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 )
+
+// TODO: Implement a Reader object for a process that knows its
+// bounds based on mapped objects.
 
 type ReadFromAddr interface {
 	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, MappedObject, error)
@@ -23,11 +27,11 @@ func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*Buff
 	}
 
 	return &BufferedReader{
-		reader:    readFrom,
-		start:     start,
-		readPtr:   Pointer{Addrs: []uintptr{startAddr}},
-		remaining: size,
-		hasMore:   true,
+		reader:     readFrom,
+		start:      start,
+		readPtr:    Pointer{Addrs: []uintptr{startAddr}},
+		readRemain: size,
+		hasMore:    true,
 	}, nil
 }
 
@@ -37,10 +41,10 @@ type BufferedReader struct {
 	reader     ReadFromAddr
 	start      Pointer
 	readPtr    Pointer
-	remaining  uint64
-	buf        []byte
-	lastData   []byte
+	readRemain uint64
+	buf        bytes.Buffer
 	lastOffset uint64
+	lastData   []byte
 	bufOffset  uint64
 	readerDone bool
 	readerOff  uint64
@@ -81,7 +85,7 @@ func (o *BufferedReader) Next(ctx context.Context, need uint64) bool {
 		return false
 	}
 
-	data, hasMore, err := o.next(ctx, need)
+	data, err := o.next(ctx, need)
 	if err != nil {
 		o.err = fmt.Errorf("next failed - %w", err)
 
@@ -89,49 +93,52 @@ func (o *BufferedReader) Next(ctx context.Context, need uint64) bool {
 	}
 
 	o.lastData = data
-	o.hasMore = hasMore
+
+	o.hasMore = !(o.readerDone && o.readerOff == o.bufOffset)
 
 	return true
 }
 
-func (o *BufferedReader) next(ctx context.Context, need uint64) ([]byte, bool, error) {
-	err := o.read(ctx, need)
-	if err != nil {
-		return nil, false, err
+func (o *BufferedReader) next(ctx context.Context, need uint64) ([]byte, error) {
+	var advanceBy uint64
+	if o.advanceBy == 0 {
+		advanceBy = need
+	} else {
+		advanceBy = o.advanceBy
 	}
 
-	bufLen := uint64(len(o.buf))
+	if o.bufOffset > 0 {
+		// Discard the bytes that we want to advance by.
+		o.buf.Next(int(advanceBy))
+	}
+
+	err := o.read(ctx, need)
+	if err != nil {
+		return nil, err
+	}
+
+	bufLen := uint64(o.buf.Len())
 
 	if bufLen == 0 {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	var dataSize uint64
-	if bufLen < need {
+	if need > bufLen {
 		dataSize = bufLen
 	} else {
 		dataSize = need
 	}
 
-	data := o.buf[0:dataSize]
+	data := o.buf.Bytes()[0:dataSize]
 
-	var advanceBy uint64
-	if o.advanceBy == 0 {
-		advanceBy = dataSize
-	} else if o.advanceBy > bufLen {
-		advanceBy = bufLen
-	} else {
-		advanceBy = o.advanceBy
-	}
-
-	o.buf = o.buf[advanceBy:]
-
-	bufOffset := o.bufOffset
+	o.lastOffset = o.bufOffset
 	o.bufOffset += advanceBy
 
-	o.lastOffset = bufOffset
+	log.Printf("TODO: readerOff: %d | o.lastOffset: %d | o.bufOffset: %d",
+		o.readerOff, o.lastOffset, o.bufOffset)
 
-	return data, len(o.buf) > 0, nil
+	return data, nil
 }
 
 func (o *BufferedReader) read(ctx context.Context, need uint64) error {
@@ -139,7 +146,7 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		return nil
 	}
 
-	if uint64(len(o.buf)) > need {
+	if uint64(o.buf.Len()) > need {
 		return nil
 	}
 
@@ -150,8 +157,8 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		readSizeBytes += minReadSizeBytes
 	}
 
-	if readSizeBytes > o.remaining {
-		readSizeBytes = o.remaining
+	if readSizeBytes > o.readRemain {
+		readSizeBytes = o.readRemain
 
 		o.readerDone = true
 	}
@@ -159,9 +166,12 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 	b, err := o.reader.ReadFromAddr(ctx, o.readPtr, readSizeBytes)
 	switch {
 	case err == nil:
-		o.remaining -= readSizeBytes
+		o.readRemain -= readSizeBytes
 
-		o.buf = append(o.buf, b...)
+		_, err := o.buf.Write(b)
+		if err != nil {
+			return fmt.Errorf("failed to write to buf - %w", err)
+		}
 
 		offset := o.readerOff
 		o.readerOff += readSizeBytes
@@ -170,7 +180,7 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		o.readPtr.Addrs[0] += uintptr(offset)
 
 		log.Printf("TODO: offset: %d | buf len: %d | read size bytes: %d",
-			offset, len(o.buf), readSizeBytes)
+			offset, o.buf.Len(), readSizeBytes)
 
 		return nil
 	default:

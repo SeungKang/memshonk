@@ -18,18 +18,22 @@ func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 	needLength := uint64(parsedPattern.Length)
 	reader.SetAdvanceBy(1)
 
+	i := 0
+
 	var matches []Pointer
 	for reader.Next(context.Background(), needLength) {
 		chunk := reader.Bytes()
 
-		addr := reader.Addr().Addrs[0]
-		if addr > 0x440 {
-			log.Println("buh")
+		if i == 0x448 {
+			log.Printf("TODO: chunk %d:\n%s",
+				i, hex.Dump(chunk))
 		}
 
 		if match(chunk, parsedPattern) {
 			matches = append(matches, reader.Addr())
 		}
+
+		i++
 	}
 
 	if len(matches) > 0 {

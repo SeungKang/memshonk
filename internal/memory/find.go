@@ -19,9 +19,10 @@ func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 
 	var matches []Pointer
 	for reader.Next(context.Background(), needLength) {
-		chunk := reader.Chunk()
-		if match(chunk.Data, parsedPattern) {
-			matches = append(matches, chunk.Addr)
+		chunk := reader.Bytes()
+
+		if match(chunk, parsedPattern) {
+			matches = append(matches, reader.Addr())
 		}
 	}
 

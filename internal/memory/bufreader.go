@@ -3,25 +3,44 @@ package memory
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 type ReadFromAddr interface {
+	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, MappedObject, error)
+
 	ReadFromAddr(ctx context.Context, addr Pointer, size uint64) ([]byte, error)
 }
 
-func NewBufferedReader(readFrom ReadFromAddr, start Pointer) *BufferedReader {
-	return &BufferedReader{
-		reader:  readFrom,
-		start:   start,
-		hasMore: true,
+// TODO: Constrain BufferedReader to a range of addresses rather
+// than an object. Implement constructor-like functions that
+// either constrain the range based on an arbitrary range or
+// base and end addrs of a mapped object.
+func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*BufferedReader, error) {
+	startAddr, _, err := readFrom.ResolvePointer(context.Background(), start)
+	if err != nil {
+		return nil, err
 	}
+
+	return &BufferedReader{
+		reader:    readFrom,
+		start:     start,
+		readPtr:   Pointer{Addrs: []uintptr{startAddr}},
+		remaining: size,
+		hasMore:   true,
+	}, nil
 }
 
+// TODO: Add Addr method to return the Pointer for the last read chunk
+// (i.e., move Pointer out of ReadChunk struct).
 type BufferedReader struct {
 	reader     ReadFromAddr
 	start      Pointer
-	last       ReadChunk
+	readPtr    Pointer
+	remaining  uint64
 	buf        []byte
+	lastData   []byte
+	lastOffset uint64
 	bufOffset  uint64
 	readerDone bool
 	readerOff  uint64
@@ -44,45 +63,46 @@ func (o *BufferedReader) Err() error {
 	return nil
 }
 
-// Chunk returns the last-read ReadChunk.
-func (o *BufferedReader) Chunk() ReadChunk {
-	return o.last
+func (o *BufferedReader) Bytes() []byte {
+	return o.lastData
+}
+
+func (o *BufferedReader) Addr() Pointer {
+	return o.start.Advance(o.bufOffset)
 }
 
 func (o *BufferedReader) SetAdvanceBy(by uint64) {
 	o.advanceBy = by
 }
 
-// Next reads the next ReadChunk.
+// Next reads another "need's" worth of []byte from the underlying reader.
 func (o *BufferedReader) Next(ctx context.Context, need uint64) bool {
 	if o.err != nil || !o.hasMore {
 		return false
 	}
 
-	chunk, hasMore, err := o.next(ctx, need)
+	hasMore, err := o.next(ctx, need)
 	if err != nil {
 		o.err = fmt.Errorf("next failed - %w", err)
 
 		return false
 	}
 
-	o.last = chunk
-
 	o.hasMore = hasMore
 
 	return true
 }
 
-func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool, error) {
+func (o *BufferedReader) next(ctx context.Context, need uint64) (bool, error) {
 	err := o.read(ctx, need)
 	if err != nil {
-		return ReadChunk{}, false, err
+		return false, err
 	}
 
 	bufLen := uint64(len(o.buf))
 
 	if bufLen == 0 {
-		return ReadChunk{}, false, nil
+		return false, nil
 	}
 
 	var dataSize uint64
@@ -92,7 +112,7 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool
 		dataSize = need
 	}
 
-	data := o.buf[0:dataSize]
+	o.lastData = o.buf[0:dataSize]
 
 	var advanceBy uint64
 	if o.advanceBy == 0 {
@@ -103,20 +123,22 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (ReadChunk, bool
 		advanceBy = o.advanceBy
 	}
 
-	// TODO: we can get rid of this by storing the start address in the last
-	// field and incrementing that value
 	o.buf = o.buf[advanceBy:]
+
 	bufOffset := o.bufOffset
 	o.bufOffset += advanceBy
 
-	return ReadChunk{
-		Data: data,
-		Addr: o.start.Advance(bufOffset),
-	}, len(o.buf) > 0, nil
+	o.lastOffset = bufOffset
+
+	return len(o.buf) > 0, nil
 }
 
 func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 	if o.readerDone {
+		return nil
+	}
+
+	if uint64(len(o.buf)) > need {
 		return nil
 	}
 
@@ -127,26 +149,31 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		readSizeBytes += minReadSizeBytes
 	}
 
-	if uint64(len(o.buf)) < need {
+	if readSizeBytes > o.remaining {
+		readSizeBytes = o.remaining
+
+		o.readerDone = true
+	}
+
+	b, err := o.reader.ReadFromAddr(ctx, o.readPtr, readSizeBytes)
+	switch {
+	case err == nil:
+		o.buf = append(o.buf, b...)
+
 		offset := o.readerOff
 		o.readerOff += readSizeBytes
 
-		ptr := o.start.Advance(offset)
+		// TODO: Replace with MutAdvance.
+		o.readPtr.Addrs[0] += uintptr(offset)
 
-		b, err := o.reader.ReadFromAddr(ctx, ptr, readSizeBytes)
-		switch {
-		case err == nil:
-			o.buf = append(o.buf, b...)
-		default:
-			// TODO: Add support for checking if read
-			// is within memory-mapped object's address
-			// range.
-			o.readerDone = true
+		log.Printf("TODO: offset: %d | buf len: %d | read size bytes: %d",
+			offset, len(o.buf), readSizeBytes)
 
-			return fmt.Errorf("failed to read %d bytes from %s - %w",
-				readSizeBytes, ptr.String(), err)
-		}
+		return nil
+	default:
+		o.readerDone = true
+
+		return fmt.Errorf("failed to read %d bytes from 0x%x - %w",
+			readSizeBytes, o.readPtr.Addrs[0], err)
 	}
-
-	return nil
 }

@@ -27,7 +27,7 @@ type Process interface {
 
 	MappedObjects(ctx context.Context) (memory.MappedObjects, error)
 
-	ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error)
+	ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, memory.MappedObject, error)
 
 	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, error)
 
@@ -83,15 +83,28 @@ func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
 	return o.current.objects(), nil
 }
 
-func (o *Ctl) ResolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, error) {
+func (o *Ctl) ResolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, memory.MappedObject, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return 0, ErrNotAttached
+		return 0, memory.MappedObject{}, ErrNotAttached
 	}
 
-	return o.current.resolvePointer(ptr)
+	addr, err := o.current.resolvePointer(ptr)
+	if err != nil {
+		return 0, memory.MappedObject{}, fmt.Errorf("failed to resolve address - %w", err)
+	}
+
+	objs := o.current.objects()
+
+	obj, hasIt := objs.ByAddr(addr)
+	if !hasIt {
+		return 0, memory.MappedObject{}, fmt.Errorf("no memory mapped object for address 0x%x",
+			addr)
+	}
+
+	return addr, obj, nil
 }
 
 func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, error) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"log"
 	"strings"
 )
 
@@ -20,6 +21,11 @@ func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 	var matches []Pointer
 	for reader.Next(context.Background(), needLength) {
 		chunk := reader.Bytes()
+
+		addr := reader.Addr().Addrs[0]
+		if addr > 0x440 {
+			log.Println("buh")
+		}
 
 		if match(chunk, parsedPattern) {
 			matches = append(matches, reader.Addr())

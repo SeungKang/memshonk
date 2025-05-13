@@ -27,8 +27,6 @@ func TestFindAll_Reader(t *testing.T) {
 		t.Fatalf("want no error, got %v", err)
 	}
 
-	log.Printf("TODO: matches: %v", matches)
-
 	if len(matches) != 1 {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
@@ -56,6 +54,8 @@ func TestFindAll_Reader2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
+
+	log.Printf("TODO: matches: %v, fake process size: %d", matches, fakeProcess.size())
 
 	if len(matches) != 1 {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))

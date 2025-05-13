@@ -68,7 +68,7 @@ func (o *BufferedReader) Bytes() []byte {
 }
 
 func (o *BufferedReader) Addr() Pointer {
-	return o.start.Advance(o.bufOffset)
+	return o.start.Advance(o.lastOffset)
 }
 
 func (o *BufferedReader) SetAdvanceBy(by uint64) {
@@ -81,28 +81,29 @@ func (o *BufferedReader) Next(ctx context.Context, need uint64) bool {
 		return false
 	}
 
-	hasMore, err := o.next(ctx, need)
+	data, hasMore, err := o.next(ctx, need)
 	if err != nil {
 		o.err = fmt.Errorf("next failed - %w", err)
 
 		return false
 	}
 
+	o.lastData = data
 	o.hasMore = hasMore
 
 	return true
 }
 
-func (o *BufferedReader) next(ctx context.Context, need uint64) (bool, error) {
+func (o *BufferedReader) next(ctx context.Context, need uint64) ([]byte, bool, error) {
 	err := o.read(ctx, need)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	bufLen := uint64(len(o.buf))
 
 	if bufLen == 0 {
-		return false, nil
+		return nil, false, nil
 	}
 
 	var dataSize uint64
@@ -112,7 +113,7 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (bool, error) {
 		dataSize = need
 	}
 
-	o.lastData = o.buf[0:dataSize]
+	data := o.buf[0:dataSize]
 
 	var advanceBy uint64
 	if o.advanceBy == 0 {
@@ -130,7 +131,7 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) (bool, error) {
 
 	o.lastOffset = bufOffset
 
-	return len(o.buf) > 0, nil
+	return data, len(o.buf) > 0, nil
 }
 
 func (o *BufferedReader) read(ctx context.Context, need uint64) error {
@@ -158,6 +159,8 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 	b, err := o.reader.ReadFromAddr(ctx, o.readPtr, readSizeBytes)
 	switch {
 	case err == nil:
+		o.remaining -= readSizeBytes
+
 		o.buf = append(o.buf, b...)
 
 		offset := o.readerOff

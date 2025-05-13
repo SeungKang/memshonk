@@ -9,12 +9,22 @@ const (
 	addrSep = ","
 )
 
+// Pointer represents a memory address or a chain of offsets to one
+// Name is a user-defined label for identification
+// Addrs is a slice of addresses:
+//   - A single element represents an absolute address
+//   - Multiple elements form a pointer chain via offsets
+//
+// OptModule specifies an optional module (e.g. a DLL) to use instead of the
+// default executable base
 type Pointer struct {
 	Name      string
 	Addrs     []uintptr
 	OptModule string
 }
 
+// Advance returns a copy of the Pointer with the last address increased by the
+// given value.
 func (o Pointer) Advance(by uint64) Pointer {
 	if by == 0 {
 		return o
@@ -34,6 +44,8 @@ func (o Pointer) Advance(by uint64) Pointer {
 	return cloned
 }
 
+// Offset returns a copy of the Pointer with the last address adjusted by the
+// given signed offset.
 func (o Pointer) Offset(by int64) Pointer {
 	if by == 0 {
 		return o
@@ -59,6 +71,7 @@ func (o Pointer) Offset(by int64) Pointer {
 	return cloned
 }
 
+// Clone returns a copy of the Pointer.
 func (o Pointer) Clone() Pointer {
 	cloned := Pointer{
 		Name:      o.Name,
@@ -71,6 +84,7 @@ func (o Pointer) Clone() Pointer {
 	return cloned
 }
 
+// String returns the Pointer as a hexadecimal string representation.
 func (o Pointer) String() string {
 	var buf string
 
@@ -93,6 +107,12 @@ func (o Pointer) String() string {
 	return buf
 }
 
+// CreatePointerFromString parses a string definition into a Pointer.
+// Examples:
+//
+//	"0xd5a351"					– absolute address
+//	"0x20,0x5,0xC0"				– pointer chain relative to the executable
+//	"buh.dll:0x20,0x5,0xC0"		– pointer chain relative to a specified module
 func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	var ptr Pointer
 	var ptrChain string

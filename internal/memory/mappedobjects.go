@@ -34,10 +34,24 @@ func (o *MappedObjects) Has(name string) (MappedObject, bool) {
 	return obj, hasIt
 }
 
+func (o *MappedObjects) ByAddr(addr uintptr) (MappedObject, bool) {
+	for _, obj := range o.namesToObjects {
+		if obj.ContainsAddr(addr) {
+			return obj, true
+		}
+	}
+
+	return MappedObject{}, false
+}
+
 type MappedObject struct {
 	Filepath string
 	Filename string
 	BaseAddr uintptr
 	EndAddr  uintptr
 	Size     uint64
+}
+
+func (o *MappedObject) ContainsAddr(addr uintptr) bool {
+	return addr >= o.BaseAddr && addr <= o.EndAddr
 }

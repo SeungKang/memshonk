@@ -85,6 +85,10 @@ func ParsePattern(pattern string) (ParsedPattern, error) {
 }
 
 func match(data []byte, parsedPattern ParsedPattern) bool {
+	if len(data) != parsedPattern.Length {
+		return false
+	}
+
 	var pos int
 	for _, part := range parsedPattern.Parts {
 		if !bytes.Equal(data[pos:pos+len(part.bytes)], part.bytes) {
@@ -93,5 +97,6 @@ func match(data []byte, parsedPattern ParsedPattern) bool {
 
 		pos += len(part.bytes) + part.wildcards
 	}
+
 	return true
 }

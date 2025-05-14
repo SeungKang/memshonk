@@ -173,14 +173,10 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 			return fmt.Errorf("failed to write to buf - %w", err)
 		}
 
-		offset := o.readerOff
 		o.readerOff += readSizeBytes
 
 		// TODO: Replace with MutAdvance.
-		o.readPtr.Addrs[0] += uintptr(offset)
-
-		log.Printf("TODO: offset: %d | buf len: %d | read size bytes: %d",
-			offset, o.buf.Len(), readSizeBytes)
+		o.readPtr.Addrs[0] += uintptr(readSizeBytes)
 
 		return nil
 	default:

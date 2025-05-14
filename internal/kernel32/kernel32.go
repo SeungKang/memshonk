@@ -1,6 +1,7 @@
 package kernel32
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"syscall"
@@ -82,7 +83,7 @@ func IterProcessModules(processHandle syscall.Handle, iterFn func(i int, total u
 	}
 
 	if totalHandles == 0 {
-		return fmt.Errorf("total number of process handles is zero (this should never happen)")
+		return errors.New("total number of process handles is zero (this should never happen)")
 	}
 
 	moduleHandles := make([]syscall.Handle, totalHandles)

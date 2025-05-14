@@ -28,13 +28,13 @@ func newProcess(exeName string, pid int) (*process, error) {
 		done: make(chan struct{}),
 	}
 
-	baseAddr, objects, err := getModules(exeName, uintptr(kiwiProc.Handle))
+	baseModule, objects, err := getModules(exeName, uintptr(kiwiProc.Handle))
 	if err != nil {
 		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get required modules - %w", err)
 	}
 
-	runningProgram.base = baseAddr
+	runningProgram.exeMod = baseModule
 	runningProgram.mods = objects
 
 	is32Bit, err := kernel32.IsProcess32Bit(syscall.Handle(kiwiProc.Handle))
@@ -76,7 +76,7 @@ func newProcess(exeName string, pid int) (*process, error) {
 	return runningProgram, nil
 }
 
-func getModules(exeName string, procHandle uintptr) (uintptr, memory.MappedObjects, error) {
+func getModules(exeName string, procHandle uintptr) (memory.MappedObject, memory.MappedObjects, error) {
 	objs := memory.MappedObjects{}
 
 	// some modules appear more than once, we are just going to use the first
@@ -92,7 +92,6 @@ func getModules(exeName string, procHandle uintptr) (uintptr, memory.MappedObjec
 			_, alreadyPresent := objs.Has(module.Filename)
 			if alreadyPresent {
 				return nil
-
 			}
 
 			err := objs.Add(memory.MappedObject{
@@ -109,19 +108,19 @@ func getModules(exeName string, procHandle uintptr) (uintptr, memory.MappedObjec
 			return nil
 		})
 	if err != nil {
-		return 0, memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
+		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
 	}
 
 	exeModule, found := objs.Has(exeName)
 	if !found {
-		return 0, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
+		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
 	}
 
-	return exeModule.BaseAddr, objs, nil
+	return exeModule, objs, nil
 }
 
 type process struct {
-	base   uintptr
+	exeMod memory.MappedObject
 	is32b  bool
 	mods   memory.MappedObjects
 	addrFn func(uintptr) (uintptr, error)
@@ -170,7 +169,7 @@ func (o *process) write(data []byte, pointer memory.Pointer) error {
 }
 
 func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
-	baseAddr := o.base
+	baseAddr := o.exeMod.BaseAddr
 
 	if pointer.OptModule != "" {
 		module, hasIt := o.mods.Has(pointer.OptModule)

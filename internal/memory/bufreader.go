@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 )
 
 // TODO: Implement a Reader object for a process that knows its
@@ -134,9 +133,6 @@ func (o *BufferedReader) next(ctx context.Context, need uint64) ([]byte, error) 
 
 	o.lastOffset = o.bufOffset
 	o.bufOffset += advanceBy
-
-	log.Printf("TODO: readerOff: %d | o.lastOffset: %d | o.bufOffset: %d",
-		o.readerOff, o.lastOffset, o.bufOffset)
 
 	return data, nil
 }

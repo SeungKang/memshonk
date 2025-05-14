@@ -32,7 +32,11 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return err
 	}
 
-	reader := memory.NewBufferedReader(s.Process(), ptr)
+	reader, err := memory.NewBufferedReader(s.Process(), ptr, 4096)
+	if err != nil {
+		return err
+	}
+
 	matches, err := memory.FindAllReader(o.args.Pattern, reader)
 	if err != nil {
 		return err

@@ -166,7 +166,8 @@ func (o *Ctl) attach() error {
 	}
 
 	if possiblePID == -1 {
-		return errors.New("failed to find a matching process")
+		return fmt.Errorf("failed to find a matching process for: %q",
+			o.exeName)
 	}
 
 	proc, err := newProcess(exeName, possiblePID)

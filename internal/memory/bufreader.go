@@ -10,7 +10,7 @@ import (
 // bounds based on mapped objects.
 
 type ReadFromAddr interface {
-	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, MappedObject, error)
+	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, error)
 
 	ReadFromAddr(ctx context.Context, addr Pointer, size uint64) ([]byte, error)
 }
@@ -20,7 +20,7 @@ type ReadFromAddr interface {
 // either constrain the range based on an arbitrary range or
 // base and end addrs of a mapped object.
 func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*BufferedReader, error) {
-	startAddr, _, err := readFrom.ResolvePointer(context.Background(), start)
+	startAddr, err := readFrom.ResolvePointer(context.Background(), start)
 	if err != nil {
 		return nil, err
 	}

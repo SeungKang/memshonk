@@ -6,18 +6,19 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/progctl"
+	"github.com/SeungKang/memshonk/internal/project"
 )
 
-func NewApp(project *Project) *App {
+func NewApp(project *project.Project) *App {
 	return &App{
 		project: project,
-		procCtl: progctl.NewCtl(project.ExeName),
+		procCtl: progctl.NewCtl(project.General().ExeName),
 	}
 }
 
 type App struct {
+	project       *project.Project
 	rwMu          sync.RWMutex
-	project       *Project
 	nextSessionId uint64
 	sessions      map[uint64]*Session
 	procCtl       *progctl.Ctl
@@ -42,10 +43,6 @@ func (o *App) NewSession(cmdIO commands.IO) *Session {
 	o.sessions[id] = session
 
 	return session
-}
-
-type Project struct {
-	ExeName string
 }
 
 func newSession(id uint64, app *App, cmdIO commands.IO) *Session {

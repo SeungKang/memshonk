@@ -47,6 +47,8 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 
 	grumbleApp.AddCommand(NewAttachCommand(session))
 
+	grumbleApp.AddCommand(NewObjectsCommand(session))
+
 	grumbleApp.AddCommand(NewFindCommand(session))
 
 	//grumbleApp.AddCommand(NewSeekCommand(session))

@@ -131,3 +131,23 @@ func NewWriteCommand(session *app.Session) *grumble.Command {
 		},
 	}
 }
+
+func NewObjectsCommand(session *app.Session) *grumble.Command {
+	return &grumble.Command{
+		Name:    "objects",
+		Aliases: []string{"o"},
+		Help:    "list the memory mapped objects",
+		Flags:   func(f *grumble.Flags) {},
+		Args:    func(a *grumble.Args) {},
+		Run: func(c *grumble.Context) error {
+			err := session.RunCommand(
+				context.Background(),
+				commands.NewObjectsCommand(commands.ObjectsCommandArgs{}))
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+}

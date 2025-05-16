@@ -44,6 +44,23 @@ func (o *MappedObjects) ByAddr(addr uintptr) (MappedObject, bool) {
 	return MappedObject{}, false
 }
 
+func (o *MappedObjects) IterObjects(fn func(MappedObject) error) error {
+	for _, obj := range o.namesToObjects {
+		obj := obj
+
+		err := fn(obj)
+		if err != nil {
+			if errors.Is(err, ErrStopIterating) {
+				return nil
+			}
+
+			return err
+		}
+	}
+
+	return nil
+}
+
 type MappedObject struct {
 	Filepath string
 	Filename string
@@ -54,4 +71,9 @@ type MappedObject struct {
 
 func (o *MappedObject) ContainsAddr(addr uintptr) bool {
 	return addr >= o.BaseAddr && addr <= o.EndAddr
+}
+
+func (o *MappedObject) String() string {
+	return fmt.Sprintf("Filepath: %q, Filename: %q, BaseAddr: 0x%x, EndAddr: 0x%x, Size: 0x%x",
+		o.Filepath, o.Filename, o.BaseAddr, o.EndAddr, o.Size)
 }

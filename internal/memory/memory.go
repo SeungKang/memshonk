@@ -1,12 +1,17 @@
 package memory
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 )
 
 const (
 	addrSep = ","
+)
+
+var (
+	ErrStopIterating = errors.New("stop iterating")
 )
 
 // Pointer represents a memory address or a chain of offsets to one

@@ -1,0 +1,2 @@
+[General]
+ExeName = MassEffect3.exe

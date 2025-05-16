@@ -17,21 +17,7 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	os.Args = os.Args[0:1]
 
 	grumbleApp := grumble.New(&grumble.Config{
-		Name:        "xmempg",
-		Description: "Wrapper for mempg",
-		Flags: func(f *grumble.Flags) {
-			f.String(
-				"E",
-				"mempg-exe",
-				"Path to mempg executable",
-				"mempg")
-
-			f.Bool(
-				"D",
-				"insecure-disable-sandbox",
-				false,
-				"Disable mempg sandbox")
-		},
+		Name: "memshonk",
 		// CommandPreProc: func(args []string) ([]string, error) {
 		// 	err := shvars.Replace(args, session.Variables())
 		// 	if err != nil {

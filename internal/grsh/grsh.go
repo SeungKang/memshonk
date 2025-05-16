@@ -3,12 +3,19 @@ package grsh
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/desertbit/grumble"
 )
 
 func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
+	// TODO: This is terrible, but grumble makes the assumption
+	// that it should parse process arguments and it always tries
+	// to parse them via os.Args (we want to do that ourselves
+	// using the flag library).
+	os.Args = os.Args[0:1]
+
 	grumbleApp := grumble.New(&grumble.Config{
 		Name:        "xmempg",
 		Description: "Wrapper for mempg",

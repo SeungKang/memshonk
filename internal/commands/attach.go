@@ -29,7 +29,7 @@ func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return err
 	}
 
-	fmt.Fprintf(inOut.Stdout, "attached to pid: %d", pid)
+	fmt.Fprintf(inOut.Stdout, "attached to pid: %d\n", pid)
 
 	return nil
 }

@@ -32,6 +32,14 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 				false,
 				"Disable mempg sandbox")
 		},
+		// CommandPreProc: func(args []string) ([]string, error) {
+		// 	err := shvars.Replace(args, session.Variables())
+		// 	if err != nil {
+		// 		return args, err
+		// 	}
+		//
+		// 	return args, nil
+		// },
 	})
 
 	grumbleApp.SetInterruptHandler(func(a *grumble.App, count int) {

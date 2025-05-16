@@ -4,8 +4,11 @@ import (
 	"github.com/SeungKang/memshonk/internal/ini"
 )
 
+// Various section names.
 const (
-	generalSection = "General"
+	generalSectionName        = "General"
+	variablesSectionName      = "Variables"
+	variablesSectionNameShort = "Vars"
 )
 
 type projectSchema struct {
@@ -16,7 +19,7 @@ func (o *projectSchema) Rules() ini.ParserRules {
 	return ini.ParserRules{
 		AllowGlobalParams: false,
 		RequiredSections: []string{
-			generalSection,
+			generalSectionName,
 		},
 	}
 }
@@ -27,10 +30,16 @@ func (o *projectSchema) OnGlobalParam(paramName string) (func(*ini.Param) error,
 
 func (o *projectSchema) OnSection(sectionName string, canconicalName string) (func() (ini.SectionSchema, error), ini.SchemaRule) {
 	switch sectionName {
-	case generalSection:
+	case generalSectionName:
 		return func() (ini.SectionSchema, error) {
 			return &generalSchema{
 				general: &o.project.general,
+			}, nil
+		}, ini.SchemaRule{Limit: 1}
+	case variablesSectionName, variablesSectionNameShort:
+		return func() (ini.SectionSchema, error) {
+			return &variablesSchema{
+				variables: &o.project.variables,
 			}, nil
 		}, ini.SchemaRule{Limit: 1}
 	default:

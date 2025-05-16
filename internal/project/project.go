@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/ini"
+	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
 func FromFilePath(filePath string) (*Project, error) {
@@ -36,9 +37,10 @@ func FromFilePath(filePath string) (*Project, error) {
 }
 
 type Project struct {
-	src     func() (io.ReadCloser, error)
-	rwMu    sync.RWMutex
-	general General
+	src       func() (io.ReadCloser, error)
+	rwMu      sync.RWMutex
+	general   General
+	variables Variables
 }
 
 func (o *Project) Reload(context.Context) error {
@@ -63,6 +65,7 @@ func (o *Project) Reload(context.Context) error {
 	}
 
 	o.general = schemea.project.general
+	o.variables = schemea.project.variables
 
 	return nil
 }
@@ -72,4 +75,11 @@ func (o *Project) General() General {
 	defer o.rwMu.RUnlock()
 
 	return o.general
+}
+
+func (o *Project) Variables() *shvars.Variables {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.variables.vars
 }

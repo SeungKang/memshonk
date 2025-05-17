@@ -143,3 +143,9 @@ func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 
 	return ptr, nil
 }
+
+func AbsoluteAddrPointer(addr uintptr) Pointer {
+	return Pointer{
+		Addrs: []uintptr{addr},
+	}
+}

@@ -6,6 +6,47 @@ import (
 	"unsafe"
 )
 
+// Various memory state constants.
+//
+// See MEMORY_BASIC_INFORMATION documentation for details.
+const (
+	MemCommit  uint32 = 0x1000
+	MemFree    uint32 = 0x10000
+	MemReserve uint32 = 0x2000
+)
+
+// Various memory type constants.
+//
+// See MEMORY_BASIC_INFORMATION documentation for details.
+const (
+	MemImage   uint32 = 0x1000000
+	MemMapped  uint32 = 0x40000
+	MemPrivate uint32 = 0x20000
+)
+
+// Various memory protection constants.
+//
+// See also:
+// https://learn.microsoft.com/en-us/windows/win32/memory/memory-protection-constants
+const (
+	PageExecute          uint32 = 0x10
+	PageExecuteRead      uint32 = 0x20
+	PageExecuteReadWrite uint32 = 0x40
+	PageExecuteWriteCopy uint32 = 0x80
+	PageNoAccess         uint32 = 0x01
+	PageReadOnly         uint32 = 0x02
+	PageReadWrite        uint32 = 0x04
+	PageWriteCopy        uint32 = 0x08
+	PageTargetsInvalid   uint32 = 0x40000000
+	PageTargetsNoUpdate  uint32 = 0x40000000
+)
+
+const (
+	PageGuard        uint32 = 0x100
+	PageNoCache      uint32 = 0x200
+	PageWriteCombine uint32 = 0x400
+)
+
 var (
 	pVirtualQueryEx = kernel32.NewProc("VirtualQueryEx")
 )
@@ -57,7 +98,7 @@ func VirtualQueryEx(hProcess syscall.Handle, lpAddress uintptr, lpBuffer *MEMORY
 		uintptr(hProcess),                 // hProcess
 		uintptr(lpAddress),                // lpAddress
 		uintptr(unsafe.Pointer(lpBuffer)), // lpBuffer
-		uintptr(dwLength))                 // dwLength
+		uintptr(dwLength)) // dwLength
 	if isError(err) {
 		return err
 	}

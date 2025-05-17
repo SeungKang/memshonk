@@ -34,7 +34,8 @@ func newProcess(exeName string, pid int) (*process, error) {
 		return nil, fmt.Errorf("failed to get required modules - %w", err)
 	}
 
-	err = getRegions(uintptr(kiwiProc.Handle))
+	// TODO: Actually use the regions object for something.
+	_, err = getRegions(uintptr(kiwiProc.Handle))
 	if err != nil {
 		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get regions - %w", err)

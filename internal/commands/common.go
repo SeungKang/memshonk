@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
@@ -13,6 +14,8 @@ type Command interface {
 
 type Session interface {
 	Process() progctl.Process
+
+	Plugins() (plugins.Ctl, bool)
 }
 
 type IO struct {

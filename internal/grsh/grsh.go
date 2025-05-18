@@ -39,6 +39,8 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 
 	grumbleApp.OnInit(sh.onInit)
 
+	grumbleApp.AddCommand(NewPluginsCommand(session))
+
 	grumbleApp.AddCommand(NewAttachCommand(session))
 
 	grumbleApp.AddCommand(NewObjectsCommand(session))

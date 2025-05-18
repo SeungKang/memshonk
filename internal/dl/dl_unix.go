@@ -1,3 +1,5 @@
+//go:build unix
+
 package dl
 
 import "github.com/ebitengine/purego"

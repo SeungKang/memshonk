@@ -60,39 +60,23 @@ type Ctl struct {
 
 	readFromAddrCallback uintptr
 
-	rwMu           sync.RWMutex
-	namesToPlugins map[string]*Plugin
+	rwMu    sync.RWMutex
+	plugins []*Plugin
 }
 
 func (o *Ctl) PrettyString(indent string) string {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	if len(o.namesToPlugins) == 0 {
-		return ""
+	if len(o.plugins) == 0 {
+		return "no plugins loaded"
 	}
-
-	pluginsSlice := make([]*Plugin, len(o.namesToPlugins))
-
-	i := 0
-
-	for _, plugin := range o.namesToPlugins {
-		plugin := plugin
-
-		pluginsSlice[i] = plugin
-
-		i++
-	}
-
-	sort.SliceStable(pluginsSlice, func(i int, j int) bool {
-		return pluginsSlice[i].name > pluginsSlice[j].name
-	})
 
 	buf := bytes.Buffer{}
 
 	innerIndent := indent + "  "
 
-	for _, plugin := range pluginsSlice {
+	for _, plugin := range o.plugins {
 		if indent != "" {
 			buf.WriteString(indent)
 		}
@@ -128,16 +112,45 @@ func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
 	return 0
 }
 
-func (o *Ctl) Get(pluginName string) (plugins.Plugin, error) {
+func (o *Ctl) Get(pluginName string) (plugins.Plugin, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	plugin, hasIt := o.namesToPlugins[pluginName]
-	if !hasIt {
-		return nil, errors.New("plugin not loaded")
+	return o.isLoaded(pluginName)
+}
+
+func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
+	for _, plugin := range o.plugins {
+		if plugin.name == pluginName {
+			plugin := plugin
+
+			return plugin, true
+		}
 	}
 
-	return plugin, nil
+	return nil, false
+}
+
+func (o *Ctl) addPlugin(plugin *Plugin) {
+	o.plugins = append(o.plugins, plugin)
+
+	sort.SliceStable(o.plugins, func(i int, j int) bool {
+		return o.plugins[i].Name() > o.plugins[j].Name()
+	})
+}
+
+func (o *Ctl) rmPlugin(plugin *Plugin) {
+	// Not the most efficient way to do this,
+	// but it is far less error-prone.
+	var newSlice []*Plugin
+
+	for i := range o.plugins {
+		if plugin != o.plugins[i] {
+			newSlice = append(newSlice, o.plugins[i])
+		}
+	}
+
+	o.plugins = newSlice
 }
 
 func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
@@ -155,13 +168,9 @@ func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 		name = before
 	}
 
-	_, alreadyLoaded := o.namesToPlugins[name]
+	_, alreadyLoaded := o.isLoaded(name)
 	if alreadyLoaded {
 		return nil, fmt.Errorf("plugin is already loaded (%q)", name)
-	}
-
-	if o.namesToPlugins == nil {
-		o.namesToPlugins = make(map[string]*Plugin)
 	}
 
 	lib, err := dl.Open(absFilePath)
@@ -177,7 +186,7 @@ func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 		return nil, fmt.Errorf("failed to setup plugin - %w", err)
 	}
 
-	o.namesToPlugins[name] = libPlugin
+	o.addPlugin(libPlugin)
 
 	return libPlugin, nil
 }
@@ -254,10 +263,13 @@ func (o *Plugin) loadParsers() error {
 		return nil
 	}
 
-	parsers := make(map[string]ParserLibraryPlugin)
+	parserNames := strings.Split(parserFnsCsv, ",")
+	sort.Strings(parserNames)
+
+	parsers := make([]*ParserLibraryPlugin, len(parserNames))
 
 	for _, parserFnName := range strings.Split(parserFnsCsv, ",") {
-		par := ParserLibraryPlugin{
+		par := &ParserLibraryPlugin{
 			parent:    o.name,
 			name:      parserFnName,
 			errStrFn:  o.ErrorStr,
@@ -270,7 +282,7 @@ func (o *Plugin) loadParsers() error {
 				parserFnName, err)
 		}
 
-		parsers[parserFnName] = par
+		parsers = append(o.parsers, par)
 	}
 
 	o.parsers = parsers
@@ -331,7 +343,7 @@ type Plugin struct {
 	getErrorStringFn func(code uint32) uintptr
 	freeStringFn     func(uintptr)
 	debufFn          func(bool)
-	parsers          map[string]ParserLibraryPlugin
+	parsers          []*ParserLibraryPlugin
 }
 
 func (o *Plugin) PrettyString(indent string) string {
@@ -388,25 +400,14 @@ func (o *Plugin) ParsersPrettyString(indent string) string {
 
 	buf := bytes.Buffer{}
 
-	names := make([]string, len(o.parsers))
-	i := 0
-
-	for _, parser := range o.parsers {
-		names[i] = parser.name
-
-		i++
-	}
-
-	sort.Strings(names)
-
-	for i, s := range names {
+	for i, s := range o.parsers {
 		if indent != "" {
 			buf.WriteString(indent)
 		}
 
-		buf.WriteString(s)
+		buf.WriteString(s.name)
 
-		if i != len(names)-1 {
+		if i != len(o.parsers)-1 {
 			buf.WriteString("\n")
 		}
 	}
@@ -450,16 +451,17 @@ func (o *Plugin) ErrorStr(code uint32) string {
 }
 
 func (o *Plugin) Parser(name string) (plugins.ParserPlugin, bool) {
-	parser, hasIt := o.parsers[name]
-	if !hasIt {
-		// Try with ID.
+	return o.getParser(name)
+}
 
-		id := parserID(o.name, name)
-
-		parser, hasIt = o.parsers[id]
+func (o *Plugin) getParser(name string) (plugins.ParserPlugin, bool) {
+	for i := range o.parsers {
+		if name == o.parsers[i].name {
+			return o.parsers[i], true
+		}
 	}
 
-	return &parser, hasIt
+	return nil, false
 }
 
 type ParserLibraryPlugin struct {

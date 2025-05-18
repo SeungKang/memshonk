@@ -9,7 +9,7 @@ var (
 type Ctl interface {
 	Load(filePath string) (Plugin, error)
 
-	Get(name string) (Plugin, error)
+	Get(name string) (Plugin, bool)
 
 	PrettyString(indent string) string
 }

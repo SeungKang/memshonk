@@ -28,7 +28,12 @@ func (o *pluginsSchema) OnParam(paramName string) (func(*ini.Param) error, ini.S
 	switch paramName {
 	case libraryPathParam:
 		return func(p *ini.Param) error {
-			o.plugins.Libraries = append(o.plugins.Libraries, p.Value)
+			pathStr, err := replaceMagicStrings(p.Value)
+			if err != nil {
+				return err
+			}
+
+			o.plugins.Libraries = append(o.plugins.Libraries, pathStr)
 
 			return nil
 		}, ini.SchemaRule{}

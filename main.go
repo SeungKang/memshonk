@@ -14,6 +14,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/grsh"
 	"github.com/SeungKang/memshonk/internal/plugins"
+	"github.com/SeungKang/memshonk/internal/plugins/pluginscompat"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginsctl"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
@@ -82,9 +83,12 @@ func mainWithError() error {
 
 	progCtl := progctl.NewCtl(proj.General().ExeName)
 
-	pluginsCtl, err := pluginsctl.New(progCtl)
+	pluginsCtl, err := pluginsctl.New(plugins.CtlConfig{
+		InitialPlugins: proj.Plugins().Libraries,
+		Process:        pluginscompat.WrapProcess(progCtl),
+	})
 	if err != nil && !errors.Is(err, plugins.ErrPluginsDisabled) {
-		return fmt.Errorf("failed to load plugins - %w", err)
+		return fmt.Errorf("failed to setup plugin ctl - %w", err)
 	}
 
 	application := app.NewApp(proj, progCtl, pluginsCtl)

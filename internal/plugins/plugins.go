@@ -33,3 +33,13 @@ type Plugin interface {
 type ParserPlugin interface {
 	Run(addr uintptr) ([]byte, error)
 }
+
+type CtlConfig struct {
+	InitialPlugins []string
+
+	Process Process
+}
+
+type Process interface {
+	ReadFromAddr(addr uintptr, size uint64) ([]byte, error)
+}

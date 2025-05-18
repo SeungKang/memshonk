@@ -1,6 +1,10 @@
 package project
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/SeungKang/memshonk/internal/ini"
 )
 
@@ -56,4 +60,28 @@ func (o *projectSchema) OnSection(sectionName string, canconicalName string) (fu
 
 func (o *projectSchema) Validate() error {
 	return nil
+}
+
+func replaceMagicStrings(str string) (string, error) {
+	str, err := innerReplaceMagicStrings(str)
+	if err != nil {
+		return "", fmt.Errorf("failed to replace magic strings - %w", err)
+	}
+
+	return str, nil
+}
+
+// innerReplaceMagicStrings exists so we can write a useful error message
+// in a wrapper function and not need to repeat that error over and over.
+func innerReplaceMagicStrings(str string) (string, error) {
+	if strings.HasPrefix(str, "~") {
+		homeDirPath, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory - %w", err)
+		}
+
+		str = homeDirPath + str[1:]
+	}
+
+	return str, nil
 }

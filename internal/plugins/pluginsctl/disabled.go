@@ -6,6 +6,6 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-func New(todoProcessPlaceholder interface{}) (plugins.Ctl, error) {
+func New(plugins.CtlConfig) (plugins.Ctl, error) {
 	return nil, plugins.ErrPluginsDisabled
 }

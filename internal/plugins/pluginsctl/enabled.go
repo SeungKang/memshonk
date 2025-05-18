@@ -2,8 +2,11 @@
 
 package pluginsctl
 
-import "github.com/SeungKang/memshonk/internal/plugins/libplugin"
+import (
+	"github.com/SeungKang/memshonk/internal/plugins"
+	"github.com/SeungKang/memshonk/internal/plugins/libplugin"
+)
 
-func New(todoProcessPlaceholder interface{}) (*libplugin.Ctl, error) {
-	return libplugin.NewCtl(todoProcessPlaceholder)
+func New(args plugins.CtlConfig) (*libplugin.Ctl, error) {
+	return libplugin.NewCtl(args)
 }

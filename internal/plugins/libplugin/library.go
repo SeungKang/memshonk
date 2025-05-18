@@ -31,28 +31,37 @@ const (
 
 var _ plugins.Ctl = (*Ctl)(nil)
 
-func NewCtl(todoProcessPlaceholder interface{}) (*Ctl, error) {
-	ctl := &Ctl{}
+func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
+	ctl := &Ctl{
+		process: args.Process,
+	}
 
 	var err error
 
-	ctl.readFromAddrCallback, err = dl.NewCallback(ctl.ReadFromAddr)
+	ctl.readFromAddrCallback, err = dl.NewCallback(ctl.readFromAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create callback for ReadFromAddr - %w",
 			err)
+	}
+
+	for _, filePath := range args.InitialPlugins {
+		_, err := ctl.Load(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load plugin: %q - %w",
+				filePath, err)
+		}
 	}
 
 	return ctl, nil
 }
 
 type Ctl struct {
+	process plugins.Process
+
 	readFromAddrCallback uintptr
 
 	rwMu           sync.RWMutex
 	namesToPlugins map[string]*Plugin
-
-	// TODO
-	// 	process progctl.Process
 }
 
 func (o *Ctl) PrettyString(indent string) string {
@@ -96,24 +105,27 @@ func (o *Ctl) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *Ctl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uintptr {
-	return 1
+func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
+	data, err := o.process.ReadFromAddr(srcAddr, uint64(size))
+	if err != nil {
+		return 1
+	}
 
-	// TODO
-	//
-	// 	data, err := o.process.ReadFromAddr(
-	// 		context.Background(),
-	// 		memory.AbsoluteAddrPointer(srcAddr),
-	// 		size)
-	// 	if err != nil {
-	// 		return 1
-	// 	}
+	if uintptr(len(data)) > size {
+		return 2
+	}
 
-	// 	if uint64(len(data)) > size {
-	// 		return 2
-	// 	}
+	dstPtr := dst
 
-	// return 0
+	for i := uintptr(0); i < size; i++ {
+		b := (*byte)(unsafe.Pointer(dstPtr))
+
+		*b = data[i]
+
+		dstPtr++
+	}
+
+	return 0
 }
 
 func (o *Ctl) Get(pluginName string) (plugins.Plugin, error) {

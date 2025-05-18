@@ -8,7 +8,33 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-var _ Command = (*PluginsCommand)(nil)
+func PluginsCommandSchema() CommandSchema {
+	return CommandSchema{
+		Name:      "plugins",
+		ShortHelp: "manage plugins",
+		NonFlags: []NonFlagSchema{
+			{
+				Name: "command",
+				Desc: "the plugin command ('list', 'ls', " +
+					"'load', 'unload', 'reload')",
+				DefValue: "list",
+				DataType: "",
+			},
+			{
+				Name:     "name",
+				Desc:     "the plugin name to operate on",
+				DataType: "",
+				DefValue: "",
+			},
+		},
+		CreateFn: func(c CommandConfig) (Command, error) {
+			return NewPluginsCommand(PluginsCommandArgs{
+				Mode:                 c.NonFlags.String("command"),
+				PluginNameOrFilePath: c.NonFlags.String("name"),
+			}), nil
+		},
+	}
+}
 
 type PluginsCommandArgs struct {
 	Mode                 string

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/desertbit/grumble"
 )
 
@@ -39,7 +40,10 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 
 	grumbleApp.OnInit(sh.onInit)
 
-	grumbleApp.AddCommand(NewPluginsCommand(session))
+	for _, cmdSchema := range commands.BuiltinCommands() {
+		grumbleApp.AddCommand(commandSchemaToGrumbleCommand(
+			cmdSchema, session))
+	}
 
 	grumbleApp.AddCommand(NewAttachCommand(session))
 

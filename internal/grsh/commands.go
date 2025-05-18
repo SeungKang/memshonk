@@ -134,31 +134,6 @@ func flagToGrumble(flag commands.FlagSchema, gflags *grumble.Flags) {
 	}
 }
 
-func NewPluginsCommand(session *app.Session) *grumble.Command {
-	return &grumble.Command{
-		Name: "plugins",
-		Help: "manage plugins",
-		Args: func(a *grumble.Args) {
-			a.String("command", "the plugin command ('list', 'ls', "+
-				"'load', 'unload', 'reload')", grumble.Default("list"))
-			a.String("name", "the plugin name to operate on", grumble.Default(""))
-		},
-		Run: func(c *grumble.Context) error {
-			err := session.RunCommand(
-				context.Background(),
-				commands.NewPluginsCommand(commands.PluginsCommandArgs{
-					Mode:                 c.Args.String("command"),
-					PluginNameOrFilePath: c.Args.String("name"),
-				}))
-			if err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}
-}
-
 func NewAttachCommand(session *app.Session) *grumble.Command {
 	return &grumble.Command{
 		Name:    "attach",

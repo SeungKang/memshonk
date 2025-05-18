@@ -25,11 +25,11 @@ type CommandSchema struct {
 }
 
 type FlagSchema struct {
-	Short       string
-	Long        string
-	Description string
-	DataType    interface{}
-	DefaultVal  interface{}
+	Short      string
+	Long       string
+	Desc       string
+	DataType   interface{}
+	DefaultVal interface{}
 }
 
 type NonFlagSchema struct {

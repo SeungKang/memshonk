@@ -99,35 +99,35 @@ func flagToGrumble(flag commands.FlagSchema, gflags *grumble.Flags) {
 			def = flag.DefaultVal.(string)
 		}
 
-		gflags.String(flag.Short, flag.Long, def, flag.Description)
+		gflags.String(flag.Short, flag.Long, def, flag.Desc)
 	case int:
 		var def int
 		if flag.DefaultVal != nil {
 			def = flag.DefaultVal.(int)
 		}
 
-		gflags.Int(flag.Short, flag.Long, def, flag.Description)
+		gflags.Int(flag.Short, flag.Long, def, flag.Desc)
 	case int64:
 		var def int64
 		if flag.DefaultVal != nil {
 			def = flag.DefaultVal.(int64)
 		}
 
-		gflags.Int64(flag.Short, flag.Long, def, flag.Description)
+		gflags.Int64(flag.Short, flag.Long, def, flag.Desc)
 	case uint:
 		var def uint
 		if flag.DefaultVal != nil {
 			def = flag.DefaultVal.(uint)
 		}
 
-		gflags.Uint(flag.Short, flag.Long, def, flag.Description)
+		gflags.Uint(flag.Short, flag.Long, def, flag.Desc)
 	case uint64:
 		var def uint64
 		if flag.DefaultVal != nil {
 			def = flag.DefaultVal.(uint64)
 		}
 
-		gflags.Uint64(flag.Short, flag.Long, def, flag.Description)
+		gflags.Uint64(flag.Short, flag.Long, def, flag.Desc)
 	default:
 		panic(fmt.Sprintf("TODO: unsupported flag type: %T",
 			flag.DataType))

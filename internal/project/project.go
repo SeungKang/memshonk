@@ -41,6 +41,7 @@ type Project struct {
 	rwMu      sync.RWMutex
 	general   General
 	variables Variables
+	plugins   Plugins
 }
 
 func (o *Project) Reload(context.Context) error {
@@ -66,6 +67,7 @@ func (o *Project) Reload(context.Context) error {
 
 	o.general = schemea.project.general
 	o.variables = schemea.project.variables
+	o.plugins = schemea.project.plugins
 
 	return nil
 }
@@ -82,4 +84,11 @@ func (o *Project) Variables() *shvars.Variables {
 	defer o.rwMu.RUnlock()
 
 	return o.variables.vars
+}
+
+func (o *Project) Plugins() Plugins {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.plugins
 }

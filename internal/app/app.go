@@ -4,26 +4,29 @@ import (
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 )
 
-func NewApp(project *project.Project) *App {
+func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
 	return &App{
-		project: project,
-		procCtl: progctl.NewCtl(project.General().ExeName),
+		project:   project,
+		procCtl:   progCtl,
+		pluginCtl: optPluginCtl,
 	}
 }
 
 type App struct {
 	project       *project.Project
+	procCtl       progctl.Process
+	pluginCtl     plugins.Ctl
 	rwMu          sync.RWMutex
 	nextSessionId uint64
 	sessions      map[uint64]*Session
-	procCtl       *progctl.Ctl
 }
 
-func (o *App) ProcCtl() *progctl.Ctl {
+func (o *App) ProcCtl() progctl.Process {
 	return o.procCtl
 }
 

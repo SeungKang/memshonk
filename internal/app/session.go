@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/shvars"
@@ -36,6 +37,14 @@ func (o *Session) Project() *project.Project {
 
 func (o *Session) Variables() *SessionVariables {
 	return o.vars
+}
+
+func (o *Session) Plugins() (plugins.Ctl, bool) {
+	if o.app.pluginCtl == nil {
+		return nil, false
+	}
+
+	return o.app.pluginCtl, true
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {

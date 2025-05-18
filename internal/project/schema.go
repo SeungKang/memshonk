@@ -9,6 +9,7 @@ const (
 	generalSectionName        = "General"
 	variablesSectionName      = "Variables"
 	variablesSectionNameShort = "Vars"
+	pluginsSectionName        = "Plugins"
 )
 
 type projectSchema struct {
@@ -40,6 +41,12 @@ func (o *projectSchema) OnSection(sectionName string, canconicalName string) (fu
 		return func() (ini.SectionSchema, error) {
 			return &variablesSchema{
 				variables: &o.project.variables,
+			}, nil
+		}, ini.SchemaRule{Limit: 1}
+	case pluginsSectionName:
+		return func() (ini.SectionSchema, error) {
+			return &pluginsSchema{
+				plugins: &o.project.plugins,
 			}, nil
 		}, ini.SchemaRule{Limit: 1}
 	default:

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/SeungKang/memshonk/internal/msplugins"
+	"github.com/SeungKang/memshonk/internal/plugins/libplugins"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 }
 
 func mainWithError() error {
-	pluginCtl, err := msplugins.NewLibraryPluginCtl(nil)
+	pluginCtl, err := libplugins.NewCtl(nil)
 	if err != nil {
 		return err
 	}

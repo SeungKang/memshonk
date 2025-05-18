@@ -1,4 +1,4 @@
-package msplugins
+package libplugin
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/SeungKang/memshonk/internal/dl"
+	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
 // Required functions for library-based plugins.
@@ -28,8 +29,10 @@ const (
 	parsersFnName = "parsers_v0"
 )
 
-func NewLibraryPluginCtl(todoProcessPlaceholder interface{}) (*LibraryPluginCtl, error) {
-	ctl := &LibraryPluginCtl{}
+var _ plugins.Ctl = (*Ctl)(nil)
+
+func NewCtl(todoProcessPlaceholder interface{}) (*Ctl, error) {
+	ctl := &Ctl{}
 
 	var err error
 
@@ -42,17 +45,17 @@ func NewLibraryPluginCtl(todoProcessPlaceholder interface{}) (*LibraryPluginCtl,
 	return ctl, nil
 }
 
-type LibraryPluginCtl struct {
+type Ctl struct {
 	readFromAddrCallback uintptr
 
 	rwMu           sync.RWMutex
-	namesToPlugins map[string]*LibraryPlugin
+	namesToPlugins map[string]*Plugin
 
 	// TODO
 	// 	process progctl.Process
 }
 
-func (o *LibraryPluginCtl) PrettyString(indent string) string {
+func (o *Ctl) PrettyString(indent string) string {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -60,7 +63,7 @@ func (o *LibraryPluginCtl) PrettyString(indent string) string {
 		return ""
 	}
 
-	pluginsSlice := make([]*LibraryPlugin, len(o.namesToPlugins))
+	pluginsSlice := make([]*Plugin, len(o.namesToPlugins))
 
 	i := 0
 
@@ -93,7 +96,7 @@ func (o *LibraryPluginCtl) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *LibraryPluginCtl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uintptr {
+func (o *Ctl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uintptr {
 	return 1
 
 	// TODO
@@ -113,7 +116,7 @@ func (o *LibraryPluginCtl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr
 	// return 0
 }
 
-func (o *LibraryPluginCtl) Get(pluginName string) (*LibraryPlugin, error) {
+func (o *Ctl) Get(pluginName string) (plugins.Plugin, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -125,7 +128,7 @@ func (o *LibraryPluginCtl) Get(pluginName string) (*LibraryPlugin, error) {
 	return plugin, nil
 }
 
-func (o *LibraryPluginCtl) Load(pluginFilePath string) (*LibraryPlugin, error) {
+func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -146,7 +149,7 @@ func (o *LibraryPluginCtl) Load(pluginFilePath string) (*LibraryPlugin, error) {
 	}
 
 	if o.namesToPlugins == nil {
-		o.namesToPlugins = make(map[string]*LibraryPlugin)
+		o.namesToPlugins = make(map[string]*Plugin)
 	}
 
 	lib, err := dl.Open(absFilePath)
@@ -167,7 +170,7 @@ func (o *LibraryPluginCtl) Load(pluginFilePath string) (*LibraryPlugin, error) {
 	return libPlugin, nil
 }
 
-func (o *LibraryPluginCtl) setupPlugin(filePath string, name string, lib *dl.Library) (*LibraryPlugin, error) {
+func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugin, error) {
 	var versionFn func() uint16
 
 	err := lib.Func(versionFnName, &versionFn)
@@ -175,7 +178,7 @@ func (o *LibraryPluginCtl) setupPlugin(filePath string, name string, lib *dl.Lib
 		return nil, fmt.Errorf("failed to get version function in library - %w", err)
 	}
 
-	plugin := &LibraryPlugin{
+	plugin := &Plugin{
 		lib:      lib,
 		name:     name,
 		loadedAt: time.Now(),
@@ -217,7 +220,7 @@ func (o *LibraryPluginCtl) setupPlugin(filePath string, name string, lib *dl.Lib
 	return plugin, nil
 }
 
-func (o *LibraryPlugin) loadParsers() error {
+func (o *Plugin) loadParsers() error {
 	var getParsersFn func() uintptr
 
 	_, err := findFirstFunc(
@@ -307,7 +310,7 @@ func findFirstFunc(funcNames []string, goFnPtr interface{}, lib *dl.Library) (st
 		funcNames)
 }
 
-type LibraryPlugin struct {
+type Plugin struct {
 	lib              *dl.Library
 	filePath         string
 	name             string
@@ -319,7 +322,7 @@ type LibraryPlugin struct {
 	parsers          map[string]ParserLibraryPlugin
 }
 
-func (o *LibraryPlugin) PrettyString(indent string) string {
+func (o *Plugin) PrettyString(indent string) string {
 	buf := bytes.Buffer{}
 
 	if indent != "" {
@@ -366,7 +369,7 @@ func (o *LibraryPlugin) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *LibraryPlugin) ParsersPrettyString(indent string) string {
+func (o *Plugin) ParsersPrettyString(indent string) string {
 	if len(o.parsers) == 0 {
 		return ""
 	}
@@ -399,31 +402,31 @@ func (o *LibraryPlugin) ParsersPrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *LibraryPlugin) EnableDebug() {
+func (o *Plugin) EnableDebug() {
 	if o.debufFn != nil {
 		o.debufFn(true)
 	}
 }
 
-func (o *LibraryPlugin) DisableDebug() {
+func (o *Plugin) DisableDebug() {
 	if o.debufFn != nil {
 		o.debufFn(false)
 	}
 }
 
-func (o *LibraryPlugin) FilePath() string {
+func (o *Plugin) FilePath() string {
 	return o.filePath
 }
 
-func (o *LibraryPlugin) Name() string {
+func (o *Plugin) Name() string {
 	return o.name
 }
 
-func (o *LibraryPlugin) Version() uint16 {
+func (o *Plugin) Version() uint16 {
 	return o.version
 }
 
-func (o *LibraryPlugin) ErrorStr(code uint32) string {
+func (o *Plugin) ErrorStr(code uint32) string {
 	// For rust impls:
 	// https://users.rust-lang.org/t/whats-the-best-practice-to-get-string-by-ffi/39496/2
 	cstr := copyCStrByNull{
@@ -434,7 +437,7 @@ func (o *LibraryPlugin) ErrorStr(code uint32) string {
 	return cstr.string()
 }
 
-func (o *LibraryPlugin) Parser(name string) (ParserLibraryPlugin, bool) {
+func (o *Plugin) Parser(name string) (plugins.ParserPlugin, bool) {
 	parser, hasIt := o.parsers[name]
 	if !hasIt {
 		// Try with ID.
@@ -444,7 +447,7 @@ func (o *LibraryPlugin) Parser(name string) (ParserLibraryPlugin, bool) {
 		parser, hasIt = o.parsers[id]
 	}
 
-	return parser, hasIt
+	return &parser, hasIt
 }
 
 type ParserLibraryPlugin struct {

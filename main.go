@@ -13,6 +13,9 @@ import (
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/grsh"
+	"github.com/SeungKang/memshonk/internal/plugins"
+	"github.com/SeungKang/memshonk/internal/plugins/pluginsctl"
+	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 )
 
@@ -77,7 +80,14 @@ func mainWithError() error {
 		syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	defer cancelFn()
 
-	application := app.NewApp(proj)
+	progCtl := progctl.NewCtl(proj.General().ExeName)
+
+	pluginsCtl, err := pluginsctl.New(progCtl)
+	if err != nil && !errors.Is(err, plugins.ErrPluginsDisabled) {
+		return fmt.Errorf("failed to load plugins - %w", err)
+	}
+
+	application := app.NewApp(proj, progCtl, pluginsCtl)
 
 	session := application.NewSession(commands.IO{
 		Stdout: os.Stdout,

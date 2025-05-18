@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/SeungKang/memshonk/internal/dl"
@@ -177,6 +178,7 @@ func (o *LibraryPluginCtl) setupPlugin(filePath string, name string, lib *dl.Lib
 	plugin := &LibraryPlugin{
 		lib:      lib,
 		name:     name,
+		loadedAt: time.Now(),
 		filePath: filePath,
 		version:  versionFn(),
 	}
@@ -309,6 +311,7 @@ type LibraryPlugin struct {
 	lib              *dl.Library
 	filePath         string
 	name             string
+	loadedAt         time.Time
 	version          uint16
 	getErrorStringFn func(code uint32) uintptr
 	freeStringFn     func(uintptr)
@@ -328,6 +331,11 @@ func (o *LibraryPlugin) PrettyString(indent string) string {
 		buf.WriteString(indent)
 	}
 	buf.WriteString("path: " + o.filePath + "\n")
+
+	if indent != "" {
+		buf.WriteString(indent)
+	}
+	buf.WriteString("loaded: " + o.loadedAt.Format(time.Stamp) + "\n")
 
 	if indent != "" {
 		buf.WriteString(indent)

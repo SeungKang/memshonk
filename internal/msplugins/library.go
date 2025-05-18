@@ -93,7 +93,7 @@ func (o *LibraryPluginCtl) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *LibraryPluginCtl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uint8 {
+func (o *LibraryPluginCtl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uintptr {
 	return 1
 
 	// TODO

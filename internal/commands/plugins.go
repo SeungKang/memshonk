@@ -8,7 +8,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-var _ Command = (*AttachCommand)(nil)
+var _ Command = (*PluginsCommand)(nil)
 
 type PluginsCommandArgs struct {
 	Mode                 string
@@ -47,6 +47,17 @@ func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) error {
 }
 
 func (o PluginsCommand) list(ctl plugins.Ctl, inOut IO) error {
+	if o.args.PluginNameOrFilePath != "" {
+		plugin, hasIt := ctl.Plugin(o.args.PluginNameOrFilePath)
+		if !hasIt {
+			return errors.New("plugin is not loaded")
+		}
+
+		fmt.Fprintln(inOut.Stdout, plugin.PrettyString(""))
+
+		return nil
+	}
+
 	fmt.Fprintln(inOut.Stdout, ctl.PrettyString(""))
 
 	return nil
@@ -63,10 +74,10 @@ func (o PluginsCommand) load(ctl plugins.Ctl, inOut IO) error {
 	return nil
 }
 
-func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) reload(ctl plugins.Ctl, inOut IO) error {
 	return errors.New("TODO: not implemented yet :(")
 }
 
-func (o PluginsCommand) reload(ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
 	return errors.New("TODO: not implemented yet :(")
 }

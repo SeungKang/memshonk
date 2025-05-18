@@ -214,7 +214,7 @@ func (o *ParserLibraryPlugin) ID() string {
 }
 
 func parserID(libName string, parserName string) string {
-	return libName + "::" + parserName
+	return libName + pluginNamespaceSep + parserName
 }
 
 func (o *ParserLibraryPlugin) Run(addr uintptr) ([]byte, error) {

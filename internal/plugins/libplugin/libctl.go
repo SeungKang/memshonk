@@ -15,6 +15,10 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
+const (
+	pluginNamespaceSep = "::"
+)
+
 // Required functions for library-based plugins.
 const (
 	versionFnName         = "version"
@@ -112,11 +116,35 @@ func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
 	return 0
 }
 
-func (o *Ctl) Get(pluginName string) (plugins.Plugin, bool) {
+func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	return o.isLoaded(pluginName)
+}
+
+func (o *Ctl) Parser(parserID string) (plugins.ParserPlugin, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	pluginName, parserName, hasIt := separateNamespace(parserID)
+	if !hasIt {
+		return nil, fmt.Errorf("parser must use <plugin-name>%s<parser-name> syntax",
+			pluginNamespaceSep)
+	}
+
+	plugin, isLoaded := o.isLoaded(pluginName)
+	if !isLoaded {
+		return nil, fmt.Errorf("library is not loaded (%q)", pluginName)
+	}
+
+	parser, hasIt := plugin.Parser(parserName)
+	if !hasIt {
+		return nil, fmt.Errorf("library does not contain parser: %q",
+			parserName)
+	}
+
+	return parser, nil
 }
 
 func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
@@ -360,4 +388,12 @@ func (o *copyCStrByNull) slice() []byte {
 	o.strPtr = 0
 
 	return buf.Bytes()
+}
+
+func separateNamespace(str string) (string, string, bool) {
+	return strings.Cut(str, pluginNamespaceSep)
+}
+
+func strUsesNamespaceSep(str string) bool {
+	return strings.Contains(str, pluginNamespaceSep)
 }

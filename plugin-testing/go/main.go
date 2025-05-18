@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"log"
 
-	"github.com/SeungKang/memshonk/internal/plugins/libplugins"
+	"github.com/SeungKang/memshonk/internal/plugins"
+	"github.com/SeungKang/memshonk/internal/plugins/libplugin"
 )
 
 func main() {
@@ -18,7 +20,9 @@ func main() {
 }
 
 func mainWithError() error {
-	pluginCtl, err := libplugins.NewCtl(nil)
+	pluginCtl, err := libplugin.NewCtl(plugins.CtlConfig{
+		Process: &fakeProcess{},
+	})
 	if err != nil {
 		return err
 	}
@@ -47,4 +51,11 @@ func mainWithError() error {
 	log.Println(hex.Dump(b))
 
 	return nil
+}
+
+type fakeProcess struct {
+}
+
+func (o fakeProcess) ReadFromAddr(addr uintptr, size uint64) ([]byte, error) {
+	return bytes.Repeat([]byte{0x41}, int(size)), nil
 }

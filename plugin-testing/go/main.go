@@ -18,12 +18,12 @@ func main() {
 }
 
 func mainWithError() error {
-	pluginApi, err := msplugins.NewLibraryLoader(nil)
+	pluginCtl, err := msplugins.NewLibraryPluginCtl(nil)
 	if err != nil {
 		return err
 	}
 
-	plugin, err := pluginApi.Load(
+	plugin, err := pluginCtl.Load(
 		"/home/u/libmemshonk_plugin.so",
 	)
 	if err != nil {
@@ -32,7 +32,7 @@ func mainWithError() error {
 
 	_ = plugin
 
-	fmt.Println(pluginApi.PrettyString(""))
+	fmt.Println(pluginCtl.PrettyString(""))
 
 	parser, hasIt := plugin.Parser("parse_enemies")
 	if !hasIt {

@@ -27,21 +27,21 @@ const (
 	parsersFnName = "parsers_v0"
 )
 
-func NewLibraryLoader(todoProcessPlaceholder interface{}) (*LibraryLoader, error) {
-	loader := &LibraryLoader{}
+func NewLibraryPluginCtl(todoProcessPlaceholder interface{}) (*LibraryPluginCtl, error) {
+	ctl := &LibraryPluginCtl{}
 
 	var err error
 
-	loader.readFromAddrCallback, err = dl.NewCallback(loader.ReadFromAddr)
+	ctl.readFromAddrCallback, err = dl.NewCallback(ctl.ReadFromAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create callback for ReadFromAddr - %w",
 			err)
 	}
 
-	return loader, nil
+	return ctl, nil
 }
 
-type LibraryLoader struct {
+type LibraryPluginCtl struct {
 	readFromAddrCallback uintptr
 
 	rwMu           sync.RWMutex
@@ -51,7 +51,7 @@ type LibraryLoader struct {
 	// 	process progctl.Process
 }
 
-func (o *LibraryLoader) PrettyString(indent string) string {
+func (o *LibraryPluginCtl) PrettyString(indent string) string {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -92,7 +92,7 @@ func (o *LibraryLoader) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *LibraryLoader) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uint8 {
+func (o *LibraryPluginCtl) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr uintptr) uint8 {
 	return 1
 
 	// TODO
@@ -112,7 +112,7 @@ func (o *LibraryLoader) ReadFromAddr(dst unsafe.Pointer, size uint64, srcAddr ui
 	// return 0
 }
 
-func (o *LibraryLoader) Get(pluginName string) (*LibraryPlugin, error) {
+func (o *LibraryPluginCtl) Get(pluginName string) (*LibraryPlugin, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -124,7 +124,7 @@ func (o *LibraryLoader) Get(pluginName string) (*LibraryPlugin, error) {
 	return plugin, nil
 }
 
-func (o *LibraryLoader) Load(pluginFilePath string) (*LibraryPlugin, error) {
+func (o *LibraryPluginCtl) Load(pluginFilePath string) (*LibraryPlugin, error) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -166,7 +166,7 @@ func (o *LibraryLoader) Load(pluginFilePath string) (*LibraryPlugin, error) {
 	return libPlugin, nil
 }
 
-func (o *LibraryLoader) setupPlugin(filePath string, name string, lib *dl.Library) (*LibraryPlugin, error) {
+func (o *LibraryPluginCtl) setupPlugin(filePath string, name string, lib *dl.Library) (*LibraryPlugin, error) {
 	var versionFn func() uint16
 
 	err := lib.Func(versionFnName, &versionFn)

@@ -196,6 +196,9 @@ func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 		name = before
 	}
 
+	name = strings.TrimSuffix(name, "-memshonk")
+	name = strings.TrimSuffix(name, "_memshonk")
+
 	_, alreadyLoaded := o.isLoaded(name)
 	if alreadyLoaded {
 		return nil, fmt.Errorf("plugin is already loaded (%q)", name)

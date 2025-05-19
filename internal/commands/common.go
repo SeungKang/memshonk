@@ -11,6 +11,7 @@ import (
 func BuiltinCommands() []CommandSchema {
 	return []CommandSchema{
 		PluginsCommandSchema(),
+		ParserCommandSchema(),
 	}
 }
 

@@ -13,8 +13,13 @@ func ParserCommandSchema() CommandSchema {
 		ShortHelp: "run parser plugins",
 		NonFlags: []NonFlagSchema{
 			{
-				Name:     "parser-id",
-				Desc:     "the parser id",
+				Name:     "plugin-name",
+				Desc:     "the plugin name",
+				DataType: "",
+			},
+			{
+				Name:     "parser-name",
+				Desc:     "the parser name",
 				DataType: "",
 			},
 			{
@@ -26,8 +31,9 @@ func ParserCommandSchema() CommandSchema {
 		CreateFn: func(c CommandConfig) (Command, error) {
 			return &ParserCommand{
 				args: ParserCommandArgs{
-					ParserID: c.NonFlags.String("parser-id"),
-					Addr:     c.NonFlags.String("addr"),
+					PluginName: c.NonFlags.String("plugin-name"),
+					ParserName: c.NonFlags.String("parser-name"),
+					Addr:       c.NonFlags.String("addr"),
 				},
 			}, nil
 		},
@@ -35,8 +41,9 @@ func ParserCommandSchema() CommandSchema {
 }
 
 type ParserCommandArgs struct {
-	ParserID string
-	Addr     string
+	PluginName string
+	ParserName string
+	Addr       string
 }
 
 type ParserCommand struct {
@@ -49,7 +56,7 @@ func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return errors.New("plugins are disabled")
 	}
 
-	parser, err := loadedPlugins.Parser(o.args.ParserID)
+	plugin, err := loadedPlugins.Plugin(o.args.PluginName)
 	if err != nil {
 		return err
 	}
@@ -59,7 +66,7 @@ func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return err
 	}
 
-	blob, err := parser.Run(addr.Addrs[0])
+	blob, err := plugin.RunParser(o.args.ParserName, addr.Addrs[0])
 	if err != nil {
 		return err
 	}

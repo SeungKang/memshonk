@@ -27,6 +27,8 @@ func mainWithError() error {
 		return err
 	}
 
+	log.Println("loading plugin...")
+
 	plugin, err := pluginCtl.Load(
 		"/home/u/libmemshonk_plugin.so",
 	)
@@ -34,21 +36,23 @@ func mainWithError() error {
 		return err
 	}
 
-	_ = plugin
-
 	fmt.Println(pluginCtl.PrettyString(""))
 
-	parser, hasIt := plugin.Parser("parse_enemies")
-	if !hasIt {
-		return fmt.Errorf("does not have it")
-	}
-
-	b, err := parser.Run(0x00)
+	b, err := plugin.RunParser("parse_enemies", 0x00)
 	if err != nil {
 		return fmt.Errorf("parser failed - %w", err)
 	}
 
-	log.Println(hex.Dump(b))
+	fmt.Println(hex.Dump(b))
+
+	log.Println("unloading plugin...")
+
+	err = pluginCtl.Unload(plugin)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(pluginCtl.PrettyString(""))
 
 	return nil
 }

@@ -74,9 +74,9 @@ func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) error {
 
 func (o PluginsCommand) list(ctl plugins.Ctl, inOut IO) error {
 	if o.args.PluginNameOrFilePath != "" {
-		plugin, hasIt := ctl.Plugin(o.args.PluginNameOrFilePath)
-		if !hasIt {
-			return errors.New("plugin is not loaded")
+		plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
+		if err != nil {
+			return err
 		}
 
 		fmt.Fprintln(inOut.Stdout, plugin.PrettyString(""))
@@ -105,5 +105,10 @@ func (o PluginsCommand) reload(ctl plugins.Ctl, inOut IO) error {
 }
 
 func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
-	return errors.New("TODO: not implemented yet :(")
+	plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin - %w", err)
+	}
+
+	return ctl.Unload(plugin)
 }

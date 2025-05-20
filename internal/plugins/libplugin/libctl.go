@@ -29,6 +29,7 @@ const (
 
 // Optional functions for library-based plugins.
 const (
+	unloadFnName  = "unload"
 	debugFnName   = "debug"
 	parsersFnName = "parsers_v0"
 )
@@ -116,35 +117,16 @@ func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
 	return 0
 }
 
-func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, bool) {
+func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	return o.isLoaded(pluginName)
-}
-
-func (o *Ctl) Parser(parserID string) (plugins.ParserPlugin, error) {
-	o.rwMu.RLock()
-	defer o.rwMu.RUnlock()
-
-	pluginName, parserName, hasIt := separateNamespace(parserID)
+	plugin, hasIt := o.isLoaded(pluginName)
 	if !hasIt {
-		return nil, fmt.Errorf("parser must use <plugin-name>%s<parser-name> syntax",
-			pluginNamespaceSep)
+		return nil, fmt.Errorf("%q: %w", plugins.ErrPluginNotLoaded)
 	}
 
-	plugin, isLoaded := o.isLoaded(pluginName)
-	if !isLoaded {
-		return nil, fmt.Errorf("library is not loaded (%q)", pluginName)
-	}
-
-	parser, hasIt := plugin.Parser(parserName)
-	if !hasIt {
-		return nil, fmt.Errorf("library does not contain parser: %q",
-			parserName)
-	}
-
-	return parser, nil
+	return plugin, nil
 }
 
 func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
@@ -157,28 +139,6 @@ func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
 	}
 
 	return nil, false
-}
-
-func (o *Ctl) addPlugin(plugin *Plugin) {
-	o.plugins = append(o.plugins, plugin)
-
-	sort.SliceStable(o.plugins, func(i int, j int) bool {
-		return o.plugins[i].Name() > o.plugins[j].Name()
-	})
-}
-
-func (o *Ctl) rmPlugin(plugin *Plugin) {
-	// Not the most efficient way to do this,
-	// but it is far less error-prone.
-	var newSlice []*Plugin
-
-	for i := range o.plugins {
-		if plugin != o.plugins[i] {
-			newSlice = append(newSlice, o.plugins[i])
-		}
-	}
-
-	o.plugins = newSlice
 }
 
 func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
@@ -222,6 +182,42 @@ func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 	return libPlugin, nil
 }
 
+func (o *Ctl) addPlugin(plugin *Plugin) {
+	o.plugins = append(o.plugins, plugin)
+
+	sort.SliceStable(o.plugins, func(i int, j int) bool {
+		return o.plugins[i].Name() > o.plugins[j].Name()
+	})
+}
+
+func (o *Ctl) Unload(plugin plugins.Plugin) error {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	// Not the most efficient way to do this,
+	// but it is far less error-prone.
+	var newSlice []*Plugin
+
+	for i := range o.plugins {
+		if plugin == o.plugins[i] {
+			err := o.plugins[i].Unload()
+			if err != nil {
+				return fmt.Errorf("failed to unload plugin - %w", err)
+			}
+		} else {
+			newSlice = append(newSlice, o.plugins[i])
+		}
+	}
+
+	if len(o.plugins) == len(newSlice) {
+		return fmt.Errorf("%q: %w", plugin.Name(), plugins.ErrPluginNotLoaded)
+	}
+
+	o.plugins = newSlice
+
+	return nil
+}
+
 func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugin, error) {
 	var versionFn func() uint16
 
@@ -262,7 +258,8 @@ func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugi
 		return nil, fmt.Errorf("failed to setup read from addr fn - %w", err)
 	}
 
-	_ = lib.Func(debugFnName, &plugin.debufFn)
+	_ = lib.Func(unloadFnName, &plugin.optUnloadFn)
+	_ = lib.Func(debugFnName, &plugin.optDebugFn)
 
 	err = plugin.loadParsers()
 	if err != nil {

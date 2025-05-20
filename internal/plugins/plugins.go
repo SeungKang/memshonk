@@ -4,14 +4,15 @@ import "errors"
 
 var (
 	ErrPluginsDisabled = errors.New("plugins are disabled")
+	ErrPluginNotLoaded = errors.New("plugin is not loaded (please check that its name is correct)")
 )
 
 type Ctl interface {
 	Load(filePath string) (Plugin, error)
 
-	Plugin(name string) (Plugin, bool)
+	Plugin(name string) (Plugin, error)
 
-	Parser(id string) (ParserPlugin, error)
+	Unload(Plugin) error
 
 	PrettyString(indent string) string
 }
@@ -27,13 +28,9 @@ type Plugin interface {
 
 	DisableDebug()
 
-	Parser(name string) (ParserPlugin, bool)
+	RunParser(id string, targetAddr uintptr) ([]byte, error)
 
 	PrettyString(indent string) string
-}
-
-type ParserPlugin interface {
-	Run(addr uintptr) ([]byte, error)
 }
 
 type CtlConfig struct {

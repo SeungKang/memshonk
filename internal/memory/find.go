@@ -30,15 +30,15 @@ func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
 		i++
 	}
 
-	if len(matches) > 0 {
-		return matches, nil
-	}
-
 	if reader.Err() != nil {
 		return nil, reader.Err()
 	}
 
-	return nil, errors.New("pattern not found in data")
+	if len(matches) > 0 {
+		return matches, nil
+	}
+
+	return nil, nil
 }
 
 type ParsedPattern struct {

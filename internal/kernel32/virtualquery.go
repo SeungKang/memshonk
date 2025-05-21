@@ -6,15 +6,6 @@ import (
 	"unsafe"
 )
 
-// Various memory state constants.
-//
-// See MEMORY_BASIC_INFORMATION documentation for details.
-const (
-	MemCommit  uint32 = 0x1000
-	MemFree    uint32 = 0x10000
-	MemReserve uint32 = 0x2000
-)
-
 // Various memory type constants.
 //
 // See MEMORY_BASIC_INFORMATION documentation for details.
@@ -22,6 +13,15 @@ const (
 	MemImage   uint32 = 0x1000000
 	MemMapped  uint32 = 0x40000
 	MemPrivate uint32 = 0x20000
+)
+
+// Various memory state constants.
+//
+// See MEMORY_BASIC_INFORMATION documentation for details.
+const (
+	MemCommit  uint32 = 0x1000
+	MemFree    uint32 = 0x10000
+	MemReserve uint32 = 0x2000
 )
 
 // Various memory protection constants.
@@ -98,7 +98,7 @@ func VirtualQueryEx(hProcess syscall.Handle, lpAddress uintptr, lpBuffer *MEMORY
 		uintptr(hProcess),                 // hProcess
 		uintptr(lpAddress),                // lpAddress
 		uintptr(unsafe.Pointer(lpBuffer)), // lpBuffer
-		uintptr(dwLength)) // dwLength
+		uintptr(dwLength))                 // dwLength
 	if isError(err) {
 		return err
 	}

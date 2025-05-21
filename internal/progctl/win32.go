@@ -16,16 +16,7 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 			region := memory.Region{
 				BaseAddress:    uintptr(info.BaseAddress),
 				AllocationBase: uintptr(info.AllocationBase),
-				RegionSize:     uint64(info.RegionSize),
-			}
-
-			switch info.State {
-			case kernel32.MemCommit:
-				region.State = memory.MemCommit
-			case kernel32.MemReserve:
-				region.State = memory.MemReserve
-			case kernel32.MemFree:
-				region.State = memory.MemFree
+				Size:           uint64(info.RegionSize),
 			}
 
 			switch info.Type {
@@ -37,8 +28,41 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 				region.Type = memory.MemPrivate
 			}
 
-			switch info.AllocationProtect {
+			switch info.State {
+			case kernel32.MemCommit:
+				region.State = memory.MemCommit
+			case kernel32.MemReserve:
+				region.State = memory.MemReserve
+			case kernel32.MemFree:
+				region.State = memory.MemFree
+			}
 
+			info.AllocationProtect &= ^(kernel32.PageGuard | kernel32.PageNoCache)
+
+			switch info.AllocationProtect {
+			case kernel32.PageExecute:
+				region.Executable = true
+			case kernel32.PageExecuteRead:
+				region.Executable = true
+				region.Readable = true
+			case kernel32.PageExecuteReadWrite:
+				region.Executable = true
+				region.Readable = true
+				region.Writeable = true
+			case kernel32.PageExecuteWriteCopy:
+				region.Executable = true
+				region.Writeable = true
+				region.Copyable = true
+			case kernel32.PageNoAccess:
+				// no access
+			case kernel32.PageReadOnly:
+				region.Readable = true
+			case kernel32.PageReadWrite:
+				region.Readable = true
+				region.Writeable = true
+			case kernel32.PageWriteCopy:
+				region.Writeable = true
+				region.Copyable = true
 			}
 
 			regions.Add(region)

@@ -142,6 +142,10 @@ func (o *process) objects() memory.MappedObjects {
 	return o.mods
 }
 
+func (o *process) regions() (memory.Regions, error) {
+	return getRegions(uintptr(o.proc.Handle))
+}
+
 func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
 	addr, err := o.resolvePointer(pointer)
 	if err != nil {

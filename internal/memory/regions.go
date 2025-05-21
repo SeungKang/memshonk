@@ -1,5 +1,7 @@
 package memory
 
+import "errors"
+
 const (
 	MemTypeUnknown MemoryType = iota
 	MemImage
@@ -26,9 +28,16 @@ func (o *Regions) Add(region Region) {
 	o.regions = append(o.regions, region)
 }
 
-func (o *Regions) Iter(fn func(i int, region Region)) error {
+func (o *Regions) Iter(fn func(i int, region Region) error) error {
 	for i, region := range o.regions {
-		fn(i, region)
+		err := fn(i, region)
+		if err != nil {
+			if errors.Is(err, ErrStopIterating) {
+				return nil
+			}
+
+			return err
+		}
 	}
 
 	return nil
@@ -37,11 +46,12 @@ func (o *Regions) Iter(fn func(i int, region Region)) error {
 type Region struct {
 	BaseAddress    uintptr
 	AllocationBase uintptr
-	RegionSize     uint64
+	Size           uint64
 	State          MemoryState
 	Type           MemoryType
 
 	Readable   bool
 	Writeable  bool
 	Executable bool
+	Copyable   bool
 }

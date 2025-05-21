@@ -29,6 +29,8 @@ type Process interface {
 
 	MappedObjects(ctx context.Context) (memory.MappedObjects, error)
 
+	Regions(ctx context.Context) (memory.Regions, error)
+
 	ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error)
 
 	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, error)
@@ -94,6 +96,17 @@ func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
 	}
 
 	return o.current.objects(), nil
+}
+
+func (o *Ctl) Regions(context.Context) (memory.Regions, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if o.current == nil {
+		return memory.Regions{}, ErrNotAttached
+	}
+
+	return o.current.regions()
 }
 
 func (o *Ctl) ResolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, error) {

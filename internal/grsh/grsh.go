@@ -45,18 +45,6 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			cmdSchema, session))
 	}
 
-	grumbleApp.AddCommand(NewAttachCommand(session))
-
-	grumbleApp.AddCommand(NewObjectsCommand(session))
-
-	grumbleApp.AddCommand(NewFindCommand(session))
-
-	//grumbleApp.AddCommand(NewSeekCommand(session))
-
-	grumbleApp.AddCommand(NewReadCommand(session))
-
-	grumbleApp.AddCommand(NewWriteCommand(session))
-
 	return sh, nil
 }
 
@@ -76,22 +64,6 @@ func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
 
 	return nil
 }
-
-//func (o *Shell) seek(c *grumble.Context) error {
-//	addr, err := strconv.ParseUint(strings.TrimPrefix(c.Args.String("addr"), "0x"), 16, 64)
-//	if err != nil {
-//		return err
-//	}
-//
-//	err = o.pg.Seek(uintptr(addr))
-//	if err != nil {
-//		return err
-//	}
-//
-//	o.setPrompt()
-//
-//	return nil
-//}
 
 // TODO: implement seek address
 func (o *Shell) setPrompt() {

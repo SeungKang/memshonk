@@ -10,6 +10,11 @@ import (
 
 func BuiltinCommands() []CommandSchema {
 	return []CommandSchema{
+		AttachCommandSchema(),
+		ReadCommandSchema(),
+		WriteCommandSchema(),
+		FindCommandSchema(),
+		ObjectsCommandSchema(),
 		PluginsCommandSchema(),
 		ParserCommandSchema(),
 	}

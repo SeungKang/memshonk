@@ -6,7 +6,16 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var _ Command = (*ObjectsCommand)(nil)
+func ObjectsCommandSchema() CommandSchema {
+	return CommandSchema{
+		Name:      "objects",
+		Aliases:   []string{"o"},
+		ShortHelp: "list the memory mapped objects",
+		CreateFn: func(c CommandConfig) (Command, error) {
+			return NewObjectsCommand(ObjectsCommandArgs{}), nil
+		},
+	}
+}
 
 type ObjectsCommandArgs struct {
 }

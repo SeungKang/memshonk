@@ -7,11 +7,45 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
-var _ Command = (*FindCommand)(nil)
+func FindCommandSchema() CommandSchema {
+	return CommandSchema{
+		Name:      "find",
+		Aliases:   []string{"f"},
+		ShortHelp: "find a pattern in memory",
+		NonFlags: []NonFlagSchema{
+			{
+				Name:     "pattern",
+				Desc:     "byte pattern to search for",
+				DefValue: "",
+				DataType: "",
+			},
+			{
+				Name:     "start",
+				Desc:     "the address to start searching from",
+				DataType: "",
+				DefValue: "",
+			},
+			{
+				Name:     "end",
+				Desc:     "the address to stop searching at",
+				DataType: "",
+				DefValue: "",
+			},
+		},
+		CreateFn: func(c CommandConfig) (Command, error) {
+			return NewFindCommand(FindCommandArgs{
+				Pattern:   c.NonFlags.String("pattern"),
+				StartAddr: c.NonFlags.String("start"),
+				EndAddr:   c.NonFlags.String("end"),
+			}), nil
+		},
+	}
+}
 
 type FindCommandArgs struct {
 	Pattern   string
 	StartAddr string
+	EndAddr   string
 }
 
 func NewFindCommand(args FindCommandArgs) FindCommand {

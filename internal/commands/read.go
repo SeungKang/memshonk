@@ -9,12 +9,48 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var _ Command = (*ReadCommand)(nil)
+func ReadCommandSchema() CommandSchema {
+	return CommandSchema{
+		Name:      "read",
+		Aliases:   []string{"r"},
+		ShortHelp: "read n bytes from addr",
+		Flags: []FlagSchema{
+			{
+				Short:      "e",
+				Long:       "encoding",
+				Desc:       "Optional: Specify output encoding format",
+				DataType:   "",
+				DefaultVal: "hexdump",
+			},
+		},
+		NonFlags: []NonFlagSchema{
+			{
+				Name:     "size",
+				Desc:     "number of bytes to read",
+				DefValue: uint64(0),
+				DataType: uint64(0),
+			},
+			{
+				Name:     "addr",
+				Desc:     "address to read from",
+				DataType: "",
+				DefValue: "",
+			},
+		},
+		CreateFn: func(c CommandConfig) (Command, error) {
+			return NewReadCommand(ReadCommandArgs{
+				EncodingFormat: c.Flags.String("encoding"),
+				SizeBytes:      c.NonFlags.Uint64("size"),
+				AddrStr:        c.NonFlags.String("addr"),
+			}), nil
+		},
+	}
+}
 
 type ReadCommandArgs struct {
 	EncodingFormat string
-	AddrStr        string
 	SizeBytes      uint64
+	AddrStr        string
 }
 
 func NewReadCommand(args ReadCommandArgs) ReadCommand {

@@ -13,11 +13,47 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var _ Command = (*WriteCommand)(nil)
+func WriteCommandSchema() CommandSchema {
+	return CommandSchema{
+		Name:      "write",
+		Aliases:   []string{"w"},
+		ShortHelp: "write value to addr",
+		Flags: []FlagSchema{
+			{
+				Short:      "e",
+				Long:       "encoding",
+				Desc:       "Optional: Specify output encoding format",
+				DataType:   "",
+				DefaultVal: "hex",
+			},
+		},
+		NonFlags: []NonFlagSchema{
+			{
+				Name:     "data",
+				Desc:     "data to write",
+				DefValue: "",
+				DataType: "",
+			},
+			{
+				Name:     "addr",
+				Desc:     "address to write to",
+				DataType: "",
+				DefValue: "",
+			},
+		},
+		CreateFn: func(c CommandConfig) (Command, error) {
+			return NewWriteCommand(WriteCommandArgs{
+				EncodingFormat: c.Flags.String("encoding"),
+				DataStr:        c.NonFlags.String("data"),
+				AddrStr:        c.NonFlags.String("addr"),
+			}), nil
+		},
+	}
+}
 
 type WriteCommandArgs struct {
-	DataStr        string
 	EncodingFormat string
+	DataStr        string
 	AddrStr        string
 }
 

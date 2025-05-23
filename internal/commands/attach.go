@@ -57,7 +57,15 @@ func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) error {
 		return err
 	}
 
-	fmt.Fprintf(inOut.Stdout, "attached to pid: %d\n", pid)
+	obj, err := s.Process().ExeObject(ctx)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(inOut.Stdout, "attached to %q, pid: %d, base addr: 0x%x\n",
+		obj.Filename,
+		pid,
+		obj.BaseAddr)
 
 	return nil
 }

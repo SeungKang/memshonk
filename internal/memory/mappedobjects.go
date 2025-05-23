@@ -3,10 +3,12 @@ package memory
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type MappedObjects struct {
-	namesToObjects map[string]MappedObject
+	objects []MappedObject
+	byName  map[string]int
 }
 
 func (o *MappedObjects) Add(object MappedObject) error {
@@ -19,33 +21,63 @@ func (o *MappedObjects) Add(object MappedObject) error {
 		return fmt.Errorf("object already present: %q", object.Filename)
 	}
 
-	if o.namesToObjects == nil {
-		o.namesToObjects = make(map[string]MappedObject)
+	if o.byName == nil {
+		o.byName = make(map[string]int)
 	}
 
-	o.namesToObjects[object.Filename] = object
+	o.objects = append(o.objects, object)
+	o.byName[object.Filename] = len(o.objects) - 1
 
 	return nil
 }
 
 func (o *MappedObjects) Has(name string) (MappedObject, bool) {
-	obj, hasIt := o.namesToObjects[name]
+	i, hasIt := o.byName[name]
+	if hasIt {
+		return o.objects[i], true
+	}
 
-	return obj, hasIt
+	return MappedObject{}, hasIt
 }
 
-func (o *MappedObjects) ByAddr(addr uintptr) (MappedObject, bool) {
-	for _, obj := range o.namesToObjects {
-		if obj.ContainsAddr(addr) {
-			return obj, true
+func (o MappedObjects) Len() int {
+	return len(o.objects)
+}
+
+func (o MappedObjects) Less(i, j int) bool {
+	return o.objects[i].BaseAddr < o.objects[j].EndAddr
+}
+
+func (o MappedObjects) Swap(i, j int) {
+	o.objects[i], o.objects[j] = o.objects[j], o.objects[i]
+}
+
+func (o MappedObjects) Sort() {
+	sort.Sort(o)
+}
+
+func (o MappedObjects) ByAddr(v uintptr) (*MappedObject, bool) {
+	// This code is based on work by Stackoverflow user OneOfOne:
+	// https://stackoverflow.com/a/39750394
+	ln := o.Len()
+
+	i := sort.Search(ln, func(i int) bool {
+		return v <= o.objects[i].EndAddr
+	})
+
+	if i < ln {
+		it := &o.objects[i]
+
+		if v >= it.BaseAddr && v <= it.EndAddr {
+			return it, true
 		}
 	}
 
-	return MappedObject{}, false
+	return nil, false
 }
 
 func (o *MappedObjects) IterObjects(fn func(MappedObject) error) error {
-	for _, obj := range o.namesToObjects {
+	for _, obj := range o.objects {
 		obj := obj
 
 		err := fn(obj)
@@ -74,6 +106,6 @@ func (o *MappedObject) ContainsAddr(addr uintptr) bool {
 }
 
 func (o *MappedObject) String() string {
-	return fmt.Sprintf("Filepath: %q, Filename: %q, BaseAddr: 0x%x, EndAddr: 0x%x, Size: 0x%x",
-		o.Filepath, o.Filename, o.BaseAddr, o.EndAddr, o.Size)
+	return fmt.Sprintf("%#012x-%#012x %#08x %s",
+		o.BaseAddr, o.EndAddr, o.Size, o.Filepath)
 }

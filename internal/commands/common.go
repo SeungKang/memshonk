@@ -14,7 +14,7 @@ func BuiltinCommands() []CommandSchema {
 		ReadCommandSchema(),
 		WriteCommandSchema(),
 		FindCommandSchema(),
-		ObjectsCommandSchema(),
+		VmmapCommandSchema(),
 		PluginsCommandSchema(),
 		ParserCommandSchema(),
 	}

@@ -15,6 +15,7 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 		func(i int, info kernel32.MEMORY_BASIC_INFORMATION) error {
 			region := memory.Region{
 				BaseAddress:    uintptr(info.BaseAddress),
+				EndAddr:        uintptr(info.BaseAddress) + info.RegionSize,
 				AllocationBase: uintptr(info.AllocationBase),
 				Size:           uint64(info.RegionSize),
 			}

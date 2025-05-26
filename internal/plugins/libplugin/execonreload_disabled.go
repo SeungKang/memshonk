@@ -1,4 +1,4 @@
-//go:build !plugins_execreload
+//go:build !plugins_execonreload
 
 package libplugin
 

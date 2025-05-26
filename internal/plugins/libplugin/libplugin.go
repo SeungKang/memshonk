@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/dl"
+	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
 type Plugin struct {
+	config           plugins.PluginConfig
 	filePath         string
 	name             string
 	loadedAt         time.Time

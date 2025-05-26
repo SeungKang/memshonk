@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -29,9 +30,10 @@ func mainWithError() error {
 
 	log.Println("loading plugin...")
 
-	plugin, err := pluginCtl.Load(
-		"/home/u/libmemshonk_plugin.so",
-	)
+	plugin, err := pluginCtl.Load(plugins.PluginConfig{
+		FilePath:     "/home/u/libmemshonk_plugin.so",
+		ExecOnReload: []string{"echo", "hello"},
+	})
 	if err != nil {
 		return err
 	}
@@ -45,9 +47,18 @@ func mainWithError() error {
 
 	fmt.Println(hex.Dump(b))
 
+	log.Println("reloading plugin...")
+
+	err = pluginCtl.Reload(context.Background(), plugin.Name())
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(pluginCtl.PrettyString(""))
+
 	log.Println("unloading plugin...")
 
-	err = pluginCtl.Unload(plugin)
+	err = pluginCtl.Unload(plugin.Name())
 	if err != nil {
 		return err
 	}

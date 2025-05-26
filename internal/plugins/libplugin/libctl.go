@@ -2,6 +2,7 @@ package libplugin
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -47,14 +48,6 @@ func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create callback for ReadFromAddr - %w",
 			err)
-	}
-
-	for _, filePath := range args.InitialPlugins {
-		_, err := ctl.Load(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load plugin: %q - %w",
-				filePath, err)
-		}
 	}
 
 	return ctl, nil
@@ -123,13 +116,41 @@ func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, error) {
 
 	plugin, hasIt := o.isLoaded(pluginName)
 	if !hasIt {
-		return nil, fmt.Errorf("%q: %w", plugins.ErrPluginNotLoaded)
+		return nil, fmt.Errorf("%q: %w",
+			pluginName, plugins.ErrPluginNotLoaded)
 	}
 
 	return plugin, nil
 }
 
-func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
+func (o *Ctl) Reload(ctx context.Context, name string) error {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	plugin, isLoaded := o.isLoaded(name)
+	if !isLoaded {
+		return plugins.ErrPluginNotLoaded
+	}
+
+	err := o.unload(name)
+	if err != nil {
+		return err
+	}
+
+	err = execReload(ctx, plugin.config)
+	if err != nil {
+		return err
+	}
+
+	_, err = o.load(plugin.config)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *Ctl) isLoaded(pluginName string) (*Plugin, bool) {
 	for _, plugin := range o.plugins {
 		if plugin.name == pluginName {
 			plugin := plugin
@@ -141,11 +162,15 @@ func (o *Ctl) isLoaded(pluginName string) (plugins.Plugin, bool) {
 	return nil, false
 }
 
-func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
+func (o *Ctl) Load(config plugins.PluginConfig) (plugins.Plugin, error) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
-	absFilePath, err := filepath.Abs(pluginFilePath)
+	return o.load(config)
+}
+
+func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
+	absFilePath, err := filepath.Abs(config.FilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute file path for library - %w", err)
 	}
@@ -171,7 +196,12 @@ func (o *Ctl) Load(pluginFilePath string) (plugins.Plugin, error) {
 
 	// setupPlugin allows us to call lib.Release
 	// in one place if the function fails.
-	libPlugin, err := o.setupPlugin(absFilePath, name, lib)
+	libPlugin, err := o.setupPlugin(setupPluginArgs{
+		config:   config,
+		filePath: absFilePath,
+		name:     name,
+		lib:      lib,
+	})
 	if err != nil {
 		lib.Release()
 		return nil, fmt.Errorf("failed to setup plugin - %w", err)
@@ -190,16 +220,20 @@ func (o *Ctl) addPlugin(plugin *Plugin) {
 	})
 }
 
-func (o *Ctl) Unload(plugin plugins.Plugin) error {
+func (o *Ctl) Unload(name string) error {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
+	return o.unload(name)
+}
+
+func (o *Ctl) unload(name string) error {
 	// Not the most efficient way to do this,
 	// but it is far less error-prone.
 	var newSlice []*Plugin
 
 	for i := range o.plugins {
-		if plugin == o.plugins[i] {
+		if name == o.plugins[i].name {
 			err := o.plugins[i].Unload()
 			if err != nil {
 				return fmt.Errorf("failed to unload plugin - %w", err)
@@ -210,7 +244,7 @@ func (o *Ctl) Unload(plugin plugins.Plugin) error {
 	}
 
 	if len(o.plugins) == len(newSlice) {
-		return fmt.Errorf("%q: %w", plugin.Name(), plugins.ErrPluginNotLoaded)
+		return fmt.Errorf("%q: %w", name, plugins.ErrPluginNotLoaded)
 	}
 
 	o.plugins = newSlice
@@ -218,26 +252,34 @@ func (o *Ctl) Unload(plugin plugins.Plugin) error {
 	return nil
 }
 
-func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugin, error) {
+type setupPluginArgs struct {
+	config   plugins.PluginConfig
+	filePath string
+	name     string
+	lib      *dl.Library
+}
+
+func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	var versionFn func() uint16
 
-	err := lib.Func(versionFnName, &versionFn)
+	err := args.lib.Func(versionFnName, &versionFn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get version function in library - %w", err)
 	}
 
 	plugin := &Plugin{
-		lib:      lib,
-		name:     name,
+		config:   args.config,
+		lib:      args.lib,
+		name:     args.name,
 		loadedAt: time.Now(),
-		filePath: filePath,
+		filePath: args.filePath,
 		version:  versionFn(),
 	}
 
 	_, err = findFirstFunc(
 		[]string{errorStringFnName},
 		&plugin.getErrorStringFn,
-		lib)
+		args.lib)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup error string fn - %w", err)
 	}
@@ -245,7 +287,7 @@ func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugi
 	_, err = findFirstFunc(
 		[]string{freeStrFnName},
 		&plugin.freeStringFn,
-		lib)
+		args.lib)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup free string fn - %w", err)
 	}
@@ -253,13 +295,13 @@ func (o *Ctl) setupPlugin(filePath string, name string, lib *dl.Library) (*Plugi
 	err = registerCallbackFn(
 		[]string{setReadFromAddrFnName},
 		o.readFromAddrCallback,
-		lib)
+		args.lib)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup read from addr fn - %w", err)
 	}
 
-	_ = lib.Func(unloadFnName, &plugin.optUnloadFn)
-	_ = lib.Func(debugFnName, &plugin.optDebugFn)
+	_ = args.lib.Func(unloadFnName, &plugin.optUnloadFn)
+	_ = args.lib.Func(debugFnName, &plugin.optDebugFn)
 
 	err = plugin.loadParsers()
 	if err != nil {

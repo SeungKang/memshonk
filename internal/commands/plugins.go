@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/plugins"
@@ -52,20 +51,20 @@ type PluginsCommand struct {
 }
 
 func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) error {
-	plugins, enabled := s.Plugins()
+	pluginsCtl, enabled := s.Plugins()
 	if !enabled {
-		return errors.New("plugins are disabled")
+		return plugins.ErrPluginsDisabled
 	}
 
 	switch o.args.Mode {
 	case "list", "ls":
-		return o.list(plugins, inOut)
+		return o.list(pluginsCtl, inOut)
 	case "load":
-		return o.load(plugins, inOut)
+		return o.load(pluginsCtl, inOut)
 	case "reload":
-		return o.reload(plugins, inOut)
+		return o.reload(ctx, pluginsCtl, inOut)
 	case "unload":
-		return o.unload(plugins, inOut)
+		return o.unload(pluginsCtl, inOut)
 	default:
 		return fmt.Errorf("unknown plugins command; %q",
 			o.args.Mode)
@@ -90,9 +89,11 @@ func (o PluginsCommand) list(ctl plugins.Ctl, inOut IO) error {
 }
 
 func (o PluginsCommand) load(ctl plugins.Ctl, inOut IO) error {
-	plugin, err := ctl.Load(o.args.PluginNameOrFilePath)
+	plugin, err := ctl.Load(plugins.PluginConfig{
+		FilePath: o.args.PluginNameOrFilePath,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to load plugin - %w", err)
+		return err
 	}
 
 	fmt.Fprintln(inOut.Stdout, plugin.PrettyString(""))
@@ -100,15 +101,20 @@ func (o PluginsCommand) load(ctl plugins.Ctl, inOut IO) error {
 	return nil
 }
 
-func (o PluginsCommand) reload(ctl plugins.Ctl, inOut IO) error {
-	return errors.New("TODO: not implemented yet :(")
+func (o PluginsCommand) reload(ctx context.Context, ctl plugins.Ctl, inOut IO) error {
+	err := ctl.Reload(ctx, o.args.PluginNameOrFilePath)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
-	plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
+	err := ctl.Unload(o.args.PluginNameOrFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to get plugin - %w", err)
+		return err
 	}
 
-	return ctl.Unload(plugin)
+	return nil
 }

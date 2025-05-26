@@ -1,18 +1,28 @@
 package plugins
 
-import "errors"
-
-var (
-	ErrPluginsDisabled = errors.New("plugins are disabled")
-	ErrPluginNotLoaded = errors.New("plugin is not loaded (please check that its name is correct)")
+import (
+	"context"
+	"errors"
 )
 
+var (
+	ErrPluginsDisabled      = errors.New("plugins are disabled")
+	ErrPluginNotLoaded      = errors.New("plugin is not loaded (please check that its name is correct)")
+	ErrExecOnReloadDisabled = errors.New("exec on reload is disabled")
+)
+
+type CtlConfig struct {
+	Process Process
+}
+
 type Ctl interface {
-	Load(filePath string) (Plugin, error)
+	Load(config PluginConfig) (Plugin, error)
 
 	Plugin(name string) (Plugin, error)
 
-	Unload(Plugin) error
+	Reload(ctx context.Context, name string) error
+
+	Unload(name string) error
 
 	PrettyString(indent string) string
 }
@@ -33,10 +43,9 @@ type Plugin interface {
 	PrettyString(indent string) string
 }
 
-type CtlConfig struct {
-	InitialPlugins []string
-
-	Process Process
+type PluginConfig struct {
+	FilePath     string
+	ExecOnReload []string
 }
 
 type Process interface {

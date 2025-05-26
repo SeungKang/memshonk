@@ -83,15 +83,12 @@ func mainWithError() error {
 
 	progCtl := progctl.NewCtl(proj.General().ExeName)
 
-	pluginsCtl, err := pluginsctl.New(plugins.CtlConfig{
-		InitialPlugins: proj.Plugins().Libraries,
-		Process:        pluginscompat.WrapProcess(progCtl),
-	})
-	if err != nil && !errors.Is(err, plugins.ErrPluginsDisabled) {
-		return fmt.Errorf("failed to setup plugin ctl - %w", err)
+	optPluginsCtl, err := loadInitialPlugins(proj, progCtl)
+	if err != nil {
+		return fmt.Errorf("failed to setup plugins - %w", err)
 	}
 
-	application := app.NewApp(proj, progCtl, pluginsCtl)
+	application := app.NewApp(proj, progCtl, optPluginsCtl)
 
 	session := application.NewSession(commands.IO{
 		Stdout: os.Stdout,
@@ -104,4 +101,27 @@ func mainWithError() error {
 	}
 
 	return sh.Run()
+}
+
+func loadInitialPlugins(proj *project.Project, progCtl *progctl.Ctl) (plugins.Ctl, error) {
+	pluginsCtl, err := pluginsctl.New(plugins.CtlConfig{
+		Process: pluginscompat.WrapProcess(progCtl),
+	})
+	if err != nil && !errors.Is(err, plugins.ErrPluginsDisabled) {
+		if errors.Is(err, plugins.ErrPluginsDisabled) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	for _, pluginConfig := range proj.Plugins().Libraries {
+		_, err := pluginsCtl.Load(pluginConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load plugin: %q - %w",
+				pluginConfig.FilePath, err)
+		}
+	}
+
+	return pluginsCtl, nil
 }

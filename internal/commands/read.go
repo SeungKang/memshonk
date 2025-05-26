@@ -28,7 +28,6 @@ func ReadCommandSchema() CommandSchema {
 			{
 				Name:     "size",
 				Desc:     "number of bytes to read",
-				DefValue: uint64(0),
 				DataType: uint64(0),
 			},
 			{

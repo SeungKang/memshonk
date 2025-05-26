@@ -66,28 +66,32 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) error {
 
 	process := s.Process()
 
-	return regions.Iter(func(i int, region memory.Region) error {
-		return o.searchRegion(region, inOut, process)
-	})
-}
+	var matches []memory.Pointer
 
-func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progctl.Process) error {
-	if !region.Readable {
+	fmt.Fprint(inOut.Stdout, "searching")
+
+	err = regions.Iter(func(i int, region memory.Region) error {
+		matchedAddrs, err := o.searchRegion(region, inOut, process)
+		if err != nil {
+			return err
+		}
+
+		// print 70 "." to show search progress
+		if i%(regions.Len()/70) == 0 {
+			_, err = fmt.Fprint(inOut.Stdout, ".")
+			if err != nil {
+				return err
+			}
+		}
+
+		matches = append(matches, matchedAddrs...)
 		return nil
-	}
+	})
 
-	reader, err := memory.NewBufferedReader(
-		process,
-		memory.AbsoluteAddrPointer(region.BaseAddress),
-		region.Size)
+	fmt.Fprintln(inOut.Stdout, "")
+
 	if err != nil {
 		return err
-	}
-
-	matches, err := memory.FindAllReader(o.args.Pattern, reader)
-	if err != nil {
-		// TODO ignoring error
-		return nil
 	}
 
 	if len(matches) > 0 {
@@ -98,4 +102,30 @@ func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progct
 	}
 
 	return nil
+}
+
+func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progctl.Process) ([]memory.Pointer, error) {
+	if !region.Readable {
+		return nil, nil
+	}
+
+	reader, err := memory.NewBufferedReader(
+		process,
+		memory.AbsoluteAddrPointer(region.BaseAddr),
+		region.Size)
+	if err != nil {
+		return nil, err
+	}
+
+	matches, err := memory.FindAllReader(o.args.Pattern, reader)
+	if err != nil {
+		// TODO ignoring error
+		return nil, nil
+	}
+
+	if len(matches) > 0 {
+		return matches, nil
+	}
+
+	return nil, nil
 }

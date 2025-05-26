@@ -1,9 +1,12 @@
 package commands
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 
+	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
@@ -63,7 +66,7 @@ type ArgFetcher interface {
 }
 
 type Command interface {
-	Run(context.Context, IO, Session) error
+	Run(context.Context, IO, Session) (CommandResult, error)
 }
 
 type Session interface {
@@ -76,4 +79,68 @@ type IO struct {
 	Stdout io.Writer
 
 	Stderr io.Writer
+}
+
+type CommandResult interface {
+	Serialize() []byte
+}
+
+type HumanCommandResult string
+
+func (o HumanCommandResult) String() string {
+	return string(o)
+}
+
+func (o HumanCommandResult) Serialize() []byte {
+	return []byte(o)
+}
+
+type UintptrCommandResult uintptr
+
+func (o UintptrCommandResult) Uintptr() uintptr {
+	return uintptr(o)
+}
+
+func (o UintptrCommandResult) Serialize() []byte {
+	return []byte(fmt.Sprintf("%#x", o))
+}
+
+type UintptrListCommandResult []uintptr
+
+func (o UintptrListCommandResult) Uintptrs() []uintptr {
+	return []uintptr(o)
+}
+
+func (o UintptrListCommandResult) Serialize() []byte {
+	buf := bytes.Buffer{}
+
+	for i, u := range o {
+		buf.WriteString(fmt.Sprintf("%#x", u))
+
+		if i < len(o)-1 {
+			buf.WriteString(", ")
+		}
+	}
+
+	return buf.Bytes()
+}
+
+type MemoryPointerListCommandResult []memory.Pointer
+
+func (o MemoryPointerListCommandResult) Pointers() []memory.Pointer {
+	return []memory.Pointer(o)
+}
+
+func (o MemoryPointerListCommandResult) Serialize() []byte {
+	buf := bytes.Buffer{}
+
+	for i, u := range o {
+		buf.WriteString(fmt.Sprintf("%#x", u))
+
+		if i < len(o)-1 {
+			buf.WriteString(", ")
+		}
+	}
+
+	return buf.Bytes()
 }

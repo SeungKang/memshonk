@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
@@ -58,17 +59,17 @@ type FindCommand struct {
 	args FindCommandArgs
 }
 
-func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) error {
+func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
 	regions, err := s.Process().Regions(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	process := s.Process()
 
-	var matches []memory.Pointer
+	var matches MemoryPointerListCommandResult
 
-	fmt.Fprint(inOut.Stdout, "searching")
+	fmt.Fprint(inOut.Stderr, "searching")
 
 	err = regions.Iter(func(i int, region memory.Region) error {
 		matchedAddrs, err := o.searchRegion(region, inOut, process)
@@ -78,30 +79,24 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) error {
 
 		// print 70 "." to show search progress
 		if i%(regions.Len()/70) == 0 {
-			_, err = fmt.Fprint(inOut.Stdout, ".")
+			_, err = fmt.Fprint(inOut.Stderr, ".")
 			if err != nil {
 				return err
 			}
 		}
 
 		matches = append(matches, matchedAddrs...)
+
 		return nil
 	})
 
-	fmt.Fprintln(inOut.Stdout, "")
+	fmt.Fprintln(inOut.Stderr, "")
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(matches) > 0 {
-		_, err = fmt.Fprintln(inOut.Stdout, "matches:", matches)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return matches, nil
 }
 
 func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progctl.Process) ([]memory.Pointer, error) {

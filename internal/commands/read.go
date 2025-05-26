@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -34,7 +35,6 @@ func ReadCommandSchema() CommandSchema {
 				Name:     "addr",
 				Desc:     "address to read from",
 				DataType: "",
-				DefValue: "",
 			},
 		},
 		CreateFn: func(c CommandConfig) (Command, error) {
@@ -63,47 +63,42 @@ type ReadCommand struct {
 	args ReadCommandArgs
 }
 
-func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) error {
-	var fmtFn func([]byte) error
+func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+	var fmtFn func([]byte) (string, error)
 
 	// TODO: Document encoding formats
 	encodingFormat := o.args.EncodingFormat
 	switch encodingFormat {
 	case "hexdump":
-		fmtFn = func(b []byte) error {
-			_, err := fmt.Fprintln(inOut.Stdout, hex.Dump(b))
-			return err
+		fmtFn = func(b []byte) (string, error) {
+			return strings.TrimSpace(hex.Dump(b)), nil
 		}
 	case "hex":
-		fmtFn = func(b []byte) error {
-			_, err := fmt.Fprintln(inOut.Stdout, hex.EncodeToString(b))
-			return err
+		fmtFn = func(b []byte) (string, error) {
+			return hex.EncodeToString(b), nil
 		}
 	case "b64", "base64":
-		fmtFn = func(b []byte) error {
-			_, err := fmt.Fprintln(inOut.Stdout, base64.StdEncoding.EncodeToString(b))
-			return err
+		fmtFn = func(b []byte) (string, error) {
+			return base64.StdEncoding.EncodeToString(b), nil
 		}
 	default:
-		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
+		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	var ptr memory.Pointer
-	addrStr := o.args.AddrStr
-	var err error
-	if addrStr == "" {
-		return errors.New("TODO: implement seek address support")
-	} else {
-		ptr, err = memory.CreatePointerFromString(addrStr)
-		if err != nil {
-			return err
-		}
+	ptr, err := memory.CreatePointerFromString(o.args.AddrStr)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := s.Process().ReadFromAddr(ctx, ptr, o.args.SizeBytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return fmtFn(data)
+	encoded, err := fmtFn(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return HumanCommandResult(encoded), nil
 }

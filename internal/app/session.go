@@ -48,8 +48,17 @@ func (o *Session) Plugins() (plugins.Ctl, bool) {
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
-	// TODO: Implement a RunCommandWithIO method to customize IO.
-	return cmd.Run(ctx, o.io, o)
+	result, err := cmd.Run(ctx, o.io, o)
+	if err != nil {
+		return err
+	}
+
+	if result != nil {
+		o.io.Stdout.Write(result.Serialize())
+		o.io.Stdout.Write([]byte{'\n'})
+	}
+
+	return nil
 }
 
 func (o *Session) Process() progctl.Process {

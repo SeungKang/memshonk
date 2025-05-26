@@ -2,9 +2,9 @@ package commands
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
 	"github.com/SeungKang/memshonk/internal/memory"
+	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
 func ParserCommandSchema() CommandSchema {
@@ -50,28 +50,26 @@ type ParserCommand struct {
 	args ParserCommandArgs
 }
 
-func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) error {
+func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
 	loadedPlugins, enabled := s.Plugins()
 	if !enabled {
-		return errors.New("plugins are disabled")
+		return nil, plugins.ErrPluginsDisabled
 	}
 
 	plugin, err := loadedPlugins.Plugin(o.args.PluginName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	addr, err := memory.CreatePointerFromString(o.args.Addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	blob, err := plugin.RunParser(o.args.ParserName, addr.Addrs[0])
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Fprintln(inOut.Stdout, string(blob))
-
-	return nil
+	return HumanCommandResult(string(blob)), nil
 }

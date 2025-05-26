@@ -3,6 +3,8 @@ package commands
 import (
 	"context"
 	"fmt"
+
+	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 func AttachCommandSchema() CommandSchema {
@@ -50,22 +52,32 @@ type AttachCommand struct {
 	args AttachCommandArgs
 }
 
-func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) error {
+func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
 	// TODO: Support AttachCommandArgs
 	pid, err := s.Process().Attach(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	obj, err := s.Process().ExeObject(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Fprintf(inOut.Stdout, "attached to %q, pid: %d, base addr: 0x%x\n",
-		obj.Filename,
-		pid,
-		obj.BaseAddr)
+	return AttachCommandResult{
+		PID:    pid,
+		ExeObj: obj,
+	}, nil
+}
 
-	return nil
+type AttachCommandResult struct {
+	PID    int
+	ExeObj memory.MappedObject
+}
+
+func (o AttachCommandResult) Serialize() []byte {
+	return []byte(fmt.Sprintf("attached to %q, pid: %d, base addr: 0x%x",
+		o.ExeObj.Filename,
+		o.PID,
+		o.ExeObj.BaseAddr))
 }

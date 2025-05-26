@@ -50,58 +50,52 @@ type PluginsCommand struct {
 	args PluginsCommandArgs
 }
 
-func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) error {
+func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
 	pluginsCtl, enabled := s.Plugins()
 	if !enabled {
-		return plugins.ErrPluginsDisabled
+		return nil, plugins.ErrPluginsDisabled
 	}
 
 	switch o.args.Mode {
 	case "list", "ls":
-		return o.list(pluginsCtl, inOut)
+		return o.list(pluginsCtl)
 	case "load":
-		return o.load(pluginsCtl, inOut)
+		return o.load(pluginsCtl)
 	case "reload":
-		return o.reload(ctx, pluginsCtl, inOut)
+		return nil, o.reload(ctx, pluginsCtl)
 	case "unload":
-		return o.unload(pluginsCtl, inOut)
+		return nil, o.unload(pluginsCtl, inOut)
 	default:
-		return fmt.Errorf("unknown plugins command; %q",
+		return nil, fmt.Errorf("unknown plugins command; %q",
 			o.args.Mode)
 	}
 }
 
-func (o PluginsCommand) list(ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) list(ctl plugins.Ctl) (CommandResult, error) {
 	if o.args.PluginNameOrFilePath != "" {
 		plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		fmt.Fprintln(inOut.Stdout, plugin.PrettyString(""))
-
-		return nil
+		return HumanCommandResult(plugin.PrettyString("")), nil
 	}
 
-	fmt.Fprintln(inOut.Stdout, ctl.PrettyString(""))
-
-	return nil
+	return HumanCommandResult(ctl.PrettyString("")), nil
 }
 
-func (o PluginsCommand) load(ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) load(ctl plugins.Ctl) (CommandResult, error) {
 	plugin, err := ctl.Load(plugins.PluginConfig{
 		FilePath: o.args.PluginNameOrFilePath,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Fprintln(inOut.Stdout, plugin.PrettyString(""))
-
-	return nil
+	return HumanCommandResult(plugin.PrettyString("")), nil
 }
 
-func (o PluginsCommand) reload(ctx context.Context, ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) reload(ctx context.Context, ctl plugins.Ctl) error {
 	err := ctl.Reload(ctx, o.args.PluginNameOrFilePath)
 	if err != nil {
 		return err

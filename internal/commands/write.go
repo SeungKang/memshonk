@@ -67,7 +67,7 @@ type WriteCommand struct {
 	args WriteCommandArgs
 }
 
-func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) error {
+func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) (CommandResult, error) {
 	dataStr := o.args.DataStr
 	var data []byte
 
@@ -77,58 +77,51 @@ func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) error {
 	case "raw":
 		data = []byte(dataStr)
 	case "hexdump":
-		return errors.New("TODO: someday invert hexdump -C output into bytes")
+		return nil, errors.New("TODO: someday invert hexdump -C output into bytes")
 	case "hex":
 		var err error
 		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
 		if err != nil {
-			return fmt.Errorf("failed to hex decode string - %w", err)
+			return nil, fmt.Errorf("failed to hex decode string - %w", err)
 		}
 	case "b64", "base64":
 		var err error
 		data, err = base64.StdEncoding.DecodeString(dataStr)
 		if err != nil {
-			return fmt.Errorf("failed to base64 decode string - %w", err)
+			return nil, fmt.Errorf("failed to base64 decode string - %w", err)
 		}
 	case "ptr", "pointer":
 		var err error
 		data, err = hex.DecodeString(strings.TrimPrefix(dataStr, "0x"))
 		if err != nil {
-			return fmt.Errorf("failed to hex decode string - %w", err)
+			return nil, fmt.Errorf("failed to hex decode string - %w", err)
 		}
 
 		if len(data) > 8 {
-			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+			return nil, fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
 		}
 
 		switch {
 		case len(data) > 8:
-			return fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
+			return nil, fmt.Errorf("pointer cannot be greater than 8 bytes, got %d", len(data))
 		case len(data) < 8:
 			data = append(bytes.Repeat([]byte{0}, 8-len(data)), data...)
 		}
 
 		binary.LittleEndian.PutUint64(data, binary.BigEndian.Uint64(data))
 	default:
-		return fmt.Errorf("unknown encoding format: %q", encodingFormat)
+		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	var ptr memory.Pointer
-	addrStr := o.args.AddrStr
-	var err error
-	if addrStr == "" {
-		return errors.New("TODO: implement seek address support")
-	} else {
-		ptr, err = memory.CreatePointerFromString(addrStr)
-		if err != nil {
-			return err
-		}
+	ptr, err := memory.CreatePointerFromString(o.args.AddrStr)
+	if err != nil {
+		return nil, err
 	}
 
 	err = s.Process().WriteToAddr(ctx, data, ptr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }

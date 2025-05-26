@@ -123,6 +123,8 @@ func getModules(exeName string, procHandle uintptr) (memory.MappedObject, memory
 		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
 	}
 
+	objs.Sort()
+
 	return exeModule, objs, nil
 }
 

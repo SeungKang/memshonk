@@ -14,10 +14,10 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 	err := kernel32.IterVirtualMemory(syscall.Handle(procHandle),
 		func(i int, info kernel32.MEMORY_BASIC_INFORMATION) error {
 			region := memory.Region{
-				BaseAddress:    uintptr(info.BaseAddress),
-				EndAddr:        uintptr(info.BaseAddress) + info.RegionSize,
-				AllocationBase: uintptr(info.AllocationBase),
-				Size:           uint64(info.RegionSize),
+				BaseAddr:  uintptr(info.BaseAddress),
+				EndAddr:   uintptr(info.BaseAddress) + info.RegionSize,
+				AllocBase: uintptr(info.AllocationBase),
+				Size:      uint64(info.RegionSize),
 			}
 
 			switch info.Type {

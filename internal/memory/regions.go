@@ -100,34 +100,35 @@ func (o *Regions) Iter(fn func(i int, region Region) error) error {
 	return nil
 }
 
-func (o Regions) Len() int {
+func (o *Regions) Len() int {
 	return len(o.regions)
 }
 
-func (o Regions) Less(i, j int) bool {
-	return o.regions[i].BaseAddress < o.regions[j].EndAddr
+func (o *Regions) Less(i, j int) bool {
+	return o.regions[i].BaseAddr < o.regions[j].EndAddr
 }
 
-func (o Regions) Swap(i, j int) {
+func (o *Regions) Swap(i, j int) {
 	o.regions[i], o.regions[j] = o.regions[j], o.regions[i]
 }
 
-func (o Regions) Sort() {
+func (o *Regions) Sort() {
 	sort.Sort(o)
 }
 
-func (o Regions) ByAddr(addr uintptr) (*Region, bool) {
+func (o *Regions) HasAddr(addr uintptr) (*Region, bool) {
 	// This code is based on work by Stackoverflow user OneOfOne:
 	// https://stackoverflow.com/a/39750394
 	ln := o.Len()
 
 	i := sort.Search(ln, func(i int) bool {
-		return addr <= o.regions[i].EndAddr
+		return addr < o.regions[i].EndAddr
 	})
 
 	if i < ln {
 		it := &o.regions[i]
-		if addr >= it.BaseAddress && addr <= it.EndAddr {
+
+		if addr >= it.BaseAddr && addr < it.EndAddr {
 			return it, true
 		}
 	}
@@ -136,12 +137,12 @@ func (o Regions) ByAddr(addr uintptr) (*Region, bool) {
 }
 
 type Region struct {
-	BaseAddress    uintptr
-	EndAddr        uintptr
-	AllocationBase uintptr
-	Size           uint64
-	State          MemoryState
-	Type           MemoryType
+	BaseAddr  uintptr
+	EndAddr   uintptr
+	AllocBase uintptr
+	Size      uint64
+	State     MemoryState
+	Type      MemoryType
 
 	Readable   bool
 	Writeable  bool
@@ -157,9 +158,9 @@ func (o Region) String() string {
 	buf := bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("%#012x-%#012x (allocb: %#012x) ",
-		o.BaseAddress,
+		o.BaseAddr,
 		o.EndAddr,
-		o.AllocationBase))
+		o.AllocBase))
 
 	if o.Readable {
 		buf.WriteByte('r')

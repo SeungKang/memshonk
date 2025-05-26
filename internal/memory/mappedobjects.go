@@ -40,35 +40,55 @@ func (o *MappedObjects) Has(name string) (MappedObject, bool) {
 	return MappedObject{}, hasIt
 }
 
-func (o MappedObjects) Len() int {
+func (o *MappedObjects) Len() int {
 	return len(o.objects)
 }
 
-func (o MappedObjects) Less(i, j int) bool {
+func (o *MappedObjects) Less(i, j int) bool {
 	return o.objects[i].BaseAddr < o.objects[j].EndAddr
 }
 
-func (o MappedObjects) Swap(i, j int) {
+func (o *MappedObjects) Swap(i, j int) {
 	o.objects[i], o.objects[j] = o.objects[j], o.objects[i]
 }
 
-func (o MappedObjects) Sort() {
+func (o *MappedObjects) Sort() {
 	sort.Sort(o)
 }
 
-func (o MappedObjects) ByAddr(v uintptr) (*MappedObject, bool) {
+func (o *MappedObjects) HasAddr(addr uintptr) (*MappedObject, bool) {
 	// This code is based on work by Stackoverflow user OneOfOne:
 	// https://stackoverflow.com/a/39750394
 	ln := o.Len()
 
 	i := sort.Search(ln, func(i int) bool {
-		return v <= o.objects[i].EndAddr
+		return addr < o.objects[i].EndAddr
 	})
 
 	if i < ln {
 		it := &o.objects[i]
 
-		if v >= it.BaseAddr && v <= it.EndAddr {
+		if addr >= it.BaseAddr && addr < it.EndAddr {
+			return it, true
+		}
+	}
+
+	return nil, false
+}
+
+func (o *MappedObjects) ContainsRegion(region Region) (*MappedObject, bool) {
+	// This code is based on work by Stackoverflow user OneOfOne:
+	// https://stackoverflow.com/a/39750394
+	ln := o.Len()
+
+	i := sort.Search(ln, func(i int) bool {
+		return region.EndAddr <= o.objects[i].EndAddr
+	})
+
+	if i < ln {
+		it := &o.objects[i]
+
+		if region.BaseAddr >= it.BaseAddr && region.EndAddr <= it.EndAddr {
 			return it, true
 		}
 	}
@@ -102,7 +122,7 @@ type MappedObject struct {
 }
 
 func (o *MappedObject) ContainsAddr(addr uintptr) bool {
-	return addr >= o.BaseAddr && addr <= o.EndAddr
+	return addr >= o.BaseAddr && addr < o.EndAddr
 }
 
 func (o *MappedObject) String() string {

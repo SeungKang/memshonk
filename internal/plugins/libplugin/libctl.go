@@ -137,11 +137,17 @@ func (o *Ctl) Reload(ctx context.Context, name string) error {
 		return err
 	}
 
-	err = execReload(ctx, plugin.config)
-	if err != nil {
-		return err
-	}
+	if len(plugin.config.ExecOnReload) > 0 {
+		err = execReload(ctx, plugin.config)
+		if err != nil {
+			_, loadErr := o.load(plugin.config)
+			if loadErr == nil {
+				return fmt.Errorf("exec on reload failed (managed load anyways) - %w", err)
+			}
 
+			return fmt.Errorf("exec on reload failed - %w", err)
+		}
+	}
 	_, err = o.load(plugin.config)
 	if err != nil {
 		return err

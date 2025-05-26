@@ -13,10 +13,6 @@ import (
 )
 
 func execReload(ctx context.Context, config plugins.PluginConfig) error {
-	if len(config.ExecOnReload) == 0 {
-		return nil
-	}
-
 	prog := exec.CommandContext(
 		ctx,
 		config.ExecOnReload[0],
@@ -29,7 +25,7 @@ func execReload(ctx context.Context, config plugins.PluginConfig) error {
 	err := prog.Run()
 	if err != nil {
 		return fmt.Errorf("exec failed for: %q - %w",
-			prog.Args, err)
+			prog.String(), err)
 	}
 
 	return nil

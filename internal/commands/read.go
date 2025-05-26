@@ -10,9 +10,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+const (
+	readCommandName = "read"
+)
+
 func ReadCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "read",
+		Name:      readCommandName,
 		Aliases:   []string{"r"},
 		ShortHelp: "read n bytes from addr",
 		Flags: []FlagSchema{
@@ -60,6 +64,10 @@ func NewReadCommand(args ReadCommandArgs) ReadCommand {
 
 type ReadCommand struct {
 	args ReadCommandArgs
+}
+
+func (o ReadCommand) Name() string {
+	return readCommandName
 }
 
 func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

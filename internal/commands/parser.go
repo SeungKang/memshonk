@@ -7,9 +7,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
+const (
+	parserCommandName = "parser"
+)
+
 func ParserCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "parser",
+		Name:      parserCommandName,
 		ShortHelp: "run parser plugins",
 		NonFlags: []NonFlagSchema{
 			{
@@ -48,6 +52,10 @@ type ParserCommandArgs struct {
 
 type ParserCommand struct {
 	args ParserCommandArgs
+}
+
+func (o ParserCommand) Name() string {
+	return parserCommandName
 }
 
 func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

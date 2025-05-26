@@ -13,9 +13,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+const (
+	writeCommandName = "write"
+)
+
 func WriteCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "write",
+		Name:      writeCommandName,
 		Aliases:   []string{"w"},
 		ShortHelp: "write value to addr",
 		Flags: []FlagSchema{
@@ -65,6 +69,10 @@ func NewWriteCommand(args WriteCommandArgs) WriteCommand {
 
 type WriteCommand struct {
 	args WriteCommandArgs
+}
+
+func (o WriteCommand) Name() string {
+	return writeCommandName
 }
 
 func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) (CommandResult, error) {

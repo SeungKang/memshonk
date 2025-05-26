@@ -66,6 +66,7 @@ type ArgFetcher interface {
 }
 
 type Command interface {
+	Name() string
 	Run(context.Context, IO, Session) (CommandResult, error)
 }
 

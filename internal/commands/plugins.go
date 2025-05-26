@@ -7,9 +7,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
+const (
+	pluginsCommandName = "plugins"
+)
+
 func PluginsCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "plugins",
+		Name:      pluginsCommandName,
 		ShortHelp: "manage plugins",
 		NonFlags: []NonFlagSchema{
 			{
@@ -48,6 +52,10 @@ func NewPluginsCommand(args PluginsCommandArgs) PluginsCommand {
 
 type PluginsCommand struct {
 	args PluginsCommandArgs
+}
+
+func (o PluginsCommand) Name() string {
+	return pluginsCommandName
 }
 
 func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

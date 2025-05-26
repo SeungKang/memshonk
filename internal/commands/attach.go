@@ -7,9 +7,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+const (
+	attachCommandName = "attach"
+)
+
 func AttachCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "attach",
+		Name:      attachCommandName,
 		Aliases:   []string{"a"},
 		ShortHelp: "attach to the process",
 		Flags: []FlagSchema{
@@ -50,6 +54,10 @@ func NewAttachCommand(args AttachCommandArgs) AttachCommand {
 
 type AttachCommand struct {
 	args AttachCommandArgs
+}
+
+func (o AttachCommand) Name() string {
+	return attachCommandName
 }
 
 func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

@@ -8,9 +8,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+const (
+	vmmapCommandName = "vmmap"
+)
+
 func VmmapCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "vmmap",
+		Name:      vmmapCommandName,
 		Aliases:   []string{"v"},
 		ShortHelp: "view the process's memory regions",
 		NonFlags: []NonFlagSchema{
@@ -37,6 +41,10 @@ type VmmapCommandArgs struct {
 
 type VmmapCommand struct {
 	args VmmapCommandArgs
+}
+
+func (o VmmapCommand) Name() string {
+	return vmmapCommandName
 }
 
 func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

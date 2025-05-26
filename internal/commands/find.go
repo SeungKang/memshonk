@@ -8,9 +8,13 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
+const (
+	findCommandName = "find"
+)
+
 func FindCommandSchema() CommandSchema {
 	return CommandSchema{
-		Name:      "find",
+		Name:      findCommandName,
 		Aliases:   []string{"f"},
 		ShortHelp: "find a pattern in memory",
 		NonFlags: []NonFlagSchema{
@@ -57,6 +61,10 @@ func NewFindCommand(args FindCommandArgs) FindCommand {
 
 type FindCommand struct {
 	args FindCommandArgs
+}
+
+func (o FindCommand) Name() string {
+	return findCommandName
 }
 
 func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {

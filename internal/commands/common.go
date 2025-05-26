@@ -135,7 +135,7 @@ func (o MemoryPointerListCommandResult) Serialize() []byte {
 	buf := bytes.Buffer{}
 
 	for i, u := range o {
-		buf.WriteString(fmt.Sprintf("%#x", u))
+		buf.WriteString(u.String())
 
 		if i < len(o)-1 {
 			buf.WriteString(", ")

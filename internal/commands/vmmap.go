@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 )
@@ -19,8 +20,8 @@ func VmmapCommandSchema() CommandSchema {
 		ShortHelp: "view the process's memory regions",
 		NonFlags: []NonFlagSchema{
 			{
-				Name:     "addr",
-				Desc:     "address to search for which region it is in",
+				Name:     "search-str",
+				Desc:     "address or name to filter regions",
 				DefValue: "",
 				DataType: "",
 			},
@@ -28,7 +29,7 @@ func VmmapCommandSchema() CommandSchema {
 		CreateFn: func(c CommandConfig) (Command, error) {
 			return VmmapCommand{
 				args: VmmapCommandArgs{
-					AddrStr: c.NonFlags.String("addr"),
+					searchStr: c.NonFlags.String("search-str"),
 				},
 			}, nil
 		},
@@ -36,7 +37,7 @@ func VmmapCommandSchema() CommandSchema {
 }
 
 type VmmapCommandArgs struct {
-	AddrStr string
+	searchStr string
 }
 
 type VmmapCommand struct {
@@ -60,8 +61,8 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 		return nil, err
 	}
 
-	if o.args.AddrStr != "" {
-		ptr, err := memory.CreatePointerFromString(o.args.AddrStr)
+	if o.args.searchStr != "" && strings.HasPrefix(o.args.searchStr, "0x") {
+		ptr, err := memory.CreatePointerFromString(o.args.searchStr)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +92,7 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 			return result, nil
 		}
 
-		return nil, fmt.Errorf("address not found for %s", o.args.AddrStr)
+		return nil, fmt.Errorf("address not found for %s", o.args.searchStr)
 	}
 
 	objs := make(map[string]bytes.Buffer, objects.Len())
@@ -122,10 +123,6 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 			return nil
 		}
 
-		if others.Len() == 0 {
-			others.WriteString("others:")
-		}
-
 		others.WriteByte('\n')
 		others.WriteString(indent)
 		others.WriteString(region.String())
@@ -140,6 +137,12 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	var out bytes.Buffer
 
 	err = objects.IterObjects(func(obj memory.MappedObject) error {
+		if o.args.searchStr != "" {
+			if !strings.Contains(obj.Filename, o.args.searchStr) {
+				return nil
+			}
+		}
+
 		if out.Len() > 0 {
 			out.WriteByte('\n')
 		}
@@ -159,8 +162,12 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 		return nil, err
 	}
 
+	if o.args.searchStr != "" {
+		return HumanCommandResult(out.String()), nil
+	}
+
 	if others.Len() > 0 {
-		out.WriteByte('\n')
+		out.WriteString("\nothers:")
 		others.WriteTo(&out)
 	}
 

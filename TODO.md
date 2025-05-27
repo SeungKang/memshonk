@@ -7,7 +7,8 @@
 
 ## vmmap
 
-- `vmmap object_Name` shows object with that name and regions under it
+~~- `vmmap object_Name` shows object with that name and regions under it~~
+- code needs to be cleaned up
 
 ## progctl
 

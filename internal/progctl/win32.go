@@ -8,6 +8,51 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
+func getModules(exeName string, procHandle uintptr) (memory.MappedObject, memory.MappedObjects, error) {
+	objs := memory.MappedObjects{}
+
+	// some modules appear more than once, we are just going to use the first
+	// entry that has a non-zero base address :)
+	// TODO add option to log weird stuff we are seeing, attach -v
+	err := kernel32.IterProcessModules(
+		syscall.Handle(procHandle),
+		func(_ int, _ uint, module kernel32.Module) error {
+			if module.BaseAddr == 0 {
+				return nil
+			}
+
+			_, alreadyPresent := objs.Has(module.Filename)
+			if alreadyPresent {
+				return nil
+			}
+
+			err := objs.Add(memory.MappedObject{
+				Filepath: module.Filepath,
+				Filename: module.Filename,
+				BaseAddr: module.BaseAddr,
+				EndAddr:  module.EndAddr,
+				Size:     module.Size,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to add module to memory mapped objects list - %w", err)
+			}
+
+			return nil
+		})
+	if err != nil {
+		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
+	}
+
+	exeModule, found := objs.Has(exeName)
+	if !found {
+		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
+	}
+
+	objs.Sort()
+
+	return exeModule, objs, nil
+}
+
 func getRegions(procHandle uintptr) (memory.Regions, error) {
 	var regions memory.Regions
 

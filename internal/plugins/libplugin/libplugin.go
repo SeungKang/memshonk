@@ -44,18 +44,18 @@ func (o *Plugin) loadParsers() error {
 		freeFn: o.freeStringFn,
 	}
 
-	parserFnsCsv := cstr.string()
+	parserFnsStr := cstr.string()
 
-	if len(parserFnsCsv) == 0 {
+	if len(parserFnsStr) == 0 {
 		return nil
 	}
 
-	parserNames := strings.Split(parserFnsCsv, ",")
+	parserNames := strings.Split(parserFnsStr, " ")
 	sort.Strings(parserNames)
 
 	parsers := make([]*parserFnConfig, len(parserNames))
 
-	for _, parserFnName := range strings.Split(parserFnsCsv, ",") {
+	for i, parserFnName := range parserNames {
 		par := &parserFnConfig{
 			name:      parserFnName,
 			errStrFn:  o.ErrorStr,
@@ -68,7 +68,7 @@ func (o *Plugin) loadParsers() error {
 				parserFnName, err)
 		}
 
-		parsers = append(o.parsers, par)
+		parsers[i] = par
 	}
 
 	o.parsers = parsers

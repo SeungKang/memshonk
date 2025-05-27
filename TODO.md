@@ -14,6 +14,10 @@
 
 - when MappedObjects is called go and actually ask windows
 
+## memory
+
+- fix the MappedObjects to be a slice instead of map, handle duplicate dlls
+
 ## command ideas
 
 - `command addr number_of_pointers` tries to determine if there are pointers at

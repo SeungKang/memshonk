@@ -91,6 +91,7 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 				region.Readable = true
 				region.Writeable = true
 			case kernel32.PageExecuteWriteCopy:
+				region.Readable = true
 				region.Executable = true
 				region.Writeable = true
 				region.Copyable = true
@@ -102,6 +103,7 @@ func getRegions(procHandle uintptr) (memory.Regions, error) {
 				region.Readable = true
 				region.Writeable = true
 			case kernel32.PageWriteCopy:
+				region.Readable = true
 				region.Writeable = true
 				region.Copyable = true
 			}

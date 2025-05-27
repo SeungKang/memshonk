@@ -28,21 +28,20 @@ func newProcess(exeName string, pid int) (*process, error) {
 		done: make(chan struct{}),
 	}
 
-	baseModule, objects, err := getModules(exeName, uintptr(kiwiProc.Handle))
+	objects, err := getModules(uintptr(kiwiProc.Handle))
 	if err != nil {
 		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get required modules - %w", err)
 	}
 
-	// TODO: Actually use the regions object for something.
-	_, err = getRegions(uintptr(kiwiProc.Handle))
-	if err != nil {
+	exeObj, hasIt := objects.Has(exeName)
+	if !hasIt {
 		runningProgram.Stop()
-		return nil, fmt.Errorf("failed to get regions - %w", err)
+		return nil, fmt.Errorf("failed to get mapped object for exe: %q - %w",
+			exeName, err)
 	}
 
-	runningProgram.exeMod = baseModule
-	runningProgram.mods = objects
+	runningProgram.exeObj = exeObj
 
 	is32Bit, err := kernel32.IsProcess32Bit(syscall.Handle(kiwiProc.Handle))
 	if err != nil {
@@ -84,9 +83,8 @@ func newProcess(exeName string, pid int) (*process, error) {
 }
 
 type process struct {
-	exeMod memory.MappedObject
+	exeObj memory.MappedObject
 	is32b  bool
-	mods   memory.MappedObjects
 	addrFn func(uintptr) (uintptr, error)
 	pid    int
 	proc   kiwi.Process
@@ -95,8 +93,8 @@ type process struct {
 	err    error
 }
 
-func (o *process) objects() memory.MappedObjects {
-	return o.mods
+func (o *process) objects() (memory.MappedObjects, error) {
+	return getModules(uintptr(o.proc.Handle))
 }
 
 func (o *process) regions() (memory.Regions, error) {
@@ -137,10 +135,15 @@ func (o *process) write(data []byte, pointer memory.Pointer) error {
 }
 
 func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
-	baseAddr := o.exeMod.BaseAddr
+	baseAddr := o.exeObj.BaseAddr
 
 	if pointer.OptModule != "" {
-		module, hasIt := o.mods.Has(pointer.OptModule)
+		objs, err := o.objects()
+		if err != nil {
+			return 0, err
+		}
+
+		module, hasIt := objs.Has(pointer.OptModule)
 		if !hasIt {
 			return 0, fmt.Errorf("unknown memory-mapped object: %q",
 				pointer.OptModule)

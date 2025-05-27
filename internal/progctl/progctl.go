@@ -84,7 +84,7 @@ func (o *Ctl) ExeObject(ctx context.Context) (memory.MappedObject, error) {
 		return memory.MappedObject{}, ErrNotAttached
 	}
 
-	return o.current.exeMod, nil
+	return o.current.exeObj, nil
 }
 
 func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
@@ -95,7 +95,7 @@ func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
 		return memory.MappedObjects{}, ErrNotAttached
 	}
 
-	return o.current.objects(), nil
+	return o.current.objects()
 }
 
 func (o *Ctl) Regions(context.Context) (memory.Regions, error) {

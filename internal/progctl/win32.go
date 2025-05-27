@@ -8,7 +8,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-func getModules(exeName string, procHandle uintptr) (memory.MappedObject, memory.MappedObjects, error) {
+func getModules(procHandle uintptr) (memory.MappedObjects, error) {
 	objs := memory.MappedObjects{}
 
 	// some modules appear more than once, we are just going to use the first
@@ -40,17 +40,12 @@ func getModules(exeName string, procHandle uintptr) (memory.MappedObject, memory
 			return nil
 		})
 	if err != nil {
-		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
-	}
-
-	exeModule, found := objs.Has(exeName)
-	if !found {
-		return memory.MappedObject{}, memory.MappedObjects{}, fmt.Errorf("failed to find exe module for: %q", exeName)
+		return memory.MappedObjects{}, fmt.Errorf("failed to iterate over process modules - %w", err)
 	}
 
 	objs.Sort()
 
-	return exeModule, objs, nil
+	return objs, nil
 }
 
 func getRegions(procHandle uintptr) (memory.Regions, error) {

@@ -14,7 +14,9 @@ import (
 var _ Process = (*Ctl)(nil)
 
 var (
-	ErrNotAttached = errors.New("not attached")
+	ErrNotAttached    = errors.New("not attached")
+	ErrDetached       = errors.New("detached")
+	ErrExitedNormally = errors.New("process exited without error")
 )
 
 type Notifier interface {
@@ -60,7 +62,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 	if o.current != nil {
 		select {
-		case <-o.current.Done():
+		case <-o.current.exitMonitor().Done():
 			// Go ahead with reattach.
 		default:
 			return 0, fmt.Errorf("already attached to pid: %d", o.current.pid)
@@ -73,7 +75,6 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	}
 
 	return o.current.pid, nil
-
 }
 
 func (o *Ctl) ExeObject(ctx context.Context) (memory.MappedObject, error) {
@@ -155,7 +156,7 @@ func (o *Ctl) Detach(ctx context.Context) error {
 		return nil
 	}
 
-	o.current.Stop()
+	o.current.Close()
 
 	o.current = nil
 

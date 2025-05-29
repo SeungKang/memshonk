@@ -1,104 +1,53 @@
 package progctl
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"sync"
-	"syscall"
 
-	"github.com/Andoryuuta/kiwi"
-	"github.com/SeungKang/memshonk/internal/kernel32"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var (
-	programExitedNormallyErr = errors.New("program exited without error")
-)
-
 func newProcess(exeName string, pid int) (*process, error) {
-	kiwiProc, err := kiwi.GetProcessByPID(pid)
+	mem, err := attachProcMem(pid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get process by PID - %w", err)
+		return nil, fmt.Errorf("failed to attach to process memory - %w", err)
 	}
 
-	runningProgram := &process{
-		pid:  pid,
-		proc: kiwiProc,
-		done: make(chan struct{}),
-	}
-
-	objects, err := getModules(uintptr(kiwiProc.Handle))
+	objects, err := mem.Objects()
 	if err != nil {
-		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get required modules - %w", err)
 	}
 
 	exeObj, hasIt := objects.Has(exeName)
 	if !hasIt {
-		runningProgram.Stop()
 		return nil, fmt.Errorf("failed to get mapped object for exe: %q - %w",
 			exeName, err)
 	}
 
-	runningProgram.exeObj = exeObj
-
-	is32Bit, err := kernel32.IsProcess32Bit(syscall.Handle(kiwiProc.Handle))
-	if err != nil {
-		runningProgram.Stop()
-		return nil, fmt.Errorf("failed to determine if process is 32 bit - %w", err)
-	}
-	runningProgram.is32b = is32Bit
-
-	if is32Bit {
-		runningProgram.addrFn = func(u uintptr) (uintptr, error) {
-			data, err := kiwiProc.ReadUint32(u)
-			return uintptr(data), err
-		}
-	} else {
-		runningProgram.addrFn = func(u uintptr) (uintptr, error) {
-			data, err := kiwiProc.ReadUint64(u)
-			return uintptr(data), err
-		}
-	}
-
-	// TODO: We will need to find an alternative on Unix-like systems.
-	// This will not work for non-child processes.
-	proc, err := os.FindProcess(int(kiwiProc.PID))
-	if err != nil {
-		runningProgram.Stop()
-		return nil, fmt.Errorf("failed to find process with PID: %d - %w", kiwiProc.PID, err)
-	}
-
-	go func() {
-		_, err := proc.Wait()
-		if err == nil {
-			err = programExitedNormallyErr
-		}
-
-		runningProgram.exited(err)
-	}()
-
-	return runningProgram, nil
+	return &process{
+		pid:    pid,
+		mem:    mem,
+		exeObj: exeObj,
+	}, nil
 }
 
 type process struct {
-	exeObj memory.MappedObject
-	is32b  bool
-	addrFn func(uintptr) (uintptr, error)
 	pid    int
-	proc   kiwi.Process
+	mem    procMem
+	exeObj memory.MappedObject
 	once   sync.Once
-	done   chan struct{}
-	err    error
+}
+
+func (o *process) exitMonitor() *ExitMonitor {
+	return o.mem.ExitMonitor()
 }
 
 func (o *process) objects() (memory.MappedObjects, error) {
-	return getModules(uintptr(o.proc.Handle))
+	return o.mem.Objects()
 }
 
 func (o *process) regions() (memory.Regions, error) {
-	return getRegions(uintptr(o.proc.Handle))
+	return o.mem.Regions()
 }
 
 func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
@@ -109,7 +58,7 @@ func (o *process) read(pointer memory.Pointer, size uint64) ([]byte, error) {
 	}
 
 	// TODO do something about this type conversion
-	data, err := o.proc.ReadBytes(addr, int(size))
+	data, err := o.mem.ReadBytes(addr, int(size))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from 0x%x - %w",
 			addr, err)
@@ -125,7 +74,7 @@ func (o *process) write(data []byte, pointer memory.Pointer) error {
 			pointer.String(), err)
 	}
 
-	err = o.proc.WriteBytes(addr, data)
+	err = o.mem.WriteBytes(addr, data)
 	if err != nil {
 		return fmt.Errorf("failed to write to 0x%x - %w",
 			addr, err)
@@ -152,7 +101,7 @@ func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
 		baseAddr = module.BaseAddr
 	}
 
-	addr, err := lookupAddr(baseAddr, pointer, o.addrFn)
+	addr, err := lookupAddr(baseAddr, pointer, o.mem.ReadPtr)
 	if err != nil {
 		return 0, fmt.Errorf("failed to lookup address - %w",
 			err)
@@ -161,28 +110,8 @@ func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
 	return addr, nil
 }
 
-func (o *process) Stop() {
-	o.exited(errors.New("stopped"))
-}
-
-func (o *process) Done() <-chan struct{} {
-	if o == nil {
-		return nil
-	}
-
-	return o.done
-}
-
-func (o *process) Err() error {
-	return o.err
-}
-
-func (o *process) exited(err error) {
-	o.once.Do(func() {
-		_ = syscall.CloseHandle(syscall.Handle(o.proc.Handle))
-		o.err = err
-		close(o.done)
-	})
+func (o *process) Close() error {
+	return o.mem.Close()
 }
 
 func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
@@ -210,4 +139,36 @@ func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr,
 	addr += offsets[len(offsets)-1]
 
 	return addr, nil
+}
+
+func newExitMonitor() *ExitMonitor {
+	return &ExitMonitor{
+		c: make(chan struct{}),
+	}
+}
+
+type ExitMonitor struct {
+	c    chan struct{}
+	once sync.Once
+	err  error
+}
+
+func (o *ExitMonitor) Done() <-chan struct{} {
+	return o.c
+}
+
+func (o *ExitMonitor) Err() error {
+	return o.err
+}
+
+func (o *ExitMonitor) SetExited(err error) {
+	o.once.Do(func() {
+		if err == nil {
+			err = ErrExitedNormally
+		}
+
+		o.err = err
+
+		close(o.c)
+	})
 }

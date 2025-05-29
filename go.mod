@@ -7,7 +7,7 @@ require (
 	github.com/desertbit/grumble v1.1.3
 	github.com/ebitengine/purego v0.8.3
 	github.com/mitchellh/go-ps v1.0.0
-	golang.org/x/sys v0.1.0
+	golang.org/x/sys v0.30.0
 )
 
 require (

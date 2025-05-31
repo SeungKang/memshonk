@@ -86,12 +86,38 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 		}
 	}
 
-	err := o.attach()
+	processes, err := ps.Processes()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get active processes - %w", err)
 	}
 
-	return o.current.PID(), nil
+	possiblePID := -1
+	var exeName string
+	for _, psProc := range processes {
+		if strings.ToLower(psProc.Executable()) == strings.ToLower(o.exeName) {
+			possiblePID = psProc.Pid()
+			exeName = psProc.Executable()
+			break
+		}
+	}
+
+	if possiblePID == -1 {
+		return 0, fmt.Errorf("failed to find a matching process for: %q",
+			o.exeName)
+	}
+
+	proc, err := attach(exeName, possiblePID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
+			possiblePID, exeName, err)
+	}
+
+	o.current = proc
+	if o.Notif != nil {
+		o.Notif.ProgramStarted(o.exeName)
+	}
+
+	return proc.PID(), nil
 }
 
 func (o *Ctl) ExeObject(ctx context.Context) (memory.Object, error) {
@@ -202,41 +228,6 @@ func (o *Ctl) Detach(ctx context.Context) error {
 	o.current = nil
 
 	return err
-}
-
-func (o *Ctl) attach() error {
-	processes, err := ps.Processes()
-	if err != nil {
-		return fmt.Errorf("failed to get active processes - %w", err)
-	}
-
-	possiblePID := -1
-	var exeName string
-	for _, psProc := range processes {
-		if strings.ToLower(psProc.Executable()) == strings.ToLower(o.exeName) {
-			possiblePID = psProc.Pid()
-			exeName = psProc.Executable()
-			break
-		}
-	}
-
-	if possiblePID == -1 {
-		return fmt.Errorf("failed to find a matching process for: %q",
-			o.exeName)
-	}
-
-	proc, err := attach(exeName, possiblePID)
-	if err != nil {
-		return fmt.Errorf("failed to attach to process %d (%q) - %w",
-			possiblePID, exeName, err)
-	}
-
-	o.current = proc
-	if o.Notif != nil {
-		o.Notif.ProgramStarted(o.exeName)
-	}
-
-	return nil
 }
 
 func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {

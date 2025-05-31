@@ -80,12 +80,12 @@ func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 
 type AttachCommandResult struct {
 	PID    int
-	ExeObj memory.MappedObject
+	ExeObj memory.Object
 }
 
 func (o AttachCommandResult) Serialize() []byte {
 	return []byte(fmt.Sprintf("attached to %q, pid: %d, base addr: 0x%x",
-		o.ExeObj.Filename,
+		o.ExeObj.Name,
 		o.PID,
 		o.ExeObj.BaseAddr))
 }

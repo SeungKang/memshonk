@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/memory"
+
 	"github.com/mitchellh/go-ps"
 )
 
@@ -27,9 +28,7 @@ type Notifier interface {
 type Process interface {
 	Attach(ctx context.Context) (int, error)
 
-	ExeObject(ctx context.Context) (memory.MappedObject, error)
-
-	MappedObjects(ctx context.Context) (memory.MappedObjects, error)
+	ExeObject(ctx context.Context) (memory.Object, error)
 
 	Regions(ctx context.Context) (memory.Regions, error)
 
@@ -77,26 +76,15 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	return o.current.pid, nil
 }
 
-func (o *Ctl) ExeObject(ctx context.Context) (memory.MappedObject, error) {
+func (o *Ctl) ExeObject(ctx context.Context) (memory.Object, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return memory.MappedObject{}, ErrNotAttached
+		return memory.Object{}, ErrNotAttached
 	}
 
 	return o.current.exeObj, nil
-}
-
-func (o *Ctl) MappedObjects(context.Context) (memory.MappedObjects, error) {
-	o.rwMu.RLock()
-	defer o.rwMu.RUnlock()
-
-	if o.current == nil {
-		return memory.MappedObjects{}, ErrNotAttached
-	}
-
-	return o.current.objects()
 }
 
 func (o *Ctl) Regions(context.Context) (memory.Regions, error) {

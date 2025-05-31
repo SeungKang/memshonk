@@ -11,8 +11,6 @@ type procMem interface {
 
 	ReadPtr(at uintptr) (uintptr, error)
 
-	Objects() (memory.MappedObjects, error)
-
 	Regions() (memory.Regions, error)
 
 	Close() error

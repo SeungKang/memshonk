@@ -13,15 +13,14 @@ func newProcess(exeName string, pid int) (*process, error) {
 		return nil, fmt.Errorf("failed to attach to process memory - %w", err)
 	}
 
-	objects, err := mem.Objects()
+	regions, err := mem.Regions()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get required modules - %w", err)
+		return nil, fmt.Errorf("failed to get memory regions - %w", err)
 	}
 
-	exeObj, hasIt := objects.Has(exeName)
-	if !hasIt {
-		return nil, fmt.Errorf("failed to get mapped object for exe: %q - %w",
-			exeName, err)
+	exeObj, err := regions.FirstObjectMatching(exeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mapped object for exe - %w", err)
 	}
 
 	return &process{
@@ -34,16 +33,12 @@ func newProcess(exeName string, pid int) (*process, error) {
 type process struct {
 	pid    int
 	mem    procMem
-	exeObj memory.MappedObject
+	exeObj memory.Object
 	once   sync.Once
 }
 
 func (o *process) exitMonitor() *ExitMonitor {
 	return o.mem.ExitMonitor()
-}
-
-func (o *process) objects() (memory.MappedObjects, error) {
-	return o.mem.Objects()
 }
 
 func (o *process) regions() (memory.Regions, error) {
@@ -87,18 +82,21 @@ func (o *process) resolvePointer(pointer memory.Pointer) (uintptr, error) {
 	baseAddr := o.exeObj.BaseAddr
 
 	if pointer.OptModule != "" {
-		objs, err := o.objects()
+		regions, err := o.regions()
 		if err != nil {
 			return 0, err
 		}
 
-		module, hasIt := objs.Has(pointer.OptModule)
-		if !hasIt {
-			return 0, fmt.Errorf("unknown memory-mapped object: %q",
-				pointer.OptModule)
+		// TODO: This is a non-exact match. Will that
+		// lead to unexpected things happening? Or do
+		// we want that level of convenience?
+		object, err := regions.FirstObjectMatching(pointer.OptModule)
+		if err != nil {
+			return 0, fmt.Errorf("failed to resolve object name - %w",
+				err)
 		}
 
-		baseAddr = module.BaseAddr
+		baseAddr = object.BaseAddr
 	}
 
 	addr, err := lookupAddr(baseAddr, pointer, o.mem.ReadPtr)

@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
@@ -79,5 +78,5 @@ func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 		return nil, err
 	}
 
-	return HumanCommandResult(string(blob)), nil
+	return HumanCommandResult(blob), nil
 }

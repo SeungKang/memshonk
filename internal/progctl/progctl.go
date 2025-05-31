@@ -41,6 +41,24 @@ type Process interface {
 	Detach(ctx context.Context) error
 }
 
+type attachedProcess interface {
+	ExitMonitor() *ExitMonitor
+
+	PID() int
+
+	ExeObj() memory.Object
+
+	ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error)
+
+	WriteBytes(b []byte, addr uintptr) error
+
+	ReadPtr(at uintptr) (uintptr, error)
+
+	Regions() (memory.Regions, error)
+
+	Close() error
+}
+
 func NewCtl(exeName string) *Ctl {
 	return &Ctl{
 		Notif:   nil,
@@ -52,7 +70,7 @@ type Ctl struct {
 	Notif   Notifier
 	exeName string
 	rwMu    sync.RWMutex
-	current procMem
+	current attachedProcess
 }
 
 func (o *Ctl) Attach(ctx context.Context) (int, error) {

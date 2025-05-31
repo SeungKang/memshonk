@@ -13,7 +13,7 @@ import (
 	"github.com/Andoryuuta/kiwi"
 )
 
-var _ procMem = (*windowsProcess)(nil)
+var _ attachedProcess = (*windowsProcess)(nil)
 
 func attach(exeName string, pid int) (*windowsProcess, error) {
 	kiwiProc, err := kiwi.GetProcessByPID(pid)

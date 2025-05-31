@@ -5,9 +5,13 @@ import "github.com/SeungKang/memshonk/internal/memory"
 type procMem interface {
 	ExitMonitor() *ExitMonitor
 
-	ReadBytes(addr uintptr, num int) ([]byte, error)
+	PID() int
 
-	WriteBytes(addr uintptr, b []byte) error
+	ExeObj() memory.Object
+
+	ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error)
+
+	WriteBytes(b []byte, addr uintptr) error
 
 	ReadPtr(at uintptr) (uintptr, error)
 

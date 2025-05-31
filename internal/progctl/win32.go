@@ -13,29 +13,53 @@ import (
 	"github.com/Andoryuuta/kiwi"
 )
 
-var _ procMem = (*windowsProcMem)(nil)
+var _ procMem = (*windowsProcess)(nil)
 
-func attachProcMem(pid int) (*windowsProcMem, error) {
+func attach(exeName string, pid int) (*windowsProcess, error) {
 	kiwiProc, err := kiwi.GetProcessByPID(pid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open process memory - %w",
+			err)
 	}
 
-	handle := syscall.Handle(kiwiProc.Handle)
+	proc := &windowsProcess{
+		kiwiProc: kiwiProc,
+		handle:   syscall.Handle(kiwiProc.Handle),
+		pid:      pid,
+		exitMon:  newExitMonitor(),
+	}
 
-	is32Bit, err := kernel32.IsProcess32Bit(handle)
+	proc.is32b, err = kernel32.IsProcess32Bit(proc.handle)
 	if err != nil {
+		proc.Close()
+
 		return nil, fmt.Errorf("failed to determine if process is 32 bit - %w",
+			err)
+	}
+
+	regions, err := proc.Regions()
+	if err != nil {
+		proc.Close()
+
+		return nil, fmt.Errorf("failed to get memory regions - %w",
+			err)
+	}
+
+	proc.exeObj, err = regions.FirstObjectMatching(exeName)
+	if err != nil {
+		proc.Close()
+
+		return nil, fmt.Errorf("failed to get mapped object for exe - %w",
 			err)
 	}
 
 	osProc, err := os.FindProcess(pid)
 	if err != nil {
+		proc.Close()
+
 		return nil, fmt.Errorf("failed to find process with PID: %d - %w",
 			pid, err)
 	}
-
-	exitMon := newExitMonitor()
 
 	// TODO: Can also use waitforsingleobject:
 	// https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
@@ -44,37 +68,43 @@ func attachProcMem(pid int) (*windowsProcMem, error) {
 	// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
 	go func() {
 		_, err := osProc.Wait()
-		exitMon.SetExited(err)
+		proc.exitMon.SetExited(err)
 	}()
 
-	return &windowsProcMem{
-		kiwiProc: kiwiProc,
-		handle:   handle,
-		is32b:    is32Bit,
-		exitMon:  exitMon,
-	}, nil
+	return proc, nil
 }
 
-type windowsProcMem struct {
+type windowsProcess struct {
 	kiwiProc kiwi.Process
 	handle   syscall.Handle
+	pid      int
 	is32b    bool
+	exeObj   memory.Object
 	exitMon  *ExitMonitor
 }
 
-func (o *windowsProcMem) ExitMonitor() *ExitMonitor {
+func (o *windowsProcess) ExitMonitor() *ExitMonitor {
 	return o.exitMon
 }
 
-func (o *windowsProcMem) ReadBytes(addr uintptr, size int) ([]byte, error) {
-	return o.kiwiProc.ReadBytes(addr, size)
+func (o *windowsProcess) PID() int {
+	return o.pid
 }
 
-func (o *windowsProcMem) WriteBytes(addr uintptr, b []byte) error {
+func (o *windowsProcess) ExeObj() memory.Object {
+	return o.exeObj
+}
+
+func (o *windowsProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+	// TODO: uint64 -> int conversion.
+	return o.kiwiProc.ReadBytes(addr, int(sizeBytes))
+}
+
+func (o *windowsProcess) WriteBytes(b []byte, addr uintptr) error {
 	return o.kiwiProc.WriteBytes(addr, b)
 }
 
-func (o *windowsProcMem) ReadPtr(at uintptr) (uintptr, error) {
+func (o *windowsProcess) ReadPtr(at uintptr) (uintptr, error) {
 	if o.is32b {
 		u32, err := o.kiwiProc.ReadUint32(at)
 		return uintptr(u32), err
@@ -84,7 +114,7 @@ func (o *windowsProcMem) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *windowsProcMem) Regions() (memory.Regions, error) {
+func (o *windowsProcess) Regions() (memory.Regions, error) {
 	objs, err := o.objects()
 	if err != nil {
 		return memory.Regions{}, fmt.Errorf("failed to get objects - %w", err)
@@ -135,7 +165,7 @@ func (o *windowsProcMem) Regions() (memory.Regions, error) {
 	return regions, nil
 }
 
-func (o *windowsProcMem) objects() (MappedObjects, error) {
+func (o *windowsProcess) objects() (MappedObjects, error) {
 	objs := MappedObjects{}
 
 	objectID := memory.ObjectID(0)
@@ -234,7 +264,7 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 	return region
 }
 
-func (o *windowsProcMem) Close() error {
+func (o *windowsProcess) Close() error {
 	o.exitMon.SetExited(ErrDetached)
 
 	return syscall.CloseHandle(o.handle)

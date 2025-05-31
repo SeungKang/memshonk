@@ -56,12 +56,15 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 		return nil, err
 	}
 
-	objects, err := process.MappedObjects(ctx)
-	if err != nil {
-		return nil, err
+	if o.args.searchStr != "" {
+		return o.search(ctx, regions, s)
 	}
 
-	if o.args.searchStr != "" && strings.HasPrefix(o.args.searchStr, "0x") {
+	return o.list(ctx, regions)
+}
+
+func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s Session) (CommandResult, error) {
+	if strings.HasPrefix(o.args.searchStr, "0x") {
 		ptr, err := memory.CreatePointerFromString(o.args.searchStr)
 		if err != nil {
 			return nil, err
@@ -72,103 +75,73 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 			return nil, err
 		}
 
-		var result HumanCommandResult
-
-		obj, foundObj := objects.HasAddr(resolvedPtr)
-		if foundObj {
-			result = HumanCommandResult(obj.String())
-		}
-
 		region, foundRegion := regions.HasAddr(resolvedPtr)
 		if foundRegion {
-			if result != "" {
-				result += "\n"
-			}
-
-			result += HumanCommandResult(region.String())
-		}
-
-		if foundObj || foundRegion {
-			return result, nil
+			return HumanCommandResult(region.String()), nil
 		}
 
 		return nil, fmt.Errorf("address not found for %s", o.args.searchStr)
 	}
 
-	objs := make(map[string]bytes.Buffer, objects.Len())
-	const indent = "|-- "
+	var out bytes.Buffer
 
-	others := bytes.Buffer{}
-
-	err = regions.Iter(func(_ int, region memory.Region) error {
-		if region.Unaccessible() {
-			// TODO: Implement argument to include these
-			// unaccessible regions.
-			return nil
+	err := regions.IterObjectsMatching(o.args.searchStr, func(object memory.Object) error {
+		if out.Len() > 0 {
+			out.WriteByte('\n')
 		}
 
-		object, hasMatch := objects.ContainsRegion(region)
-		if hasMatch {
-			buf := objs[object.Filepath]
-
-			if buf.Len() > 0 {
-				buf.WriteByte('\n')
-			}
-
-			buf.WriteString(indent)
-			buf.WriteString(region.String())
-
-			objs[object.Filepath] = buf
-
-			return nil
-		}
-
-		others.WriteByte('\n')
-		others.WriteString(indent)
-		others.WriteString(region.String())
+		out.WriteString(object.String())
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
+	if out.Len() == 0 {
+		return nil, fmt.Errorf("failed to find object matching: %q", o.args.searchStr)
+	}
+
+	return HumanCommandResult(out.String()), nil
+}
+
+func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (CommandResult, error) {
 	var out bytes.Buffer
 
-	err = objects.IterObjects(func(obj memory.MappedObject) error {
-		if o.args.searchStr != "" {
-			if !strings.Contains(obj.Filename, o.args.searchStr) {
-				return nil
-			}
-		}
-
+	err := regions.IterObjects(func(obj memory.Object) error {
 		if out.Len() > 0 {
 			out.WriteByte('\n')
 		}
 
 		out.WriteString(obj.String())
 
-		buf, hasIt := objs[obj.Filepath]
-		if hasIt {
-			out.WriteByte('\n')
-			buf.WriteTo(&out)
-		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	if o.args.searchStr != "" {
+	if regions.NonObjectsLen() == 0 {
 		return HumanCommandResult(out.String()), nil
 	}
 
-	if others.Len() > 0 {
-		out.WriteString("\nothers:")
-		others.WriteTo(&out)
+	out.WriteString("\nothers:")
+
+	err = regions.IterNonObjects(func(region *memory.Region) error {
+		if region.NoPermissions() {
+			// TODO: Implement argument to include these
+			// inaccessible regions.
+			return nil
+		}
+
+		out.WriteByte('\n')
+
+		out.WriteString(region.String())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return HumanCommandResult(out.String()), nil

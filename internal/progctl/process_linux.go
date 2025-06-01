@@ -1,10 +1,9 @@
-////go:build linux
+//go:build linux
 
 package progctl
 
 import (
 	"github.com/SeungKang/memshonk/internal/linuxmaps"
-
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 

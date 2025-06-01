@@ -86,7 +86,12 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		}
 
 		// print 70 "." to show search progress
-		if i%(regions.Len()/70) == 0 {
+		step := regions.Len() / 70
+		if step == 0 {
+			step = 1
+		}
+
+		if i%step == 0 {
 			_, err = fmt.Fprint(inOut.Stderr, ".")
 			if err != nil {
 				return err

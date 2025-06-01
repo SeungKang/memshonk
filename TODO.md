@@ -31,6 +31,7 @@
 ## progctl
 
 ~~- when MappedObjects is called go and actually ask windows~~
+- Support for exitMonitor on Unix-like systems
 
 ## memory
 

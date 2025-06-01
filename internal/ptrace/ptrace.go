@@ -84,20 +84,20 @@ func (o *Tracer) Detach() error {
 	return unix.PtraceDetach(o.pid)
 }
 
-func (o *Tracer) Registers() (*unix.Reg, error) {
-	regs := &unix.Reg{}
-
-	err := unix.PtraceGetRegs(o.pid, regs)
-	if err != nil {
-		return nil, err
-	}
-
-	return regs, nil
-}
-
-func (o *Tracer) SetRegs(regs *unix.Reg) error {
-	return unix.PtraceSetRegs(o.pid, regs)
-}
+//func (o *Tracer) Registers() (*unix.Reg, error) {
+//	regs := &unix.Reg{}
+//
+//	err := unix.PtraceGetRegs(o.pid, regs)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return regs, nil
+//}
+//
+//func (o *Tracer) SetRegs(regs *unix.Reg) error {
+//	return unix.PtraceSetRegs(o.pid, regs)
+//}
 
 func (o *Tracer) SingleStep() error {
 	return unix.PtraceSingleStep(o.pid)

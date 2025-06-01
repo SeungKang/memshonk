@@ -14,6 +14,11 @@ const (
 	MemImage
 	MemMapped
 	MemPrivate
+	MemStack
+	MemHeap
+	MemVvar
+	MemVdso
+	MemAnon
 )
 
 type MemoryType int
@@ -26,6 +31,16 @@ func (o MemoryType) String() string {
 		return "mapped"
 	case MemPrivate:
 		return "private"
+	case MemStack:
+		return "stack"
+	case MemHeap:
+		return "heap"
+	case MemVvar:
+		return "vvar"
+	case MemVdso:
+		return "vdso"
+	case MemAnon:
+		return "anon"
 	default:
 		return "unknown"
 	}
@@ -326,6 +341,7 @@ type Region struct {
 	Writeable  bool
 	Executable bool
 	Copyable   bool
+	Shared     bool
 
 	Parent ObjectMeta
 }
@@ -353,10 +369,14 @@ func (o Region) String() string {
 func (o Region) StringWithoutObject() string {
 	buf := bytes.Buffer{}
 
-	buf.WriteString(fmt.Sprintf("%#012x-%#012x (allocb: %#012x) ",
+	buf.WriteString(fmt.Sprintf("%#012x-%#012x ",
 		o.BaseAddr,
-		o.EndAddr,
-		o.AllocBase))
+		o.EndAddr))
+
+	if o.AllocBase > 0 {
+		buf.WriteString(fmt.Sprintf("(allocb: %#012x) ",
+			o.AllocBase))
+	}
 
 	if o.Readable {
 		buf.WriteByte('r')
@@ -380,6 +400,12 @@ func (o Region) StringWithoutObject() string {
 
 	if o.Copyable {
 		buf.WriteByte('C')
+	} else {
+		buf.WriteByte('-')
+	}
+
+	if o.Shared {
+		buf.WriteByte('S')
 	} else {
 		buf.WriteByte('-')
 	}

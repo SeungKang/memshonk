@@ -8,66 +8,39 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func StopAndAttach(pid int) (*Tracer, error) {
-	err := syscall.Kill(pid, syscall.SIGSTOP)
-	if err != nil {
-		return nil, err
-	}
-
-	return Attach(pid)
-}
-
-func Attach(pid int) (*Tracer, error) {
-	err := unix.PtraceAttach(pid)
-	if err != nil {
-		return nil, err
-	}
-
-	t := &Tracer{
+func New(pid int) *Tracer {
+	return &Tracer{
 		pid: pid,
 	}
-
-	_, _, err = t.Wait()
-	if err != nil {
-		t.Detach()
-		return nil, err
-	}
-
-	return t, nil
 }
 
 type Tracer struct {
 	pid int
 }
 
-func (o *Tracer) SigstopAndSuspend() (unix.WaitStatus, unix.Rusage, error) {
-	err := o.Signal(syscall.SIGSTOP)
+func (o *Tracer) StopAndAttach() error {
+	err := unix.PtraceAttach(o.pid)
 	if err != nil {
-		return 0, unix.Rusage{}, err
+		return fmt.Errorf("ptrace attach failed - %w", err)
 	}
 
-	wstatus, rusage, err := o.Wait()
+	_, _, err = o.WaitStopped()
 	if err != nil {
-		return 0, unix.Rusage{}, err
+		return fmt.Errorf("failed to wait for process to stop after ptrace attach - %w", err)
 	}
 
-	err = o.Request(unix.PT_SUSPEND, 0, 0)
-	if err != nil {
-		return 0, unix.Rusage{}, err
-	}
-
-	return wstatus, rusage, nil
+	return nil
 }
 
 func (o *Tracer) Signal(sig syscall.Signal) error {
 	return syscall.Kill(o.pid, sig)
 }
 
-func (o *Tracer) Wait() (unix.WaitStatus, unix.Rusage, error) {
+func (o *Tracer) WaitStopped() (unix.WaitStatus, unix.Rusage, error) {
 	var wstatus unix.WaitStatus
 	var rusage unix.Rusage
 
-	_, err := unix.Wait4(o.pid, &wstatus, 0, &rusage)
+	_, err := unix.Wait4(o.pid, &wstatus, unix.WSTOPPED, &rusage)
 	if err != nil {
 		return 0, unix.Rusage{}, fmt.Errorf("wait4 failed - %w", err)
 	}
@@ -120,22 +93,6 @@ func (o *Tracer) Registers() (*unix.Reg, error) {
 	}
 
 	return regs, nil
-}
-
-func (o *Tracer) PeekData(addr uintptr, out []byte) (int, error) {
-	return unix.PtracePeekData(o.pid, addr, out)
-}
-
-func (o *Tracer) PeekText(addr uintptr, out []byte) (int, error) {
-	return unix.PtracePeekText(o.pid, addr, out)
-}
-
-func (o *Tracer) PokeData(addr uintptr, data []byte) (int, error) {
-	return unix.PtracePokeData(o.pid, addr, data)
-}
-
-func (o *Tracer) PokeText(addr uintptr, data []byte) (int, error) {
-	return unix.PtracePokeText(o.pid, addr, data)
 }
 
 func (o *Tracer) SetRegs(regs *unix.Reg) error {

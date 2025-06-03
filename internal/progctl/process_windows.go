@@ -5,9 +5,9 @@ package progctl
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"syscall"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/kernel32"
 	"github.com/SeungKang/memshonk/internal/memory"
@@ -55,22 +55,22 @@ func attach(exeName string, pid int) (*windowsProcess, error) {
 			err)
 	}
 
-	osProc, err := os.FindProcess(pid)
-	if err != nil {
-		proc.Close()
-
-		return nil, fmt.Errorf("failed to find process with PID: %d - %w",
-			pid, err)
-	}
-
-	// TODO: Can also use waitforsingleobject:
-	// https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
-	//
-	// or GetExitCodeProcess:
-	// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
 	go func() {
-		_, err := osProc.Wait()
-		proc.exitMon.SetExited(err)
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-proc.exitMon.Done():
+				return
+			case <-ticker.C:
+				err := proc.isAlive()
+				if err != nil {
+					proc.exitMon.SetExited(err)
+					return
+				}
+			}
+		}
 	}()
 
 	return proc, nil
@@ -83,6 +83,22 @@ type windowsProcess struct {
 	is32b    bool
 	exeObj   memory.Object
 	exitMon  *ExitMonitor
+}
+
+func (o *windowsProcess) isAlive() error {
+	var exitStatus uint32
+	err := syscall.GetExitCodeProcess(o.handle, &exitStatus)
+	if err != nil {
+		return fmt.Errorf("failed get exit code process - %s", err)
+	}
+
+	// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
+	// 259 STILL_ACTIVE
+	if exitStatus == 259 {
+		return nil
+	}
+
+	return fmt.Errorf("process exited with status: %d", exitStatus)
 }
 
 func (o *windowsProcess) ExitMonitor() *ExitMonitor {

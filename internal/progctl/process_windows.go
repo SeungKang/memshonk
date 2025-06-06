@@ -282,6 +282,14 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 	return region
 }
 
+func (o *windowsProcess) Suspend() error {
+	return nil
+}
+
+func (o *windowsProcess) Resume() error {
+	return nil
+}
+
 func (o *windowsProcess) Close() error {
 	o.exitMon.SetExited(ErrDetached)
 

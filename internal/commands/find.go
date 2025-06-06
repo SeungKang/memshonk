@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/progctl"
@@ -68,6 +69,20 @@ func (o FindCommand) Name() string {
 }
 
 func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+	err := s.Process().Suspend(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to suspend process - %w", err)
+	}
+	defer func() {
+		deferCtx, doneFn := context.WithTimeout(context.Background(), time.Second)
+		defer doneFn()
+
+		err := s.Process().Resume(deferCtx)
+		if err != nil {
+			fmt.Fprintf(inOut.Stderr, "failed to resume process - %s\n", err)
+		}
+	}()
+
 	regions, err := s.Process().Regions(ctx)
 	if err != nil {
 		return nil, err

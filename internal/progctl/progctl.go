@@ -38,6 +38,10 @@ type Process interface {
 
 	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
 
+	Suspend(ctx context.Context) error
+
+	Resume(ctx context.Context) error
+
 	Detach(ctx context.Context) error
 }
 
@@ -55,6 +59,10 @@ type attachedProcess interface {
 	ReadPtr(at uintptr) (uintptr, error)
 
 	Regions() (memory.Regions, error)
+
+	Suspend() error
+
+	Resume() error
 
 	Close() error
 }
@@ -213,6 +221,28 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) e
 	}
 
 	return o.current.WriteBytes(data, addr)
+}
+
+func (o *Ctl) Suspend(ctx context.Context) error {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	if o.current == nil {
+		return nil
+	}
+
+	return o.current.Suspend()
+}
+
+func (o *Ctl) Resume(ctx context.Context) error {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	if o.current == nil {
+		return nil
+	}
+
+	return o.current.Resume()
 }
 
 func (o *Ctl) Detach(ctx context.Context) error {

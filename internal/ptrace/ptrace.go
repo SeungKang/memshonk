@@ -18,15 +18,19 @@ type Tracer struct {
 	pid int
 }
 
-func (o *Tracer) StopAndAttach() error {
-	err := unix.PtraceAttach(o.pid)
+func (o *Tracer) Attach() error {
+	return unix.PtraceAttach(o.pid)
+}
+
+func (o *Tracer) Stop() error {
+	err := o.Signal(syscall.SIGSTOP)
 	if err != nil {
-		return fmt.Errorf("ptrace attach failed - %w", err)
+		return fmt.Errorf("failed to signal stop - %w", err)
 	}
 
-	_, _, err = o.WaitStopped()
+	_, _, err = o.Wait(0)
 	if err != nil {
-		return fmt.Errorf("failed to wait for process to stop after ptrace attach - %w", err)
+		return fmt.Errorf("failed to wait for process to stop - %w", err)
 	}
 
 	return nil
@@ -37,12 +41,16 @@ func (o *Tracer) Signal(sig syscall.Signal) error {
 }
 
 func (o *Tracer) WaitStopped() (unix.WaitStatus, unix.Rusage, error) {
+	return o.Wait(unix.WALL)
+}
+
+func (o *Tracer) Wait(options int) (unix.WaitStatus, unix.Rusage, error) {
 	var wstatus unix.WaitStatus
 	var rusage unix.Rusage
 
-	_, err := unix.Wait4(o.pid, &wstatus, unix.WSTOPPED, &rusage)
+	_, err := unix.Wait4(o.pid, &wstatus, options, &rusage)
 	if err != nil {
-		return 0, unix.Rusage{}, fmt.Errorf("wait4 failed - %w", err)
+		return 0, unix.Rusage{}, fmt.Errorf("wait4 failed (options: %v) - %w", options, err)
 	}
 
 	return wstatus, rusage, nil
@@ -83,21 +91,6 @@ func (o *Tracer) ContSignal(sig syscall.Signal) error {
 func (o *Tracer) Detach() error {
 	return unix.PtraceDetach(o.pid)
 }
-
-//func (o *Tracer) Registers() (*unix.Reg, error) {
-//	regs := &unix.Reg{}
-//
-//	err := unix.PtraceGetRegs(o.pid, regs)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return regs, nil
-//}
-//
-//func (o *Tracer) SetRegs(regs *unix.Reg) error {
-//	return unix.PtraceSetRegs(o.pid, regs)
-//}
 
 func (o *Tracer) SingleStep() error {
 	return unix.PtraceSingleStep(o.pid)

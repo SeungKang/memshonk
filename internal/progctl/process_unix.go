@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
+	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/ptrace"
@@ -83,17 +85,9 @@ func (o *unixProcess) ExeObj() memory.Object {
 }
 
 func (o *unixProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
-	err := o.stopAndPtrace()
-	if err != nil {
-		return nil, fmt.Errorf("failed to suspend process prior to peek - %w", err)
-	}
-	defer func() {
-		o.ptrace.Detach()
-	}()
-
 	b := make([]byte, sizeBytes)
 
-	_, err = o.ptrace.PeekData(addr, b)
+	_, err := o.ptrace.PeekData(addr, b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to peek data - %w", err)
 	}
@@ -102,15 +96,7 @@ func (o *unixProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) 
 }
 
 func (o *unixProcess) WriteBytes(b []byte, addr uintptr) error {
-	err := o.stopAndPtrace()
-	if err != nil {
-		return fmt.Errorf("failed to ptrace process prior to poke - %w", err)
-	}
-	defer func() {
-		o.ptrace.Detach()
-	}()
-
-	_, err = o.ptrace.PokeData(addr, b)
+	_, err := o.ptrace.PokeData(addr, b)
 	if err != nil {
 		return fmt.Errorf("failed to poke data - %w", err)
 	}
@@ -146,18 +132,28 @@ func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *unixProcess) stopAndPtrace() error {
-	err := o.ptrace.StopAndAttach()
+func (o *unixProcess) Suspend() error {
+	runtime.LockOSThread()
+
+	err := o.ptrace.Attach()
 	if err != nil {
-		return fmt.Errorf("failed to ptrace attach - %w",
-			err)
+		return fmt.Errorf("failed to attach process - %w", err)
+	}
+
+	_, _, err = o.ptrace.WaitStopped()
+	if err != nil {
+		return fmt.Errorf("failed to wait stopped - %w", err)
 	}
 
 	return nil
 }
 
+func (o *unixProcess) Resume() error {
+	return o.ptrace.ContSignal(syscall.SIGCONT)
+}
+
 func (o *unixProcess) Close() error {
-	return nil
+	return o.ptrace.Detach()
 }
 
 func elfFileType(elfPath string) (uint32, error) {

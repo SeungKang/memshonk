@@ -32,6 +32,7 @@
 
 ~~- when MappedObjects is called go and actually ask windows~~
 - Support for exitMonitor on Unix-like systems
+- Need to implement Suspend and Resume methods for WindowsProcess
 
 ## memory
 
@@ -46,3 +47,4 @@ this addr
 ## find
 
 - "*" support for super wildcard pattern search, maybe not at the end
+- add configurable logging for when error occurs

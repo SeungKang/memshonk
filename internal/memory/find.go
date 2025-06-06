@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -62,9 +63,9 @@ func ParsePattern(pattern string) (ParsedPattern, error) {
 			continue
 		}
 
-		b, err := hex.DecodeString(p)
+		b, err := hex.DecodeString(strings.TrimPrefix(p, "0x"))
 		if err != nil {
-			return ParsedPattern{}, err
+			return ParsedPattern{}, fmt.Errorf("failed to hex decode pattern: %q - %w", p, err)
 		}
 
 		if len(b) > 1 {

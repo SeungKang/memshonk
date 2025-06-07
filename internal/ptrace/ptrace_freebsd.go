@@ -2,7 +2,11 @@
 
 package ptrace
 
-import "golang.org/x/sys/unix"
+import (
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
 
 // Note: unix.PtracePeeek(...) and PtracePoke(...) are limited
 // to 4 or 8 bytes on FreeBSD. These limitations likely stem
@@ -14,6 +18,10 @@ import "golang.org/x/sys/unix"
 // limits when calling the FreeBSD-specific PT_IO API. Thus,
 // we can just skip straight to Go's unix.PtraceIO wrapper
 // and specify our own sizes.
+
+func (o *Tracer) WaitStopped() (unix.WaitStatus, unix.Rusage, error) {
+	return o.Wait(syscall.WSTOPPED)
+}
 
 func (o *Tracer) PeekData(addr uintptr, out []byte) (int, error) {
 	return unix.PtraceIO(unix.PIOD_READ_D, o.pid, addr, out, len(out))

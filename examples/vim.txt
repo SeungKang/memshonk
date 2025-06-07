@@ -1,2 +1,2 @@
 [General]
-ExeName = vim.exe
+ExeName = vim

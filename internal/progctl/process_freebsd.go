@@ -10,13 +10,26 @@ import (
 )
 
 func (o *unixProcess) Regions() (memory.Regions, error) {
-	err := o.stopAndPtrace()
-	if err != nil {
-		return memory.Regions{}, fmt.Errorf("failed to ptrace process prior to getting regions - %w", err)
-	}
-	defer func() {
-		o.ptrace.Detach()
-	}()
+	needToResume := false
 
-	return fbsdmaps.Vmmap(o.ptrace)
+	if !o.stopped {
+		needToResume = true
+
+		err := o.Suspend()
+		if err != nil {
+			return memory.Regions{}, fmt.Errorf("failed to suspend process prior to getting regions - %w", err)
+		}
+	}
+
+	regions, regionsErr := fbsdmaps.Vmmap(o.ptrace)
+
+	if needToResume {
+		err := o.Resume()
+		if err != nil {
+			return memory.Regions{}, fmt.Errorf("failed to resume process after getting regions - %w",
+				err)
+		}
+	}
+
+	return regions, regionsErr
 }

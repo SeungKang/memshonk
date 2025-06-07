@@ -18,6 +18,20 @@ type Tracer struct {
 	pid int
 }
 
+func (o *Tracer) AttachAndWaitStopped() error {
+	err := o.Attach()
+	if err != nil {
+		return err
+	}
+
+	_, _, err = o.WaitStopped()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (o *Tracer) Attach() error {
 	return unix.PtraceAttach(o.pid)
 }
@@ -38,10 +52,6 @@ func (o *Tracer) Stop() error {
 
 func (o *Tracer) Signal(sig syscall.Signal) error {
 	return syscall.Kill(o.pid, sig)
-}
-
-func (o *Tracer) WaitStopped() (unix.WaitStatus, unix.Rusage, error) {
-	return o.Wait(unix.WALL)
 }
 
 func (o *Tracer) Wait(options int) (unix.WaitStatus, unix.Rusage, error) {

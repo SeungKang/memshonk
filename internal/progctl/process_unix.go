@@ -66,6 +66,7 @@ func attach(exeName string, pid int) (*unixProcess, error) {
 type unixProcess struct {
 	pid     int
 	ptrace  *ptrace.Tracer
+	stopped bool
 	endian  binary.ByteOrder
 	is32b   bool
 	exeObj  memory.Object
@@ -135,21 +136,25 @@ func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {
 func (o *unixProcess) Suspend() error {
 	runtime.LockOSThread()
 
-	err := o.ptrace.Attach()
+	err := o.ptrace.AttachAndWaitStopped()
 	if err != nil {
-		return fmt.Errorf("failed to attach process - %w", err)
+		return fmt.Errorf("failed to attach to process - %w", err)
 	}
 
-	_, _, err = o.ptrace.WaitStopped()
-	if err != nil {
-		return fmt.Errorf("failed to wait stopped - %w", err)
-	}
+	o.stopped = true
 
 	return nil
 }
 
 func (o *unixProcess) Resume() error {
-	return o.ptrace.ContSignal(syscall.SIGCONT)
+	err := o.ptrace.ContSignal(syscall.SIGCONT)
+	if err != nil {
+		return fmt.Errorf("failed to ptrace continue - %w", err)
+	}
+
+	o.stopped = false
+
+	return nil
 }
 
 func (o *unixProcess) Close() error {

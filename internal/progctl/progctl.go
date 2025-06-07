@@ -78,7 +78,7 @@ type Ctl struct {
 	Notif   Notifier
 	exeName string
 	rwMu    sync.RWMutex
-	current attachedProcess
+	current *processThread
 }
 
 func (o *Ctl) Attach(ctx context.Context) (int, error) {
@@ -114,7 +114,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 			o.exeName)
 	}
 
-	proc, err := attach(exeName, possiblePID)
+	proc, err := newProcessThread(exeName, possiblePID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
 			possiblePID, exeName, err)
@@ -125,7 +125,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 		o.Notif.ProgramStarted(o.exeName)
 	}
 
-	return proc.PID(), nil
+	return possiblePID, nil
 }
 
 func (o *Ctl) ExeObject(ctx context.Context) (memory.Object, error) {
@@ -139,7 +139,7 @@ func (o *Ctl) ExeObject(ctx context.Context) (memory.Object, error) {
 	return o.current.ExeObj(), nil
 }
 
-func (o *Ctl) Regions(context.Context) (memory.Regions, error) {
+func (o *Ctl) Regions(ctx context.Context) (memory.Regions, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -147,7 +147,18 @@ func (o *Ctl) Regions(context.Context) (memory.Regions, error) {
 		return memory.Regions{}, ErrNotAttached
 	}
 
-	return o.current.Regions()
+	return o.regions(ctx)
+}
+
+func (o *Ctl) regions(ctx context.Context) (memory.Regions, error) {
+	var regions memory.Regions
+	err := o.current.Do(ctx, func(process attachedProcess) error {
+		var err error
+		regions, err = process.Regions()
+		return err
+	})
+
+	return regions, err
 }
 
 func (o *Ctl) ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error) {
@@ -161,11 +172,11 @@ func (o *Ctl) ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 	return o.resolvePointer(ctx, ptr)
 }
 
-func (o *Ctl) resolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, error) {
+func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error) {
 	baseAddr := o.current.ExeObj().BaseAddr
 
 	if ptr.OptModule != "" {
-		regions, err := o.current.Regions()
+		regions, err := o.regions(ctx)
 		if err != nil {
 			return 0, err
 		}
@@ -182,7 +193,12 @@ func (o *Ctl) resolvePointer(_ context.Context, ptr memory.Pointer) (uintptr, er
 		baseAddr = object.BaseAddr
 	}
 
-	addr, err := lookupAddr(baseAddr, ptr, o.current.ReadPtr)
+	var addr uintptr
+	err := o.current.Do(ctx, func(process attachedProcess) error {
+		var err error
+		addr, err = lookupAddr(baseAddr, ptr, process.ReadPtr)
+		return err
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to lookup address - %w",
 			err)
@@ -204,7 +220,14 @@ func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 		return nil, fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
-	return o.current.ReadBytes(addr, sizeBytes)
+	var buf []byte
+	err = o.current.Do(ctx, func(process attachedProcess) error {
+		var err error
+		buf, err = process.ReadBytes(addr, sizeBytes)
+		return err
+	})
+
+	return buf, err
 }
 
 func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) error {
@@ -220,7 +243,9 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) e
 		return fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
-	return o.current.WriteBytes(data, addr)
+	return o.current.Do(ctx, func(process attachedProcess) error {
+		return process.WriteBytes(data, addr)
+	})
 }
 
 func (o *Ctl) Suspend(ctx context.Context) error {
@@ -231,7 +256,9 @@ func (o *Ctl) Suspend(ctx context.Context) error {
 		return nil
 	}
 
-	return o.current.Suspend()
+	return o.current.Do(ctx, func(process attachedProcess) error {
+		return process.Suspend()
+	})
 }
 
 func (o *Ctl) Resume(ctx context.Context) error {
@@ -242,7 +269,9 @@ func (o *Ctl) Resume(ctx context.Context) error {
 		return nil
 	}
 
-	return o.current.Resume()
+	return o.current.Do(ctx, func(process attachedProcess) error {
+		return process.Resume()
+	})
 }
 
 func (o *Ctl) Detach(ctx context.Context) error {
@@ -253,7 +282,7 @@ func (o *Ctl) Detach(ctx context.Context) error {
 		return nil
 	}
 
-	err := o.current.Close()
+	err := o.current.Close(ctx)
 
 	o.current = nil
 
@@ -285,36 +314,4 @@ func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr,
 	addr += offsets[len(offsets)-1]
 
 	return addr, nil
-}
-
-func newExitMonitor() *ExitMonitor {
-	return &ExitMonitor{
-		c: make(chan struct{}),
-	}
-}
-
-type ExitMonitor struct {
-	c    chan struct{}
-	once sync.Once
-	err  error
-}
-
-func (o *ExitMonitor) Done() <-chan struct{} {
-	return o.c
-}
-
-func (o *ExitMonitor) Err() error {
-	return o.err
-}
-
-func (o *ExitMonitor) SetExited(err error) {
-	o.once.Do(func() {
-		if err == nil {
-			err = ErrExitedNormally
-		}
-
-		o.err = err
-
-		close(o.c)
-	})
 }

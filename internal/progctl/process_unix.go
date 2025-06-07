@@ -7,8 +7,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"runtime"
-	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/ptrace"
@@ -134,8 +132,6 @@ func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {
 }
 
 func (o *unixProcess) Suspend() error {
-	runtime.LockOSThread()
-
 	err := o.ptrace.AttachAndWaitStopped()
 	if err != nil {
 		return fmt.Errorf("failed to attach to process - %w", err)
@@ -147,9 +143,9 @@ func (o *unixProcess) Suspend() error {
 }
 
 func (o *unixProcess) Resume() error {
-	err := o.ptrace.ContSignal(syscall.SIGCONT)
+	err := o.ptrace.Detach()
 	if err != nil {
-		return fmt.Errorf("failed to ptrace continue - %w", err)
+		return fmt.Errorf("failed to ptrace detach - %w", err)
 	}
 
 	o.stopped = false

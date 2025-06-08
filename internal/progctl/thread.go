@@ -24,6 +24,8 @@ func newProcessThread(exeName string, pid int) (*processThread, error) {
 	return thread, nil
 }
 
+// we did this because on linux ptrace operations need to be executed by the same thread
+// https://stackoverflow.com/questions/16767832/ptrace-not-recognizing-child-process
 type processThread struct {
 	callbacks chan *processThreadCallback
 	process   attachedProcess

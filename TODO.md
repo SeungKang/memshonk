@@ -43,8 +43,10 @@
 - `command addr number_of_pointers` tries to determine if there are pointers at
 this addr
 - outputs command
+- command performance measuring
 
 ## find
 
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
+- improve find performance (increase size read, or with start/end address)

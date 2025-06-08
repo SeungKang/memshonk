@@ -84,23 +84,53 @@ func (o *unixProcess) ExeObj() memory.Object {
 }
 
 func (o *unixProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
-	b := make([]byte, sizeBytes)
+	needToResume := false
 
-	_, err := o.ptrace.PeekData(addr, b)
-	if err != nil {
-		return nil, fmt.Errorf("failed to peek data - %w", err)
+	if !o.stopped {
+		needToResume = true
+
+		err := o.Suspend()
+		if err != nil {
+			return nil, fmt.Errorf("failed to suspend process prior to peek data - %w", err)
+		}
 	}
 
-	return b, nil
+	b := make([]byte, sizeBytes)
+
+	_, peakErr := o.ptrace.PeekData(addr, b)
+
+	if needToResume {
+		err := o.Resume()
+		if err != nil {
+			return nil, fmt.Errorf("failed to resume process after peek data - %w", err)
+		}
+	}
+
+	return b, peakErr
 }
 
 func (o *unixProcess) WriteBytes(b []byte, addr uintptr) error {
-	_, err := o.ptrace.PokeData(addr, b)
-	if err != nil {
-		return fmt.Errorf("failed to poke data - %w", err)
+	needToResume := false
+
+	if !o.stopped {
+		needToResume = true
+
+		err := o.Suspend()
+		if err != nil {
+			return fmt.Errorf("failed to suspend process prior to poke data - %w", err)
+		}
 	}
 
-	return nil
+	_, pokeErr := o.ptrace.PokeData(addr, b)
+
+	if needToResume {
+		err := o.Resume()
+		if err != nil {
+			return fmt.Errorf("failed to resume process after poke data - %w", err)
+		}
+	}
+
+	return pokeErr
 }
 
 func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {

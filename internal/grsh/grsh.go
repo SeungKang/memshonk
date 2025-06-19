@@ -29,10 +29,6 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 		// },
 	})
 
-	grumbleApp.SetInterruptHandler(func(a *grumble.App, count int) {
-		a.Close()
-	})
-
 	sh := &Shell{
 		ga:  grumbleApp,
 		ctx: ctx,

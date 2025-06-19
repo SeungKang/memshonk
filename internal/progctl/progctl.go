@@ -300,7 +300,7 @@ func (o *Ctl) Detach(ctx context.Context) error {
 // code has ensured that is the case.
 func resolvePointerChain(baseAddr uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
 	addr := baseAddr
-	var offsets = ptr.Addrs
+	var offsets = ptr.Addrs()
 	var err error
 
 	// We are purposely skipping the last offset.

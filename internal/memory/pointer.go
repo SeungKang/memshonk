@@ -17,6 +17,8 @@ const (
 //   - "0xd5a351"              – absolute address
 //   - "0x20,0x5,0xC0"         – pointer chain relative to the executable
 //   - "buh.dll:0x20,0x5,0xC0" – pointer chain relative to a specified object
+//
+// Refer to the Pointer documentation for additional details.
 func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	var ptr Pointer
 	var ptrChain string
@@ -30,17 +32,17 @@ func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	}
 
 	ptrParts := strings.Split(ptrChain, addrSep)
-	ptr.Addrs = make([]uintptr, len(ptrParts))
+	ptr.addrs = make([]uintptr, len(ptrParts))
 	for i, part := range ptrParts {
 		addr, err := strconv.ParseUint(strings.TrimPrefix(part, "0x"), 16, 64)
 		if err != nil {
 			return Pointer{}, err
 		}
 
-		ptr.Addrs[i] = uintptr(addr)
+		ptr.addrs[i] = uintptr(addr)
 	}
 
-	if len(ptr.Addrs) > 1 {
+	if len(ptr.addrs) > 1 {
 		ptr._type = ChainPointerType
 	} else {
 		ptr._type = AbsoluteAddrPointerType
@@ -49,31 +51,34 @@ func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	return ptr, nil
 }
 
+// AbsoluteAddrPointer creates a Pointer to an arbitrary memory address.
 func AbsoluteAddrPointer(addr uintptr) Pointer {
 	return Pointer{
-		Addrs: []uintptr{addr},
+		addrs: []uintptr{addr},
 		_type: AbsoluteAddrPointerType,
 	}
 }
 
-// Pointer represents a memory address or a chain of offsets to one.
+// Pointer represents a memory address or a chain of offsets to one
+// similar to Cheat Engine's pointer feature.
+//
+// The []uintptr returned by the Addrs method represents several
+// possible values depending on the PointerType:
+//
+//   - AbsoluteAddrPointerType: Only the first element in the slice is
+//     used and it is treated as a pointer to arbitrary memory
+//   - ChainPointerType: The elements are treated as offsets from
+//     one of the following addresses:
+//   - The executable's base address if OptModule is empty
+//   - A memory-mapped object's base address if OptModule
+//     is not empty
 type Pointer struct {
 	// Name is a user-defined label for identification.
 	Name string
 
-	// Addrs is a slice of values that represents several
-	// possible values:
-	//
-	//   - A single element represents two possible values:
-	//     - If OptModule is empty, then the first value
-	//       is treated as an absolute address (i.e., points
-	//       directly to the target memory)
-	//     - If OptModule is *not empty*, the first value
-	//       is treated as an offset from the base address
-	//       of that object
-	//   - Multiple elements form a pointer chain via offsets
-	//     similar to that of CheatEngine's pointer feature
-	Addrs []uintptr
+	// addrs stores the address or offset(s) to an address.
+	// Refer to the type's top-level documentation for details.
+	addrs []uintptr
 
 	// OptModule specifies an optional object (e.g. a DLL)
 	// to use as the base address. Refer to Addrs for details.
@@ -94,9 +99,13 @@ func (o Pointer) Type() PointerType {
 	return o._type
 }
 
+func (o Pointer) Addrs() []uintptr {
+	return o.addrs
+}
+
 func (o Pointer) FirstAddr() uintptr {
-	if len(o.Addrs) > 0 {
-		return o.Addrs[0]
+	if len(o.addrs) > 0 {
+		return o.addrs[0]
 	}
 
 	return 0
@@ -108,14 +117,14 @@ func (o *Pointer) MutAdvance(by uint64) {
 		return
 	}
 
-	lastIndex := len(o.Addrs) - 1
+	lastIndex := len(o.addrs) - 1
 
 	if lastIndex < 0 {
 		return
 	}
 
-	last := o.Addrs[lastIndex]
-	o.Addrs[lastIndex] = last + uintptr(by)
+	last := o.addrs[lastIndex]
+	o.addrs[lastIndex] = last + uintptr(by)
 }
 
 // Advance returns a copy of the Pointer with the last address increased by the
@@ -125,7 +134,7 @@ func (o Pointer) Advance(by uint64) Pointer {
 		return o
 	}
 
-	lastIndex := len(o.Addrs) - 1
+	lastIndex := len(o.addrs) - 1
 
 	if lastIndex < 0 {
 		return o
@@ -133,8 +142,8 @@ func (o Pointer) Advance(by uint64) Pointer {
 
 	cloned := o.Clone()
 
-	last := cloned.Addrs[lastIndex]
-	cloned.Addrs[lastIndex] = last + uintptr(by)
+	last := cloned.addrs[lastIndex]
+	cloned.addrs[lastIndex] = last + uintptr(by)
 
 	return cloned
 }
@@ -146,7 +155,7 @@ func (o Pointer) Offset(by int64) Pointer {
 		return o
 	}
 
-	lastIndex := len(o.Addrs) - 1
+	lastIndex := len(o.addrs) - 1
 
 	if lastIndex < 0 {
 		return o
@@ -154,13 +163,13 @@ func (o Pointer) Offset(by int64) Pointer {
 
 	cloned := o.Clone()
 
-	last := cloned.Addrs[lastIndex]
+	last := cloned.addrs[lastIndex]
 
 	if by < 0 {
 		u := uintptr((by * -1))
-		cloned.Addrs[lastIndex] = last - u
+		cloned.addrs[lastIndex] = last - u
 	} else {
-		cloned.Addrs[lastIndex] = last + uintptr(by)
+		cloned.addrs[lastIndex] = last + uintptr(by)
 	}
 
 	return cloned
@@ -170,12 +179,12 @@ func (o Pointer) Offset(by int64) Pointer {
 func (o Pointer) Clone() Pointer {
 	cloned := Pointer{
 		Name:      o.Name,
-		Addrs:     make([]uintptr, len(o.Addrs)),
+		addrs:     make([]uintptr, len(o.addrs)),
 		OptModule: o.OptModule,
 		_type:     o._type,
 	}
 
-	copy(cloned.Addrs, o.Addrs)
+	copy(cloned.addrs, o.addrs)
 
 	return cloned
 }
@@ -192,10 +201,10 @@ func (o Pointer) String() string {
 		buf += o.OptModule + objectSep
 	}
 
-	for i, addr := range o.Addrs {
+	for i, addr := range o.addrs {
 		buf += "0x" + strconv.FormatUint(uint64(addr), 16)
 
-		if i != len(o.Addrs)-1 {
+		if i != len(o.addrs)-1 {
 			buf += addrSep
 		}
 	}

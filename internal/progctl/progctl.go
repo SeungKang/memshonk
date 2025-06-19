@@ -294,24 +294,24 @@ func (o *Ctl) Detach(ctx context.Context) error {
 }
 
 func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
-	start := ptr.Addrs[0]
-	// treat as absolute address
-	if len(ptr.Addrs) == 1 {
-		return start, nil
-	}
+	firstOffset := ptr.FirstAddr()
+	target := base + firstOffset
 
-	addr, err := addrFn(base + start)
+	addr, err := addrFn(target)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read from target process at 0x%x - %w",
-			addr, err)
+		return 0, fmt.Errorf("failed to read initial addr from target process (base: %#x, offset: %#x, target: %#x) - %w",
+			base, firstOffset, target, err)
 	}
 
 	var offsets = ptr.Addrs[1:]
-	for _, offset := range offsets[:len(offsets)-1] {
-		addr, err = addrFn(addr + offset)
+
+	for i, offset := range offsets[:len(offsets)-1] {
+		currentTarget := addr + offset
+
+		addr, err = addrFn(currentTarget)
 		if err != nil {
-			return 0, fmt.Errorf("failed to read from target process at 0x%x - %w",
-				addr, err)
+			return 0, fmt.Errorf("failed to read offset index %d from process (offset: %#x | addr: %#x) - %w",
+				i+1, offset, currentTarget, err)
 		}
 	}
 

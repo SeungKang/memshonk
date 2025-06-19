@@ -12,7 +12,7 @@ func TestBufferedReader(t *testing.T) {
 		0x8B, 0x45, 0x69, 0xC7, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x5D, 0xC2, 0x08, 0x00, 0x8B, 0x4D)
 
-	reader, err := NewBufferedReader(fakeProcess, Pointer{Addrs: []uintptr{0}}, fakeProcess.size())
+	reader, err := NewBufferedReader(fakeProcess, AbsoluteAddrPointer(0), fakeProcess.size())
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -22,7 +22,7 @@ func TestBufferedReader(t *testing.T) {
 	i := 0
 
 	for reader.Next(context.Background(), 5) {
-		addr := reader.Addr().Addrs[0]
+		addr := reader.Addr().FirstAddr()
 		if i != int(addr) {
 			t.Fatalf("got: %d, want: %d",
 				addr, i)

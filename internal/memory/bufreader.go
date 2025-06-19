@@ -164,14 +164,13 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 
 		o.readerOff += readSizeBytes
 
-		// TODO: Replace with MutAdvance.
-		o.readPtr.Addrs[0] += uintptr(readSizeBytes)
+		o.readPtr.MutAdvance(readSizeBytes)
 
 		return nil
 	default:
 		o.readerDone = true
 
 		return fmt.Errorf("failed to read %d bytes from 0x%x - %w",
-			readSizeBytes, o.readPtr.Addrs[0], err)
+			readSizeBytes, o.readPtr.FirstAddr(), err)
 	}
 }

@@ -20,7 +20,7 @@ func TestFindAll_Reader(t *testing.T) {
 
 	fakeProcess.data = append(fakeProcess.data, bytes.Repeat([]byte{0x69}, 1024)...)
 
-	reader, err := NewBufferedReader(fakeProcess, Pointer{Addrs: []uintptr{0}}, fakeProcess.size())
+	reader, err := NewBufferedReader(fakeProcess, AbsoluteAddrPointer(0), fakeProcess.size())
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -34,8 +34,8 @@ func TestFindAll_Reader(t *testing.T) {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
 
-	if matches[0].Addrs[0] != 69 {
-		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].Addrs[0])
+	if matches[0].FirstAddr() != 69 {
+		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].FirstAddr())
 	}
 }
 
@@ -52,7 +52,7 @@ func TestFindAll_Reader2(t *testing.T) {
 
 	fakeProcess.data = append(fakeProcess.data, bytes.Repeat([]byte{0x69}, 1024)...)
 
-	reader, err := NewBufferedReader(fakeProcess, Pointer{Addrs: []uintptr{0}}, fakeProcess.size())
+	reader, err := NewBufferedReader(fakeProcess, AbsoluteAddrPointer(0), fakeProcess.size())
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -66,8 +66,8 @@ func TestFindAll_Reader2(t *testing.T) {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
 
-	if matches[0].Addrs[0] != 69 {
-		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].Addrs[0])
+	if matches[0].FirstAddr() != 69 {
+		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].FirstAddr())
 	}
 }
 
@@ -79,16 +79,18 @@ func (o *fakeReader) size() uint64 {
 	return uint64(len(o.data))
 }
 
-func (o *fakeReader) ResolvePointer(_ context.Context, ptr Pointer) (uintptr, MappedObject, error) {
-	return 0, MappedObject{}, nil
+func (o *fakeReader) ResolvePointer(_ context.Context, ptr Pointer) (uintptr, error) {
+	return 0, nil
 }
 
-func (o *fakeReader) ReadFromAddr(_ context.Context, addr Pointer, size uint64) ([]byte, error) {
-	if len(addr.Addrs) == 0 {
+func (o *fakeReader) ReadFromAddr(_ context.Context, ptr Pointer, size uint64) ([]byte, error) {
+	addr := ptr.FirstAddr()
+
+	if addr == 0 {
 		return nil, errors.New("invalid address")
 	}
 
-	offset := uint64(addr.Addrs[len(addr.Addrs)-1])
+	offset := uint64(addr)
 	if offset > uint64(len(o.data)) {
 		return nil, errors.New("invalid offset")
 	}

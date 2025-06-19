@@ -13,9 +13,9 @@ const (
 //
 // Examples:
 //
-//   - "0xd5a351"               – absolute address
-//   - "0x20,0x5,0xC0"          – pointer chain relative to the executable
-//   - "buh.dll:0x20,0x5,0xC0"	– pointer chain relative to a specified module
+//   - "0xd5a351"              – absolute address
+//   - "0x20,0x5,0xC0"         – pointer chain relative to the executable
+//   - "buh.dll:0x20,0x5,0xC0" – pointer chain relative to a specified module
 func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	var ptr Pointer
 	var ptrChain string

@@ -298,28 +298,23 @@ func (o *Ctl) Detach(ctx context.Context) error {
 //
 // Note: This code assumes the Pointer is a chain and that the upstream
 // code has ensured that is the case.
-func resolvePointerChain(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
-	firstOffset := ptr.FirstAddr()
-	target := base + firstOffset
+func resolvePointerChain(baseAddr uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
+	addr := baseAddr
+	var offsets = ptr.Addrs
+	var err error
 
-	addr, err := addrFn(target)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read initial addr from target process (base: %#x, offset: %#x, target: %#x) - %w",
-			base, firstOffset, target, err)
-	}
-
-	var offsets = ptr.Addrs[1:]
-
+	// We are purposely skipping the last offset.
 	for i, offset := range offsets[:len(offsets)-1] {
 		currentTarget := addr + offset
 
 		addr, err = addrFn(currentTarget)
 		if err != nil {
 			return 0, fmt.Errorf("failed to read offset index %d from process (offset: %#x | addr: %#x) - %w",
-				i+1, offset, currentTarget, err)
+				i, offset, currentTarget, err)
 		}
 	}
 
+	// sfox: I believe this is based on what Cheat Engine does.
 	addr += offsets[len(offsets)-1]
 
 	return addr, nil

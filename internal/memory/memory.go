@@ -1,17 +1,12 @@
 package memory
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 )
 
 const (
 	addrSep = ","
-)
-
-var (
-	ErrStopIterating = errors.New("stop iterating")
 )
 
 // CreatePointerFromString parses a string definition into a Pointer.

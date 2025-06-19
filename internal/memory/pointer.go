@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	addrSep = ","
+	addrSep   = ","
+	objectSep = ":"
 )
 
 // CreatePointerFromString parses a string definition into a Pointer.
@@ -20,8 +21,8 @@ func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	var ptr Pointer
 	var ptrChain string
 
-	before, after, found := strings.Cut(ptrDefinition, ":")
-	if found {
+	before, after, hasObjectDelim := strings.Cut(ptrDefinition, objectSep)
+	if hasObjectDelim {
 		ptr.OptModule = before
 		ptrChain = after
 	} else {
@@ -39,12 +40,19 @@ func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 		ptr.Addrs[i] = uintptr(addr)
 	}
 
+	if len(ptr.Addrs) > 1 {
+		ptr._type = ChainPointerType
+	} else {
+		ptr._type = AbsoluteAddrPointerType
+	}
+
 	return ptr, nil
 }
 
 func AbsoluteAddrPointer(addr uintptr) Pointer {
 	return Pointer{
 		Addrs: []uintptr{addr},
+		_type: AbsoluteAddrPointerType,
 	}
 }
 
@@ -60,6 +68,27 @@ type Pointer struct {
 	Name      string
 	Addrs     []uintptr
 	OptModule string
+	_type     PointerType
+}
+
+type PointerType int
+
+const (
+	UnknownPointerType PointerType = iota
+	AbsoluteAddrPointerType
+	ChainPointerType
+)
+
+func (o Pointer) Type() PointerType {
+	return o._type
+}
+
+func (o Pointer) FirstAddr() uintptr {
+	if len(o.Addrs) > 0 {
+		return o.Addrs[0]
+	}
+
+	return 0
 }
 
 // Advance returns a copy of the Pointer with the last address increased by the
@@ -116,6 +145,7 @@ func (o Pointer) Clone() Pointer {
 		Name:      o.Name,
 		Addrs:     make([]uintptr, len(o.Addrs)),
 		OptModule: o.OptModule,
+		_type:     o._type,
 	}
 
 	copy(cloned.Addrs, o.Addrs)
@@ -132,7 +162,7 @@ func (o Pointer) String() string {
 	}
 
 	if o.OptModule != "" {
-		buf += o.OptModule + ":"
+		buf += o.OptModule + objectSep
 	}
 
 	for i, addr := range o.Addrs {

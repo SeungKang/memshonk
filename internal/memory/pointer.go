@@ -102,6 +102,22 @@ func (o Pointer) FirstAddr() uintptr {
 	return 0
 }
 
+// MutAdvance advances the Pointer by the given value.
+func (o *Pointer) MutAdvance(by uint64) {
+	if by == 0 {
+		return
+	}
+
+	lastIndex := len(o.Addrs) - 1
+
+	if lastIndex < 0 {
+		return
+	}
+
+	last := o.Addrs[lastIndex]
+	o.Addrs[lastIndex] = last + uintptr(by)
+}
+
 // Advance returns a copy of the Pointer with the last address increased by the
 // given value.
 func (o Pointer) Advance(by uint64) Pointer {

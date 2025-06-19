@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
@@ -76,7 +78,10 @@ func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 			return nil, err
 		}
 
-		addr = ptr.Addrs[0]
+		addr, err = s.Process().ResolvePointer(ctx, ptr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve pointer - %w", err)
+		}
 	}
 
 	blob, err := plugin.RunParser(o.args.ParserName, addr)

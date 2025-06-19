@@ -2,7 +2,7 @@
 
 ## next stopping point
 
-- unix support
+~~- unix support~~
 - command output support (access the result of previous commands)
 - plugin command for me3
 - don't make ctrl + c exit
@@ -22,6 +22,10 @@
   - ex. lineup - makes all enemies lineup in front of player
   - ex. coords - prints x,y,z coords of all enemies
 - me3 plugin finds all enemy structs
+
+## parser
+- check if we are attached to a process before running a parser
+- fix assumption of user supplying absolute address in parser
 
 ## vmmap
 
@@ -44,6 +48,8 @@
 this addr
 - outputs command
 - command performance measuring
+- detach command
+- pid in prompt when attached
 
 ## find
 

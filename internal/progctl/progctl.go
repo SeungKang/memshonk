@@ -173,6 +173,10 @@ func (o *Ctl) ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 }
 
 func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error) {
+	if ptr.Type() == memory.AbsoluteAddrPointerType {
+		return ptr.FirstAddr(), nil
+	}
+
 	baseAddr := o.current.ExeObj().BaseAddr
 
 	if ptr.OptModule != "" {

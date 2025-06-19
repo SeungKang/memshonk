@@ -16,7 +16,7 @@ const (
 //
 //   - "0xd5a351"              – absolute address
 //   - "0x20,0x5,0xC0"         – pointer chain relative to the executable
-//   - "buh.dll:0x20,0x5,0xC0" – pointer chain relative to a specified module
+//   - "buh.dll:0x20,0x5,0xC0" – pointer chain relative to a specified object
 func CreatePointerFromString(ptrDefinition string) (Pointer, error) {
 	var ptr Pointer
 	var ptrChain string
@@ -56,19 +56,30 @@ func AbsoluteAddrPointer(addr uintptr) Pointer {
 	}
 }
 
-// Pointer represents a memory address or a chain of offsets to one
-// Name is a user-defined label for identification
-// Addrs is a slice of addresses:
-//   - A single element represents an absolute address
-//   - Multiple elements form a pointer chain via offsets
-//
-// OptModule specifies an optional module (e.g. a DLL) to use instead of the
-// default executable base
+// Pointer represents a memory address or a chain of offsets to one.
 type Pointer struct {
-	Name      string
-	Addrs     []uintptr
+	// Name is a user-defined label for identification.
+	Name string
+
+	// Addrs is a slice of values that represents several
+	// possible values:
+	//
+	//   - A single element represents two possible values:
+	//     - If OptModule is empty, then the first value
+	//       is treated as an absolute address (i.e., points
+	//       directly to the target memory)
+	//     - If OptModule is *not empty*, the first value
+	//       is treated as an offset from the base address
+	//       of that object
+	//   - Multiple elements form a pointer chain via offsets
+	//     similar to that of CheatEngine's pointer feature
+	Addrs []uintptr
+
+	// OptModule specifies an optional object (e.g. a DLL)
+	// to use as the base address. Refer to Addrs for details.
 	OptModule string
-	_type     PointerType
+
+	_type PointerType
 }
 
 type PointerType int

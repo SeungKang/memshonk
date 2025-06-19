@@ -28,7 +28,7 @@ func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*Buff
 	return &BufferedReader{
 		reader:     readFrom,
 		start:      start,
-		readPtr:    Pointer{Addrs: []uintptr{startAddr}},
+		readPtr:    AbsoluteAddrPointer(startAddr),
 		readRemain: size,
 		hasMore:    true,
 	}, nil

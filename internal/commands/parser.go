@@ -29,6 +29,7 @@ func ParserCommandSchema() CommandSchema {
 				Name:     "addr",
 				Desc:     "the addr to parse",
 				DataType: "",
+				DefValue: "",
 			},
 		},
 		CreateFn: func(c CommandConfig) (Command, error) {
@@ -68,12 +69,17 @@ func (o ParserCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 		return nil, err
 	}
 
-	addr, err := memory.CreatePointerFromString(o.args.Addr)
-	if err != nil {
-		return nil, err
+	var addr uintptr
+	if o.args.Addr != "" {
+		ptr, err := memory.CreatePointerFromString(o.args.Addr)
+		if err != nil {
+			return nil, err
+		}
+
+		addr = ptr.Addrs[0]
 	}
 
-	blob, err := plugin.RunParser(o.args.ParserName, addr.Addrs[0])
+	blob, err := plugin.RunParser(o.args.ParserName, addr)
 	if err != nil {
 		return nil, err
 	}

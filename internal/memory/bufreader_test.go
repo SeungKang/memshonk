@@ -31,7 +31,9 @@ func TestBufferedReader(t *testing.T) {
 		i++
 	}
 
-	if reader.Err() != nil {
+	err = reader.Err()
+
+	if err != nil {
 		t.Fatal(err)
 	}
 }

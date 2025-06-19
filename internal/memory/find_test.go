@@ -86,10 +86,6 @@ func (o *fakeReader) ResolvePointer(_ context.Context, ptr Pointer) (uintptr, er
 func (o *fakeReader) ReadFromAddr(_ context.Context, ptr Pointer, size uint64) ([]byte, error) {
 	addr := ptr.FirstAddr()
 
-	if addr == 0 {
-		return nil, errors.New("invalid address")
-	}
-
 	offset := uint64(addr)
 	if offset > uint64(len(o.data)) {
 		return nil, errors.New("invalid offset")

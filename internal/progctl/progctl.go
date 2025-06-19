@@ -182,7 +182,8 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 	if ptr.OptModule != "" {
 		regions, err := o.regions(ctx)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to get memeory regions - %w",
+				err)
 		}
 
 		// TODO: This is a non-exact match. Will that
@@ -200,11 +201,11 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 	var addr uintptr
 	err := o.current.Do(ctx, func(process attachedProcess) error {
 		var err error
-		addr, err = lookupAddr(baseAddr, ptr, process.ReadPtr)
+		addr, err = resolvePointerChain(baseAddr, ptr, process.ReadPtr)
 		return err
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to lookup address - %w",
+		return 0, fmt.Errorf("failed to resolve pointer chain - %w",
 			err)
 	}
 
@@ -293,7 +294,11 @@ func (o *Ctl) Detach(ctx context.Context) error {
 	return err
 }
 
-func lookupAddr(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
+// resolvePointerChain resolves a chain-type memory.Pointer.
+//
+// Note: This code assumes the Pointer is a chain and that the upstream
+// code has ensured that is the case.
+func resolvePointerChain(base uintptr, ptr memory.Pointer, addrFn func(uintptr) (uintptr, error)) (uintptr, error) {
 	firstOffset := ptr.FirstAddr()
 	target := base + firstOffset
 

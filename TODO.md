@@ -42,6 +42,11 @@
 ## memory
 
 ~~- fix the MappedObjects to be a slice instead of map, handle duplicate dlls~~
+- Implement a Reader object for a process that knows its bounds based on
+  mapped objects
+- BufferedReader: Implement constructor-like functions that either constrain
+  the range based on an arbitrary range or base and end addrs of a mapped
+  object
 
 ## command ideas
 

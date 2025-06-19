@@ -6,19 +6,12 @@ import (
 	"fmt"
 )
 
-// TODO: Implement a Reader object for a process that knows its
-// bounds based on mapped objects.
-
 type ReadFromAddr interface {
 	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, error)
 
 	ReadFromAddr(ctx context.Context, addr Pointer, size uint64) ([]byte, error)
 }
 
-// TODO: Constrain BufferedReader to a range of addresses rather
-// than an object. Implement constructor-like functions that
-// either constrain the range based on an arbitrary range or
-// base and end addrs of a mapped object.
 func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*BufferedReader, error) {
 	startAddr, err := readFrom.ResolvePointer(context.Background(), start)
 	if err != nil {

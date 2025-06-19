@@ -5,7 +5,7 @@
 ~~- unix support~~
 - command output support (access the result of previous commands)
 - plugin command for me3
-- don't make ctrl + c exit
+~~- don't make ctrl + c exit~~
 - retain shell command history
 
 ## diff
@@ -24,6 +24,7 @@
 - me3 plugin finds all enemy structs
 
 ## parser
+
 - check if we are attached to a process before running a parser
 - fix assumption of user supplying absolute address in parser
 
@@ -45,7 +46,7 @@
 ## command ideas
 
 - `command addr number_of_pointers` tries to determine if there are pointers at
-this addr
+  this addr
 - outputs command
 - command performance measuring
 - detach command

@@ -24,6 +24,9 @@ const (
 const (
 	versionFnName         = "version"
 	errorStringFnName     = "error_string_v0"
+	setAddErrorFnName     = "set_add_error_v0"
+	setGetErrorFnName     = "set_get_error_v0"
+	setFreeErrorFnName    = "set_free_error_v0"
 	setReadFromAddrFnName = "set_read_from_addr_v0"
 	freeStrFnName         = "free_string_v0"
 )
@@ -39,14 +42,33 @@ var _ plugins.Ctl = (*Ctl)(nil)
 
 func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
 	ctl := &Ctl{
-		process: args.Process,
+		process:   args.Process,
+		errorList: newSharedObjects(),
 	}
 
 	var err error
 
+	ctl.addErrorCallback, err = dl.NewCallback(ctl.errorList.addFromPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create callback for addErrorFromPlugin - %w",
+			err)
+	}
+
+	ctl.getErrorCallback, err = dl.NewCallback(ctl.errorList.getFromPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create callback for getErrorFromPlugin - %w",
+			err)
+	}
+
+	ctl.freeErrorCallback, err = dl.NewCallback(ctl.errorList.freeFromPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create callback for freeErrorFromPlugin- %w",
+			err)
+	}
+
 	ctl.readFromAddrCallback, err = dl.NewCallback(ctl.readFromAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create callback for ReadFromAddr - %w",
+		return nil, fmt.Errorf("failed to create callback for readFromAddr - %w",
 			err)
 	}
 
@@ -54,8 +76,12 @@ func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
 }
 
 type Ctl struct {
-	process plugins.Process
+	process   plugins.Process
+	errorList *sharedObjects
 
+	addErrorCallback     uintptr
+	getErrorCallback     uintptr
+	freeErrorCallback    uintptr
 	readFromAddrCallback uintptr
 
 	rwMu    sync.RWMutex
@@ -90,11 +116,17 @@ func (o *Ctl) PrettyString(indent string) string {
 func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
 	data, err := o.process.ReadFromAddr(srcAddr, uint64(size))
 	if err != nil {
-		return 1
+		err := fmt.Errorf("memshonk failed to read from process - %w", err)
+
+		return uintptr(o.errorList.addErrorFromMemshonk(err))
 	}
 
 	if uintptr(len(data)) > size {
-		return 2
+		err := fmt.Errorf("size of data returned from process "+
+			"(%d bytes) is greater than dest buffer size (%d bytes)",
+			size, len(data))
+
+		return uintptr(o.errorList.addErrorFromMemshonk(err))
 	}
 
 	dstPtr := dst
@@ -274,12 +306,13 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	}
 
 	plugin := &Plugin{
-		config:   args.config,
-		lib:      args.lib,
-		name:     args.name,
-		loadedAt: time.Now(),
-		filePath: args.filePath,
-		version:  versionFn(),
+		config:    args.config,
+		lib:       args.lib,
+		errorList: o.errorList,
+		name:      args.name,
+		loadedAt:  time.Now(),
+		filePath:  args.filePath,
+		version:   versionFn(),
 	}
 
 	_, err = findFirstFunc(
@@ -296,6 +329,30 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 		args.lib)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup free string fn - %w", err)
+	}
+
+	err = registerCallbackFn(
+		[]string{setAddErrorFnName},
+		o.addErrorCallback,
+		args.lib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup add error fn - %w", err)
+	}
+
+	err = registerCallbackFn(
+		[]string{setGetErrorFnName},
+		o.getErrorCallback,
+		args.lib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup get error fn - %w", err)
+	}
+
+	err = registerCallbackFn(
+		[]string{setFreeErrorFnName},
+		o.freeErrorCallback,
+		args.lib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup release error fn - %w", err)
 	}
 
 	err = registerCallbackFn(
@@ -376,10 +433,6 @@ func (o *copyCStrByLen) slice() []byte {
 		return nil
 	}
 
-	if o.freeFn == nil {
-		panic("free function pointer is nil")
-	}
-
 	ptr := (*byte)(unsafe.Pointer(o.strPtr))
 
 	origStr := unsafe.String(ptr, o.len)
@@ -390,7 +443,9 @@ func (o *copyCStrByLen) slice() []byte {
 		copied[i] = origStr[i]
 	}
 
-	o.freeFn(o.strPtr)
+	if o.freeFn != nil {
+		o.freeFn(o.strPtr)
+	}
 
 	o.strPtr = 0
 	o.len = 0
@@ -412,10 +467,6 @@ func (o *copyCStrByNull) slice() []byte {
 		return nil
 	}
 
-	if o.freeFn == nil {
-		panic("free function pointer is nil")
-	}
-
 	walker := o.strPtr
 
 	buf := bytes.Buffer{}
@@ -431,7 +482,9 @@ func (o *copyCStrByNull) slice() []byte {
 		walker++
 	}
 
-	o.freeFn(o.strPtr)
+	if o.freeFn != nil {
+		o.freeFn(o.strPtr)
+	}
 
 	o.strPtr = 0
 

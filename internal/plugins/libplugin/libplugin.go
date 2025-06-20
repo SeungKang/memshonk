@@ -15,11 +15,13 @@ import (
 
 type Plugin struct {
 	config           plugins.PluginConfig
+	errorList        *errorList
 	filePath         string
 	name             string
 	loadedAt         time.Time
 	version          uint16
 	getErrorStringFn func(code uint32) uintptr
+	allocFn          func(uint32) uintptr
 	freeStringFn     func(uintptr)
 	optUnloadFn      func()
 	optDebugFn       func(bool)
@@ -60,6 +62,7 @@ func (o *Plugin) loadParsers() error {
 			name:      parserFnName,
 			errStrFn:  o.ErrorStr,
 			freeStrFn: o.freeStringFn,
+			errorList: o.errorList,
 		}
 
 		err := o.lib.Func(parserFnName, &par.parseFn)
@@ -272,6 +275,7 @@ type parserFnConfig struct {
 	parseFn   func(addr uintptr, strPtr *uintptr) uint32
 	errStrFn  func(uint32) string
 	freeStrFn func(uintptr)
+	errorList *errorList
 }
 
 func (o *parserFnConfig) PrettyString(indent string) string {
@@ -292,8 +296,8 @@ func (o *parserFnConfig) run(addr uintptr) ([]byte, error) {
 
 	result := o.parseFn(addr, &cstr.strPtr)
 	if result != 0 {
-		return nil, fmt.Errorf("parser failed with code %d: %s",
-			result, o.errStrFn(result))
+		return nil, fmt.Errorf("parser failed: %w",
+			o.errorList.getFromMemshonk(result))
 	}
 
 	return cstr.slice(), nil

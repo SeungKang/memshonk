@@ -1,0 +1,5 @@
+[General]
+ExeName = vim
+
+[Plugin]
+Library = examples/plugins/example-memshonk-plugin/target/debug/libexample_memshonk_plugin.so

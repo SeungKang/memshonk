@@ -1,9 +1,9 @@
 use core::{ffi::c_void, ptr};
 
-use std::{error::Error, ffi::c_char, io::Write, sync::OnceLock};
+use std::{error::Error, io::Write, sync::OnceLock};
 
 static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
-type ReadFromProcessSig = extern "C" fn(into: *mut c_void, size: usize, from: usize) -> *mut c_char;
+type ReadFromProcessSig = extern "C" fn(into: *mut c_void, size: usize, from: usize) -> *mut u8;
 
 #[no_mangle]
 extern "C" fn version() -> u16 {
@@ -47,7 +47,7 @@ struct ExampleStruct {
 }
 
 #[no_mangle]
-extern "C" fn example_parser(addr: usize, str_ptr: *mut *mut c_char) -> *mut u8 {
+extern "C" fn example_parser(addr: usize, str_ptr: *mut *mut u8) -> *mut u8 {
     match _example_parser(addr) {
         Ok(str) => {
             unsafe { *str_ptr = str.share() };
@@ -76,14 +76,14 @@ fn _example_parser(addr: usize) -> Result<String, Box<dyn Error>> {
 }
 
 #[no_mangle]
-extern "C" fn broken_parser(_: usize, str_ptr: *mut *mut c_char) -> *mut u8 {
+extern "C" fn broken_parser(_: usize, str_ptr: *mut *mut u8) -> *mut u8 {
     match _broken_parser(str_ptr) {
         Ok(_) => ptr::null_mut(),
         Err(err) => err.share(),
     }
 }
 
-fn _broken_parser(_: *mut *mut c_char) -> Result<(), Box<dyn Error>> {
+fn _broken_parser(_: *mut *mut u8) -> Result<(), Box<dyn Error>> {
     Err("whoops, this is broken")?
 }
 

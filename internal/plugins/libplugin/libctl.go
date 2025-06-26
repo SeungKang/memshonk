@@ -23,12 +23,9 @@ const (
 // Required functions for library-based plugins.
 const (
 	versionFnName         = "version"
-	errorStringFnName     = "error_string_v0"
-	setAddErrorFnName     = "set_add_error_v0"
-	setGetErrorFnName     = "set_get_error_v0"
-	setFreeErrorFnName    = "set_free_error_v0"
-	setReadFromAddrFnName = "set_read_from_addr_v0"
-	freeStrFnName         = "free_string_v0"
+	allocFnName           = "alloc_v0"
+	freeFnName            = "free_v0"
+	setReadFromProcFnName = "set_read_from_process_v0"
 )
 
 // Optional functions for library-based plugins.
@@ -42,50 +39,18 @@ var _ plugins.Ctl = (*Ctl)(nil)
 
 func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
 	ctl := &Ctl{
-		process:   args.Process,
-		errorList: newSharedObjects(),
-	}
-
-	var err error
-
-	ctl.addErrorCallback, err = dl.NewCallback(ctl.errorList.addFromPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create callback for addErrorFromPlugin - %w",
-			err)
-	}
-
-	ctl.getErrorCallback, err = dl.NewCallback(ctl.errorList.getFromPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create callback for getErrorFromPlugin - %w",
-			err)
-	}
-
-	ctl.freeErrorCallback, err = dl.NewCallback(ctl.errorList.freeFromPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create callback for freeErrorFromPlugin- %w",
-			err)
-	}
-
-	ctl.readFromAddrCallback, err = dl.NewCallback(ctl.readFromAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create callback for readFromAddr - %w",
-			err)
+		process:       args.Process,
+		callbacksList: newGoCallbacksList(args.Process),
 	}
 
 	return ctl, nil
 }
 
 type Ctl struct {
-	process   plugins.Process
-	errorList *sharedObjects
-
-	addErrorCallback     uintptr
-	getErrorCallback     uintptr
-	freeErrorCallback    uintptr
-	readFromAddrCallback uintptr
-
-	rwMu    sync.RWMutex
-	plugins []*Plugin
+	process       plugins.Process
+	callbacksList *goCallbacksList
+	rwMu          sync.RWMutex
+	plugins       []*Plugin
 }
 
 func (o *Ctl) PrettyString(indent string) string {
@@ -111,35 +76,6 @@ func (o *Ctl) PrettyString(indent string) string {
 	}
 
 	return buf.String()
-}
-
-func (o *Ctl) readFromAddr(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
-	data, err := o.process.ReadFromAddr(srcAddr, uint64(size))
-	if err != nil {
-		err := fmt.Errorf("memshonk failed to read from process - %w", err)
-
-		return uintptr(o.errorList.addErrorFromMemshonk(err))
-	}
-
-	if uintptr(len(data)) > size {
-		err := fmt.Errorf("size of data returned from process "+
-			"(%d bytes) is greater than dest buffer size (%d bytes)",
-			size, len(data))
-
-		return uintptr(o.errorList.addErrorFromMemshonk(err))
-	}
-
-	dstPtr := dst
-
-	for i := uintptr(0); i < size; i++ {
-		b := (*byte)(unsafe.Pointer(dstPtr))
-
-		*b = data[i]
-
-		dstPtr++
-	}
-
-	return 0
 }
 
 func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, error) {
@@ -276,6 +212,8 @@ func (o *Ctl) unload(name string) error {
 			if err != nil {
 				return fmt.Errorf("failed to unload plugin - %w", err)
 			}
+
+			o.callbacksList.deregister(o.plugins[i].callbacks)
 		} else {
 			newSlice = append(newSlice, o.plugins[i])
 		}
@@ -306,64 +244,37 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	}
 
 	plugin := &Plugin{
-		config:    args.config,
-		lib:       args.lib,
-		errorList: o.errorList,
-		name:      args.name,
-		loadedAt:  time.Now(),
-		filePath:  args.filePath,
-		version:   versionFn(),
+		config:   args.config,
+		lib:      args.lib,
+		name:     args.name,
+		loadedAt: time.Now(),
+		filePath: args.filePath,
+		version:  versionFn(),
+	}
+
+	plugin.callbacks, err = o.callbacksList.register(plugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register callbacks - %w", err)
 	}
 
 	_, err = findFirstFunc(
-		[]string{errorStringFnName},
-		&plugin.getErrorStringFn,
+		[]string{allocFnName},
+		&plugin.allocFn,
 		args.lib)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup error string fn - %w", err)
+		return nil, fmt.Errorf("failed to setup alloc fn - %w", err)
 	}
 
 	_, err = findFirstFunc(
-		[]string{freeStrFnName},
-		&plugin.freeStringFn,
+		[]string{freeFnName},
+		&plugin.freeMemFn,
 		args.lib)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup free string fn - %w", err)
-	}
-
-	err = registerCallbackFn(
-		[]string{setAddErrorFnName},
-		o.addErrorCallback,
-		args.lib)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup add error fn - %w", err)
-	}
-
-	err = registerCallbackFn(
-		[]string{setGetErrorFnName},
-		o.getErrorCallback,
-		args.lib)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup get error fn - %w", err)
-	}
-
-	err = registerCallbackFn(
-		[]string{setFreeErrorFnName},
-		o.freeErrorCallback,
-		args.lib)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup release error fn - %w", err)
-	}
-
-	err = registerCallbackFn(
-		[]string{setReadFromAddrFnName},
-		o.readFromAddrCallback,
-		args.lib)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup read from addr fn - %w", err)
+		return nil, fmt.Errorf("failed to setup free fn - %w", err)
 	}
 
 	_ = args.lib.Func(unloadFnName, &plugin.optUnloadFn)
+
 	_ = args.lib.Func(debugFnName, &plugin.optDebugFn)
 
 	err = plugin.loadParsers()
@@ -374,7 +285,7 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	return plugin, nil
 }
 
-func registerCallbackFn(funcNames []string, callbackFnPtr uintptr, lib *dl.Library) error {
+func setGoCallbackInPlugin(funcNames []string, callbackFnPtr uintptr, lib *dl.Library) error {
 	var setCallbackFn func(cb uintptr) uint8
 
 	fnName, err := findFirstFunc(funcNames, &setCallbackFn, lib)

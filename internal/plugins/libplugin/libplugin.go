@@ -14,20 +14,19 @@ import (
 )
 
 type Plugin struct {
-	config           plugins.PluginConfig
-	errorList        *errorList
-	filePath         string
-	name             string
-	loadedAt         time.Time
-	version          uint16
-	getErrorStringFn func(code uint32) uintptr
-	allocFn          func(uint32) uintptr
-	freeStringFn     func(uintptr)
-	optUnloadFn      func()
-	optDebugFn       func(bool)
-	parsers          []*parserFnConfig
-	unloadRwMu       sync.RWMutex
-	lib              *dl.Library
+	config      plugins.PluginConfig
+	filePath    string
+	name        string
+	loadedAt    time.Time
+	version     uint16
+	callbacks   *goCallbacks
+	allocFn     func(uint32) uintptr
+	freeMemFn   func(uintptr)
+	optUnloadFn func()
+	optDebugFn  func(bool)
+	parsers     []*parserFnConfig
+	unloadRwMu  sync.RWMutex
+	lib         *dl.Library
 }
 
 func (o *Plugin) loadParsers() error {
@@ -41,14 +40,9 @@ func (o *Plugin) loadParsers() error {
 		return nil
 	}
 
-	cstr := copyCStrByNull{
-		strPtr: getParsersFn(),
-		freeFn: o.freeStringFn,
-	}
+	parserFnsStr := stringFromSharedBufRef(getParsersFn(), o.Free)
 
-	parserFnsStr := cstr.string()
-
-	if len(parserFnsStr) == 0 {
+	if parserFnsStr == "" {
 		return nil
 	}
 
@@ -60,9 +54,7 @@ func (o *Plugin) loadParsers() error {
 	for i, parserFnName := range parserNames {
 		par := &parserFnConfig{
 			name:      parserFnName,
-			errStrFn:  o.ErrorStr,
-			freeStrFn: o.freeStringFn,
-			errorList: o.errorList,
+			freeBufFn: o.Free,
 		}
 
 		err := o.lib.Func(parserFnName, &par.parseFn)
@@ -187,25 +179,29 @@ func (o *Plugin) DisableDebug() {
 	}
 }
 
-func (o *Plugin) ErrorStr(code uint32) string {
+func (o *Plugin) Alloc(sizeBytes uint32) (SharedBuf, error) {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
 
 		err := o.isUnloaded()
 		if err != nil {
-			return "plugin was unloaded"
+			return SharedBuf{}, errors.New("plugin was unloaded")
 		}
 	}
 
-	// For rust impls:
-	// https://users.rust-lang.org/t/whats-the-best-practice-to-get-string-by-ffi/39496/2
-	cstr := copyCStrByNull{
-		strPtr: o.getErrorStringFn(code),
-		freeFn: o.freeStringFn,
+	return sharedBufFromPtr(o.allocFn(sizeBytes)), nil
+}
+
+func (o *Plugin) Free(buf SharedBuf) {
+	if o.optUnloadFn != nil {
+		o.unloadRwMu.RLock()
+		defer o.unloadRwMu.RUnlock()
 	}
 
-	return cstr.string()
+	if o.freeMemFn != nil {
+		o.freeMemFn(buf.ptr)
+	}
 }
 
 func (o *Plugin) RunParser(name string, targetAddr uintptr) ([]byte, error) {
@@ -262,8 +258,8 @@ func (o *Plugin) Unload() error {
 	o.lib = nil
 
 	o.optUnloadFn = func() {}
-	o.freeStringFn = func(uintptr) {}
-	o.getErrorStringFn = func(uint32) uintptr { return 0 }
+	o.allocFn = func(uint32) uintptr { return 0 }
+	o.freeMemFn = func(uintptr) {}
 	o.parsers = nil
 	o.optDebugFn = nil
 
@@ -272,10 +268,9 @@ func (o *Plugin) Unload() error {
 
 type parserFnConfig struct {
 	name      string
-	parseFn   func(addr uintptr, strPtr *uintptr) uint32
-	errStrFn  func(uint32) string
-	freeStrFn func(uintptr)
-	errorList *errorList
+	parseFn   func(addr uintptr, dstStrPtr *uintptr) uintptr
+	freeBufFn func(SharedBuf)
+	errorList *sharedObjects
 }
 
 func (o *parserFnConfig) PrettyString(indent string) string {
@@ -290,15 +285,14 @@ func (o *parserFnConfig) PrettyString(indent string) string {
 }
 
 func (o *parserFnConfig) run(addr uintptr) ([]byte, error) {
-	cstr := copyCStrByNull{
-		freeFn: o.freeStrFn,
-	}
+	var strPtr uintptr
 
-	result := o.parseFn(addr, &cstr.strPtr)
+	result := o.parseFn(addr, &strPtr)
 	if result != 0 {
-		return nil, fmt.Errorf("parser failed: %w",
-			o.errorList.getFromMemshonk(result))
+		msg := stringFromSharedBufRef(result, o.freeBufFn)
+
+		return nil, fmt.Errorf("parser failed: %s", msg)
 	}
 
-	return cstr.slice(), nil
+	return bytesFromSharedBufRef(strPtr, o.freeBufFn), nil
 }

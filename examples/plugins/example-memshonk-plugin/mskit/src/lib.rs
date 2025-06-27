@@ -3,7 +3,10 @@ use core::ffi::c_void;
 use std::{error::Error, io::Write, sync::OnceLock};
 
 static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
-type ReadFromProcessSig = extern "C" fn(into: *mut c_void, size: usize, from: usize) -> *mut u8;
+type ReadFromProcessSig = extern "C" fn(pluginAddr: *mut c_void, size: usize, procAddr: usize) -> *mut u8;
+
+static WRITE_TO_PROCESS: OnceLock<WriteToProcessSig> = OnceLock::new();
+type WriteToProcessSig = extern "C" fn(procAddr: usize, size: usize, pluginAddr: *mut c_void) -> *mut u8;
 
 #[no_mangle]
 extern "C" fn alloc_v0(size: u32) -> *mut u8 {
@@ -37,6 +40,24 @@ pub fn read_from_process(size: usize, src_adr: usize) -> Result<Vec<u8>, Box<dyn
     }
 
     Ok(dst)
+}
+
+#[no_mangle]
+extern "C" fn set_write_to_process_v0(func_ptr: WriteToProcessSig) -> u32 {
+    WRITE_TO_PROCESS.get_or_init(|| func_ptr);
+
+    0
+}
+
+pub fn write_to_process(dst_adr: usize, data: Vec<u8>) -> Result<(), Box<dyn Error>> {
+    let func = WRITE_TO_PROCESS.get().unwrap();
+
+    let err_ptr = func(dst_adr, data.len(), data.as_ptr() as *mut c_void);
+    if !err_ptr.is_null() {
+        Err(SharedBufRef::reclaim_error(err_ptr))?
+    }
+
+    Ok(())
 }
 
 pub trait ShareableType {

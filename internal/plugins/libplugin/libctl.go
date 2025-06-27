@@ -26,6 +26,7 @@ const (
 	allocFnName           = "alloc_v0"
 	freeFnName            = "free_v0"
 	setReadFromProcFnName = "set_read_from_process_v0"
+	setWriteToProcFnName  = "set_write_to_process_v0"
 )
 
 // Optional functions for library-based plugins.

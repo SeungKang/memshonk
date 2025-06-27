@@ -50,4 +50,5 @@ type PluginConfig struct {
 
 type Process interface {
 	ReadFromAddr(addr uintptr, size uint64) ([]byte, error)
+	WriteToAddr(addr uintptr, data []byte) error
 }

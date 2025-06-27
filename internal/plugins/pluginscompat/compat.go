@@ -23,3 +23,7 @@ type ProcessCompatLayer struct {
 func (o ProcessCompatLayer) ReadFromAddr(addr uintptr, size uint64) ([]byte, error) {
 	return o.proc.ReadFromAddr(context.Background(), memory.AbsoluteAddrPointer(addr), size)
 }
+
+func (o ProcessCompatLayer) WriteToAddr(addr uintptr, data []byte) error {
+	return o.proc.WriteToAddr(context.Background(), data, memory.AbsoluteAddrPointer(addr))
+}

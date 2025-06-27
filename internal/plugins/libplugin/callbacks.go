@@ -65,10 +65,18 @@ func (o *goCallbacksList) register(plugin *Plugin) (*goCallbacks, error) {
 
 	err := setGoCallbackInPlugin(
 		[]string{setReadFromProcFnName},
-		target.readFromProcAddrPtr,
+		target.readFromProcPtr,
 		plugin.lib)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set read from proc callback - %w", err)
+	}
+
+	err = setGoCallbackInPlugin(
+		[]string{setWriteToProcFnName},
+		target.writeToProcPtr,
+		plugin.lib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set write to proc callback - %w", err)
 	}
 
 	return target, nil
@@ -89,7 +97,12 @@ func newGoCallbacks(plugin *Plugin, process plugins.Process) (*goCallbacks, erro
 
 	var err error
 
-	callbacks.readFromProcAddrPtr, err = dl.NewCallback(callbacks.readFromProc)
+	callbacks.readFromProcPtr, err = dl.NewCallback(callbacks.readFromProc)
+	if err != nil {
+		return nil, err
+	}
+
+	callbacks.writeToProcPtr, err = dl.NewCallback(callbacks.writeToProc)
 	if err != nil {
 		return nil, err
 	}
@@ -104,15 +117,16 @@ type goCallbacks struct {
 	inUseBy *Plugin
 	process plugins.Process
 
-	readFromProcAddrPtr uintptr
+	readFromProcPtr uintptr
+	writeToProcPtr uintptr
 }
 
-func (o *goCallbacks) readFromProc(dst uintptr, size uintptr, srcAddr uintptr) uintptr {
+func (o *goCallbacks) readFromProc(pluginAddr uintptr, size uintptr, procAddr uintptr) uintptr {
 	if o.inUseBy == nil {
-		panic("library is nil when go callback was executed - this should never happen")
+		panic("library is nil when go callback (readFromProc) was executed - this should never happen")
 	}
 
-	data, err := o.process.ReadFromAddr(srcAddr, uint64(size))
+	data, err := o.process.ReadFromAddr(procAddr, uint64(size))
 	if err != nil {
 		buf := allocSharedString(
 			fmt.Sprintf("memshonk failed to read from process - %s", err),
@@ -131,14 +145,33 @@ func (o *goCallbacks) readFromProc(dst uintptr, size uintptr, srcAddr uintptr) u
 		return buf.Pointer()
 	}
 
-	dstPtr := dst
+	pluginAddrCopy := pluginAddr
 
 	for i := uintptr(0); i < size; i++ {
-		b := (*byte)(unsafe.Pointer(dstPtr))
+		b := (*byte)(unsafe.Pointer(pluginAddrCopy))
 
 		*b = data[i]
 
-		dstPtr++
+		pluginAddrCopy++
+	}
+
+	return 0
+}
+
+func (o *goCallbacks) writeToProc(procAddr uintptr, size uintptr, pluginAddr uintptr) uintptr {
+	if o.inUseBy == nil {
+		panic("library is nil when go callback (writeToProc) was executed - this should never happen")
+	}
+
+	data := unsafe.Slice((*byte)(unsafe.Pointer(pluginAddr)), int(size))
+
+	err := o.process.WriteToAddr(procAddr, data)
+	if err != nil {
+		buf := allocSharedString(
+			fmt.Sprintf("memshonk failed to write to process - %s", err),
+			o.inUseBy.Alloc)
+
+		return buf.Pointer()
 	}
 
 	return 0

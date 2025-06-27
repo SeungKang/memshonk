@@ -270,7 +270,6 @@ type parserFnConfig struct {
 	name      string
 	parseFn   func(addr uintptr, dstStrPtr *uintptr) uintptr
 	freeBufFn func(SharedBuf)
-	errorList *sharedObjects
 }
 
 func (o *parserFnConfig) PrettyString(indent string) string {

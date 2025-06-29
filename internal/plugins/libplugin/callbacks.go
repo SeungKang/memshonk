@@ -118,7 +118,7 @@ type goCallbacks struct {
 	process plugins.Process
 
 	readFromProcPtr uintptr
-	writeToProcPtr uintptr
+	writeToProcPtr  uintptr
 }
 
 func (o *goCallbacks) readFromProc(pluginAddr uintptr, size uintptr, procAddr uintptr) uintptr {
@@ -175,4 +175,21 @@ func (o *goCallbacks) writeToProc(procAddr uintptr, size uintptr, pluginAddr uin
 	}
 
 	return 0
+}
+
+func setGoCallbackInPlugin(funcNames []string, callbackFnPtr uintptr, lib *dl.Library) error {
+	var setCallbackFn func(cb uintptr) uint8
+
+	fnName, err := findFirstFunc(funcNames, &setCallbackFn, lib)
+	if err != nil {
+		return fmt.Errorf("failed to find first matching function - %w", err)
+	}
+
+	result := setCallbackFn(callbackFnPtr)
+	if result != 0 {
+		return fmt.Errorf("%q failed - got status %d",
+			fnName, result)
+	}
+
+	return nil
 }

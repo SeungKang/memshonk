@@ -21,7 +21,6 @@
 - support for custom plugin commands
   - ex. lineup - makes all enemies lineup in front of player
   - ex. coords - prints x,y,z coords of all enemies
-- me3 plugin finds all enemy structs
 
 ### mskit
 
@@ -31,8 +30,8 @@
 
 ## parser
 
-- check if we are attached to a process before running a parser
-- fix assumption of user supplying absolute address in parser
+~~- check if we are attached to a process before running a parser~~
+~~- fix assumption of user supplying absolute address in parser~~
 
 ## vmmap
 

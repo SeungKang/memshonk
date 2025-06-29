@@ -23,6 +23,12 @@
   - ex. coords - prints x,y,z coords of all enemies
 - me3 plugin finds all enemy structs
 
+### mskit
+
+- helper function for reading a pointer from process
+- helper function for reading data from process using a pointer to a Vec<u8>
+- investigate rust macro to generate ffi functions
+
 ## parser
 
 - check if we are attached to a process before running a parser

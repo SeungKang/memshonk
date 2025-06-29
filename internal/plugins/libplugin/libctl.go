@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/SeungKang/memshonk/internal/dl"
 	"github.com/SeungKang/memshonk/internal/plugins"
@@ -328,79 +327,6 @@ func findFirstFunc(funcNames []string, goFnPtr interface{}, lib *dl.Library) (st
 
 	return "", fmt.Errorf("failed to find functions matching: %q (no additional info available)",
 		funcNames)
-}
-
-type copyCStrByLen struct {
-	strPtr uintptr
-	len    uintptr
-	freeFn func(uintptr)
-}
-
-func (o *copyCStrByLen) string() string {
-	return string(o.slice())
-}
-
-func (o *copyCStrByLen) slice() []byte {
-	if o.strPtr == 0 || o.len == 0 {
-		return nil
-	}
-
-	ptr := (*byte)(unsafe.Pointer(o.strPtr))
-
-	origStr := unsafe.String(ptr, o.len)
-
-	copied := make([]byte, o.len)
-
-	for i := range origStr {
-		copied[i] = origStr[i]
-	}
-
-	if o.freeFn != nil {
-		o.freeFn(o.strPtr)
-	}
-
-	o.strPtr = 0
-	o.len = 0
-
-	return copied
-}
-
-type copyCStrByNull struct {
-	strPtr uintptr
-	freeFn func(uintptr)
-}
-
-func (o *copyCStrByNull) string() string {
-	return string(o.slice())
-}
-
-func (o *copyCStrByNull) slice() []byte {
-	if o.strPtr == 0 {
-		return nil
-	}
-
-	walker := o.strPtr
-
-	buf := bytes.Buffer{}
-
-	for {
-		b := *(*byte)(unsafe.Pointer(walker))
-		if b == 0x00 {
-			break
-		}
-
-		buf.WriteByte(b)
-
-		walker++
-	}
-
-	if o.freeFn != nil {
-		o.freeFn(o.strPtr)
-	}
-
-	o.strPtr = 0
-
-	return buf.Bytes()
 }
 
 func separateNamespace(str string) (string, string, bool) {

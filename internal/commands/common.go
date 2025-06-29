@@ -14,6 +14,7 @@ import (
 func BuiltinCommands() []CommandSchema {
 	return []CommandSchema{
 		AttachCommandSchema(),
+		DetachCommandSchema(),
 		ReadCommandSchema(),
 		WriteCommandSchema(),
 		FindCommandSchema(),

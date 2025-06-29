@@ -184,7 +184,22 @@ func (o *unixProcess) Resume() error {
 }
 
 func (o *unixProcess) Close() error {
-	return o.ptrace.Detach()
+	// TODO: on linux the process needs to be stopped according to the
+	// PTRACE_DETACH section in the linux manual page unsure what other
+	// unix-like operating systems require
+	if !o.stopped {
+		err := o.Suspend()
+		if err != nil {
+			return fmt.Errorf("failed to suspend process prior to ptrace detach - %w", err)
+		}
+	}
+
+	err := o.ptrace.Detach()
+	if err != nil {
+		return fmt.Errorf("failed to ptrace detach - %w", err)
+	}
+
+	return nil
 }
 
 func elfFileType(elfPath string) (uint32, error) {

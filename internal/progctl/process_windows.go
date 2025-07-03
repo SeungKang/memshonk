@@ -3,6 +3,7 @@
 package progctl
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
@@ -11,24 +12,21 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/kernel32"
 	"github.com/SeungKang/memshonk/internal/memory"
-
-	"github.com/Andoryuuta/kiwi"
 )
 
 var _ attachedProcess = (*windowsProcess)(nil)
 
 func attach(exeName string, pid int) (*windowsProcess, error) {
-	kiwiProc, err := kiwi.GetProcessByPID(pid)
+	handle, err := kernel32.GetReadWriteHandle(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open process memory - %w",
 			err)
 	}
 
 	proc := &windowsProcess{
-		kiwiProc: kiwiProc,
-		handle:   syscall.Handle(kiwiProc.Handle),
-		pid:      pid,
-		exitMon:  newExitMonitor(),
+		handle:  handle,
+		pid:     pid,
+		exitMon: newExitMonitor(),
 	}
 
 	proc.is32b, err = kernel32.IsProcess32Bit(proc.handle)
@@ -77,12 +75,11 @@ func attach(exeName string, pid int) (*windowsProcess, error) {
 }
 
 type windowsProcess struct {
-	kiwiProc kiwi.Process
-	handle   syscall.Handle
-	pid      int
-	is32b    bool
-	exeObj   memory.Object
-	exitMon  *ExitMonitor
+	handle  syscall.Handle
+	pid     int
+	is32b   bool
+	exeObj  memory.Object
+	exitMon *ExitMonitor
 }
 
 func (o *windowsProcess) isAlive() error {
@@ -114,21 +111,18 @@ func (o *windowsProcess) ExeObj() memory.Object {
 }
 
 func (o *windowsProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
-	// TODO: uint64 -> int conversion.
-	return o.kiwiProc.ReadBytes(addr, int(sizeBytes))
+	return kernel32.ReadProcessMemory(o.handle, addr, uintptr(sizeBytes))
 }
 
 func (o *windowsProcess) WriteBytes(b []byte, addr uintptr) error {
-	return o.kiwiProc.WriteBytes(addr, b)
+	return kernel32.WriteProcessMemory(o.handle, addr, b)
 }
 
 func (o *windowsProcess) ReadPtr(at uintptr) (uintptr, error) {
 	if o.is32b {
-		u32, err := o.kiwiProc.ReadUint32(at)
-		return uintptr(u32), err
+		return kernel32.ReadPtr(o.handle, at, 4, binary.LittleEndian)
 	} else {
-		u64, err := o.kiwiProc.ReadUint64(at)
-		return uintptr(u64), err
+		return kernel32.ReadPtr(o.handle, at, 8, binary.LittleEndian)
 	}
 }
 

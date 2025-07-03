@@ -6,7 +6,7 @@
 - command output support (access the result of previous commands)
 - plugin command for me3
 ~~- don't make ctrl + c exit~~
-- retain shell command history
+~~- retain shell command history~~
 
 ## diff
 

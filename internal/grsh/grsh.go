@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/desertbit/grumble"
+	"github.com/fatih/color"
 )
 
 func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
@@ -17,8 +19,21 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	// using the flag library).
 	os.Args = os.Args[0:1]
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home dir - %w", err)
+	}
+
+	configDir := filepath.Join(homeDir, ".memshonk")
+	err = os.MkdirAll(configDir, 0o700)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make config directory at '%s' - %w", configDir, err)
+	}
+
 	grumbleApp := grumble.New(&grumble.Config{
-		Name: "memshonk",
+		Name:        "memshonk",
+		HistoryFile: filepath.Join(configDir, "history"),
+		PromptColor: color.New(color.FgCyan),
 		// CommandPreProc: func(args []string) ([]string, error) {
 		// 	err := shvars.Replace(args, session.Variables())
 		// 	if err != nil {

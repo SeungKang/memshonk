@@ -67,3 +67,7 @@
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
 - improve find performance (increase size read, or with start/end address)
+
+## kernel32
+
+- make Read/Write process memory behave like io interfaces, return the number of bytes read/written

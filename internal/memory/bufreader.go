@@ -139,7 +139,8 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		return nil
 	}
 
-	const minReadSizeBytes uint64 = 1024
+	// one megabyte chosen as limit
+	const minReadSizeBytes uint64 = 1_048_576
 
 	readSizeBytes := need
 	if readSizeBytes < minReadSizeBytes {

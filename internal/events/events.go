@@ -105,12 +105,15 @@ func newEventor(parent *EventGroup) *EventSub {
 	return &EventSub{
 		parent: parent,
 		ch:     make(chan interface{}, 10),
+		done:   make(chan struct{}),
 	}
 }
 
 type EventSub struct {
 	parent *EventGroup
 	ch     chan interface{}
+	once   sync.Once
+	done   chan struct{}
 }
 
 func (o *EventSub) Recv(ctx context.Context) (interface{}, error) {
@@ -123,13 +126,19 @@ func (o *EventSub) Recv(ctx context.Context) (interface{}, error) {
 }
 
 func (o *EventSub) Unsubscribe() {
-	o.parent.unsub(o)
+	o.once.Do(func() {
+		close(o.done)
+
+		o.parent.unsub(o)
+	})
 }
 
 func (o *EventSub) send(ctx context.Context, event interface{}) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-o.done:
+		return nil
 	case <-time.After(time.Second):
 		return nil
 	case o.ch <- event:

@@ -125,6 +125,10 @@ func (o *EventSub) Recv(ctx context.Context) (interface{}, error) {
 	}
 }
 
+func (o *EventSub) RecvCh() <-chan interface{} {
+	return o.ch
+}
+
 func (o *EventSub) Unsubscribe() {
 	o.once.Do(func() {
 		close(o.done)

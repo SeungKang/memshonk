@@ -31,6 +31,10 @@ type Session struct {
 	io     commands.IO
 }
 
+func (o *Session) Events() *EventsPubSub {
+	return o.app.events
+}
+
 func (o *Session) Project() *project.Project {
 	return o.app.project
 }

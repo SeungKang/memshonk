@@ -11,6 +11,7 @@ import (
 
 func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
 	return &App{
+		events:    NewEventsPubSub(),
 		project:   project,
 		procCtl:   progCtl,
 		pluginCtl: optPluginCtl,
@@ -18,12 +19,17 @@ func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plug
 }
 
 type App struct {
+	events        *EventsPubSub
 	project       *project.Project
 	procCtl       progctl.Process
 	pluginCtl     plugins.Ctl
 	rwMu          sync.RWMutex
 	nextSessionId uint64
 	sessions      map[uint64]*Session
+}
+
+func (o *App) Events() *EventsPubSub {
+	return o.events
 }
 
 func (o *App) ProcCtl() progctl.Process {

@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
@@ -11,7 +12,7 @@ import (
 
 func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
 	return &App{
-		events:    NewEventsPubSub(),
+		events:    events.NewEventsPubSub(),
 		project:   project,
 		procCtl:   progCtl,
 		pluginCtl: optPluginCtl,
@@ -19,7 +20,7 @@ func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plug
 }
 
 type App struct {
-	events        *EventsPubSub
+	events        *events.EventsPubSub
 	project       *project.Project
 	procCtl       progctl.Process
 	pluginCtl     plugins.Ctl
@@ -28,7 +29,7 @@ type App struct {
 	sessions      map[uint64]*Session
 }
 
-func (o *App) Events() *EventsPubSub {
+func (o *App) Events() *events.EventsPubSub {
 	return o.events
 }
 

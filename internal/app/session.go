@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
@@ -31,7 +32,7 @@ type Session struct {
 	io     commands.IO
 }
 
-func (o *Session) Events() *EventsPubSub {
+func (o *Session) Events() *events.EventsPubSub {
 	return o.app.events
 }
 

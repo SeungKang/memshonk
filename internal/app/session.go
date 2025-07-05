@@ -32,7 +32,7 @@ type Session struct {
 	io     commands.IO
 }
 
-func (o *Session) Events() *events.EventsPubSub {
+func (o *Session) Events() *events.Groups {
 	return o.app.events
 }
 

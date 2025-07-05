@@ -7,81 +7,71 @@ import (
 	"time"
 )
 
-func NewEventsPubSub() *EventsPubSub {
-	return &EventsPubSub{}
+func NewGroups() *Groups {
+	return &Groups{}
 }
 
-type EventsPubSub struct {
+type Groups struct {
 	rwMu   sync.RWMutex
-	groups map[interface{}]*EventGroup
+	groups map[interface{}]interface{}
 }
 
-func (o *EventsPubSub) Subscribe(category interface{}) *EventSub {
-	o.rwMu.Lock()
-	defer o.rwMu.Unlock()
+func getOrAddPubSubGroup[C comparable](groups *Groups) *group[C] {
+	groups.rwMu.Lock()
+	defer groups.rwMu.Unlock()
 
-	group, hasIt := o.groups[category]
-	if !hasIt {
-		if o.groups == nil {
-			o.groups = make(map[interface{}]*EventGroup)
-		}
-
-		group = newEventGroup()
-
-		o.groups[category] = group
+	if groups.groups == nil {
+		groups.groups = make(map[interface{}]interface{})
 	}
 
-	return group.sub()
-}
+	var category C
 
-func (o *EventsPubSub) Publisher(category interface{}) *EventGroup {
-	o.rwMu.Lock()
-	defer o.rwMu.Unlock()
-
-	group, hasIt := o.groups[category]
+	target, hasIt := groups.groups[category]
 	if !hasIt {
-		if o.groups == nil {
-			o.groups = make(map[interface{}]*EventGroup)
-		}
+		group := newGroup[C]()
 
-		group = newEventGroup()
+		target = group
 
-		o.groups[category] = group
+		groups.groups[category] = group
 	}
 
-	return group
+	return target.(*group[C])
 }
 
-func newEventGroup() *EventGroup {
-	return &EventGroup{}
+func newGroup[C comparable]() *group[C] {
+	return &group[C]{}
 }
 
-type EventGroup struct {
+type group[C comparable] struct {
 	rwMu sync.RWMutex
-	subs map[*EventSub]struct{}
+	subs map[*Sub[C]]struct{}
 }
 
-func (o *EventGroup) sub() *EventSub {
+func (o *group[C]) NewSub() *Sub[C] {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
 	if o.subs == nil {
-		o.subs = make(map[*EventSub]struct{})
+		o.subs = make(map[*Sub[C]]struct{})
 	}
 
-	eventSub := newEventor(o)
+	sub := &Sub[C]{
+		parent: o,
+		ch:     make(chan C, 10),
+		done:   make(chan struct{}),
+	}
 
-	o.subs[eventSub] = struct{}{}
+	o.subs[sub] = struct{}{}
 
-	return eventSub
+	return sub
 }
 
-func (o *EventGroup) Send(ctx context.Context, event interface{}) error {
+func (o *group[C]) Send(ctx context.Context, event C) error {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	for eventor := range o.subs {
-		err := eventor.send(ctx, event)
+	for sub := range o.subs {
+		err := sub.send(ctx, event)
 		if err != nil {
 			return err
 		}
@@ -90,54 +80,67 @@ func (o *EventGroup) Send(ctx context.Context, event interface{}) error {
 	return nil
 }
 
-func (o *EventGroup) unsub(e *EventSub) {
+func (o *group[C]) Unsub(sub *Sub[C]) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
-	delete(o.subs, e)
+	delete(o.subs, sub)
 
 	if len(o.subs) == 0 {
 		o.subs = nil
 	}
 }
 
-func newEventor(parent *EventGroup) *EventSub {
-	return &EventSub{
-		parent: parent,
-		ch:     make(chan interface{}, 10),
-		done:   make(chan struct{}),
+func NewPublisher[C comparable](pubSub *Groups) *Publisher[C] {
+	return &Publisher[C]{
+		parent: getOrAddPubSubGroup[C](pubSub),
 	}
 }
 
-type EventSub struct {
-	parent *EventGroup
-	ch     chan interface{}
+type Publisher[C comparable] struct {
+	parent *group[C]
+}
+
+func (o *Publisher[C]) Send(ctx context.Context, event C) error {
+	return o.parent.Send(ctx, event)
+}
+
+func NewSubscriber[C comparable](pubSub *Groups) *Sub[C] {
+	group := getOrAddPubSubGroup[C](pubSub)
+
+	return group.NewSub()
+}
+
+type Sub[C comparable] struct {
+	parent *group[C]
+	ch     chan C
 	once   sync.Once
 	done   chan struct{}
 }
 
-func (o *EventSub) Recv(ctx context.Context) (interface{}, error) {
+func (o *Sub[C]) Recv(ctx context.Context) (C, error) {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		var empty C
+		return empty, ctx.Err()
 	case event := <-o.ch:
 		return event, nil
 	}
 }
 
-func (o *EventSub) RecvCh() <-chan interface{} {
+func (o *Sub[C]) RecvCh() <-chan C {
 	return o.ch
 }
 
-func (o *EventSub) Unsubscribe() {
+func (o *Sub[C]) Unsubscribe() {
 	o.once.Do(func() {
 		close(o.done)
 
-		o.parent.unsub(o)
+		o.parent.Unsub(o)
 	})
 }
 
-func (o *EventSub) send(ctx context.Context, event interface{}) error {
+func (o *Sub[C]) send(ctx context.Context, event C) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

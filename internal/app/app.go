@@ -12,7 +12,7 @@ import (
 
 func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
 	return &App{
-		events:    events.NewEventsPubSub(),
+		events:    events.NewGroups(),
 		project:   project,
 		procCtl:   progCtl,
 		pluginCtl: optPluginCtl,
@@ -20,7 +20,7 @@ func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plug
 }
 
 type App struct {
-	events        *events.EventsPubSub
+	events        *events.Groups
 	project       *project.Project
 	procCtl       progctl.Process
 	pluginCtl     plugins.Ctl
@@ -29,7 +29,7 @@ type App struct {
 	sessions      map[uint64]*Session
 }
 
-func (o *App) Events() *events.EventsPubSub {
+func (o *App) Events() *events.Groups {
 	return o.events
 }
 

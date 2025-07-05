@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
@@ -73,8 +74,8 @@ type Command interface {
 
 type Session interface {
 	Process() progctl.Process
-
 	Plugins() (plugins.Ctl, bool)
+	Events() *events.Groups
 }
 
 type IO struct {

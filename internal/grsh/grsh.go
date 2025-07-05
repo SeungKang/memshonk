@@ -8,6 +8,7 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/desertbit/grumble"
 	"github.com/fatih/color"
 )
@@ -56,6 +57,29 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			cmdSchema, session))
 	}
 
+	attachEvents := events.NewSubscriber[commands.AttachEvent](session.Events())
+	detachEvents := events.NewSubscriber[commands.DetachEvent](session.Events())
+
+	go func() {
+		defer attachEvents.Unsubscribe()
+		defer detachEvents.Unsubscribe()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e := <-attachEvents.RecvCh():
+				sh.setPrompt(e.Pid)
+
+				close(e.Done)
+			case e := <-detachEvents.RecvCh():
+				sh.setPrompt(0)
+
+				close(e.Done)
+			}
+		}
+	}()
+
 	return sh, nil
 }
 
@@ -71,12 +95,16 @@ func (o *Shell) Run() error {
 
 func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
 	o.fm = flags
-	o.setPrompt()
+	o.setPrompt(0)
 
 	return nil
 }
 
 // TODO: implement seek address
-func (o *Shell) setPrompt() {
-	o.ga.SetPrompt(fmt.Sprintf("[0x%x] $ ", 0))
+func (o *Shell) setPrompt(pid int) {
+	if pid == 0 {
+		o.ga.SetPrompt("$ ")
+	} else {
+		o.ga.SetPrompt(fmt.Sprintf("[%d] $ ", pid))
+	}
 }

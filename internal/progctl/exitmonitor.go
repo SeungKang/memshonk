@@ -1,17 +1,24 @@
 package progctl
 
-import "sync"
+import (
+	"context"
+	"sync"
 
-func newExitMonitor() *ExitMonitor {
+	"github.com/SeungKang/memshonk/internal/events"
+)
+
+func newExitMonitor(pub *events.Publisher[ProcessExitedEvent]) *ExitMonitor {
 	return &ExitMonitor{
-		c: make(chan struct{}),
+		events: pub,
+		c:      make(chan struct{}),
 	}
 }
 
 type ExitMonitor struct {
-	c    chan struct{}
-	once sync.Once
-	err  error
+	events *events.Publisher[ProcessExitedEvent]
+	c      chan struct{}
+	once   sync.Once
+	err    error
 }
 
 func (o *ExitMonitor) Done() <-chan struct{} {
@@ -28,8 +35,14 @@ func (o *ExitMonitor) SetExited(err error) {
 			err = ErrExitedNormally
 		}
 
+		_ = o.events.Send(context.Background(), ProcessExitedEvent{err})
+
 		o.err = err
 
 		close(o.c)
 	})
+}
+
+type ProcessExitedEvent struct {
+	Reason error
 }

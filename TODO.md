@@ -71,3 +71,7 @@
 ## kernel32
 
 - make Read/Write process memory behave like io interfaces, return the number of bytes read/written
+
+## events
+
+- move event and grsh into app or session and implement state for those events

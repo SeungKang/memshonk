@@ -16,7 +16,7 @@ import (
 
 var _ attachedProcess = (*windowsProcess)(nil)
 
-func attach(exeName string, pid int) (*windowsProcess, error) {
+func attach(exeName string, pid int, exitMon *ExitMonitor) (*windowsProcess, error) {
 	handle, err := kernel32.GetReadWriteHandle(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open process memory - %w",
@@ -26,7 +26,7 @@ func attach(exeName string, pid int) (*windowsProcess, error) {
 	proc := &windowsProcess{
 		handle:  handle,
 		pid:     pid,
-		exitMon: newExitMonitor(),
+		exitMon: exitMon,
 	}
 
 	proc.is32b, err = kernel32.IsProcess32Bit(proc.handle)

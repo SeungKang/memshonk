@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/memory"
-
 	"github.com/mitchellh/go-ps"
 )
 
@@ -19,11 +19,6 @@ var (
 	ErrDetached       = errors.New("detached")
 	ErrExitedNormally = errors.New("process exited without error")
 )
-
-type Notifier interface {
-	ProgramStarted(exename string)
-	ProgramStopped(exename string, err error)
-}
 
 type Process interface {
 	Attach(ctx context.Context) (int, error)
@@ -67,16 +62,16 @@ type attachedProcess interface {
 	Close() error
 }
 
-func NewCtl(exeName string) *Ctl {
+func NewCtl(exeName string, eventGroups *events.Groups) *Ctl {
 	return &Ctl{
-		Notif:   nil,
 		exeName: exeName,
+		events:  eventGroups,
 	}
 }
 
 type Ctl struct {
-	Notif   Notifier
 	exeName string
+	events  *events.Groups
 	rwMu    sync.RWMutex
 	current *processThread
 }
@@ -114,16 +109,16 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 			o.exeName)
 	}
 
-	proc, err := newProcessThread(exeName, possiblePID)
+	exitPub := events.NewPublisher[ProcessExitedEvent](o.events)
+	exitMon := newExitMonitor(exitPub)
+
+	proc, err := newProcessThread(exeName, possiblePID, exitMon)
 	if err != nil {
 		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
 			possiblePID, exeName, err)
 	}
 
 	o.current = proc
-	if o.Notif != nil {
-		o.Notif.ProgramStarted(o.exeName)
-	}
 
 	return possiblePID, nil
 }

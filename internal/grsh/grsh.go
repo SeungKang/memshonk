@@ -3,12 +3,14 @@ package grsh
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/desertbit/grumble"
 	"github.com/fatih/color"
 )
@@ -59,10 +61,12 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 
 	attachEvents := events.NewSubscriber[commands.AttachEvent](session.Events())
 	detachEvents := events.NewSubscriber[commands.DetachEvent](session.Events())
+	exitedEvents := events.NewSubscriber[progctl.ProcessExitedEvent](session.Events())
 
 	go func() {
 		defer attachEvents.Unsubscribe()
 		defer detachEvents.Unsubscribe()
+		defer exitedEvents.Unsubscribe()
 
 		for {
 			select {
@@ -76,6 +80,9 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 				sh.setPrompt(0)
 
 				close(e.Done)
+			case e := <-exitedEvents.RecvCh():
+				sh.setPrompt(0)
+				log.Printf("process exited - %v", e.Reason)
 			}
 		}
 	}()
@@ -100,7 +107,6 @@ func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
 	return nil
 }
 
-// TODO: implement seek address
 func (o *Shell) setPrompt(pid int) {
 	if pid == 0 {
 		o.ga.SetPrompt("$ ")

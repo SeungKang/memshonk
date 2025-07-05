@@ -12,6 +12,7 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/grsh"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginscompat"
@@ -81,14 +82,16 @@ func mainWithError() error {
 		syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	defer cancelFn()
 
-	progCtl := progctl.NewCtl(proj.General().ExeName)
+	eventGroups := events.NewGroups()
+
+	progCtl := progctl.NewCtl(proj.General().ExeName, eventGroups)
 
 	optPluginsCtl, err := loadInitialPlugins(proj, progCtl)
 	if err != nil {
 		return fmt.Errorf("failed to setup plugins - %w", err)
 	}
 
-	application := app.NewApp(proj, progCtl, optPluginsCtl)
+	application := app.NewApp(eventGroups, proj, progCtl, optPluginsCtl)
 
 	session := application.NewSession(commands.IO{
 		Stdout: os.Stdout,
@@ -99,6 +102,8 @@ func mainWithError() error {
 	if err != nil {
 		return err
 	}
+
+	log.SetFlags(log.LstdFlags)
 
 	return sh.Run()
 }

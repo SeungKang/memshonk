@@ -14,12 +14,12 @@ import (
 
 var _ attachedProcess = (*unixProcess)(nil)
 
-func attach(exeName string, pid int) (*unixProcess, error) {
+func attach(exeName string, pid int, exitMon *ExitMonitor) (*unixProcess, error) {
 	proc := &unixProcess{
 		pid:     pid,
 		ptrace:  ptrace.New(pid),
 		endian:  binary.LittleEndian,
-		exitMon: newExitMonitor(),
+		exitMon: exitMon,
 	}
 
 	regions, err := proc.Regions()

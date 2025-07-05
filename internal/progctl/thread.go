@@ -3,13 +3,15 @@ package progctl
 import (
 	"context"
 	"fmt"
-	"github.com/SeungKang/memshonk/internal/memory"
 	"runtime"
+
+	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-func newProcessThread(exeName string, pid int) (*processThread, error) {
+func newProcessThread(exeName string, pid int, exitMon *ExitMonitor) (*processThread, error) {
 	thread := &processThread{
 		callbacks: make(chan *processThreadCallback),
+		exitMon:   exitMon,
 	}
 
 	attachResult := make(chan error, 1)
@@ -27,6 +29,7 @@ func newProcessThread(exeName string, pid int) (*processThread, error) {
 // we did this because on linux ptrace operations need to be executed by the same thread
 // https://stackoverflow.com/questions/16767832/ptrace-not-recognizing-child-process
 type processThread struct {
+	exitMon   *ExitMonitor
 	callbacks chan *processThreadCallback
 	process   attachedProcess
 }
@@ -63,7 +66,7 @@ func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
 	defer runtime.UnlockOSThread()
 
 	var err error
-	o.process, err = attach(exeName, pid)
+	o.process, err = attach(exeName, pid, o.exitMon)
 	if err != nil {
 		attachResult <- fmt.Errorf("failed to attach process - %w", err)
 		return

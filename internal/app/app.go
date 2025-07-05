@@ -10,9 +10,9 @@ import (
 	"github.com/SeungKang/memshonk/internal/project"
 )
 
-func NewApp(project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
+func NewApp(eventGroups *events.Groups, project *project.Project, progCtl progctl.Process, optPluginCtl plugins.Ctl) *App {
 	return &App{
-		events:    events.NewGroups(),
+		events:    eventGroups,
 		project:   project,
 		procCtl:   progCtl,
 		pluginCtl: optPluginCtl,

@@ -12,11 +12,18 @@ func NewGroups() *Groups {
 }
 
 type Groups struct {
-	rwMu   sync.RWMutex
+	rwMu sync.RWMutex
+
+	// groups contains a mapping of empty event type to
+	// eventGroup[C]. I.e.,
+	//
+	//   map[C{}]*eventGroup[C]
+	//
+	// ... where C is a user-specified data type.
 	groups map[interface{}]interface{}
 }
 
-func getOrAddPubSubGroup[C comparable](groups *Groups) *group[C] {
+func getOrAddEventGroup[C comparable](groups *Groups) *eventGroup[C] {
 	groups.rwMu.Lock()
 	defer groups.rwMu.Unlock()
 
@@ -28,26 +35,26 @@ func getOrAddPubSubGroup[C comparable](groups *Groups) *group[C] {
 
 	target, hasIt := groups.groups[category]
 	if !hasIt {
-		group := newGroup[C]()
+		group := newEventGroup[C]()
 
 		target = group
 
 		groups.groups[category] = group
 	}
 
-	return target.(*group[C])
+	return target.(*eventGroup[C])
 }
 
-func newGroup[C comparable]() *group[C] {
-	return &group[C]{}
+func newEventGroup[C comparable]() *eventGroup[C] {
+	return &eventGroup[C]{}
 }
 
-type group[C comparable] struct {
+type eventGroup[C comparable] struct {
 	rwMu sync.RWMutex
 	subs map[*Sub[C]]struct{}
 }
 
-func (o *group[C]) NewSub() *Sub[C] {
+func (o *eventGroup[C]) Sub() *Sub[C] {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -66,7 +73,7 @@ func (o *group[C]) NewSub() *Sub[C] {
 	return sub
 }
 
-func (o *group[C]) Send(ctx context.Context, event C) error {
+func (o *eventGroup[C]) Send(ctx context.Context, event C) error {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -80,7 +87,7 @@ func (o *group[C]) Send(ctx context.Context, event C) error {
 	return nil
 }
 
-func (o *group[C]) Unsub(sub *Sub[C]) {
+func (o *eventGroup[C]) Unsub(sub *Sub[C]) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -91,28 +98,28 @@ func (o *group[C]) Unsub(sub *Sub[C]) {
 	}
 }
 
-func NewPublisher[C comparable](pubSub *Groups) *Publisher[C] {
+func NewPublisher[C comparable](groups *Groups) *Publisher[C] {
 	return &Publisher[C]{
-		parent: getOrAddPubSubGroup[C](pubSub),
+		parent: getOrAddEventGroup[C](groups),
 	}
 }
 
 type Publisher[C comparable] struct {
-	parent *group[C]
+	parent *eventGroup[C]
 }
 
 func (o *Publisher[C]) Send(ctx context.Context, event C) error {
 	return o.parent.Send(ctx, event)
 }
 
-func NewSubscriber[C comparable](pubSub *Groups) *Sub[C] {
-	group := getOrAddPubSubGroup[C](pubSub)
+func NewSubscriber[C comparable](groups *Groups) *Sub[C] {
+	group := getOrAddEventGroup[C](groups)
 
-	return group.NewSub()
+	return group.Sub()
 }
 
 type Sub[C comparable] struct {
-	parent *group[C]
+	parent *eventGroup[C]
 	ch     chan C
 	once   sync.Once
 	done   chan struct{}

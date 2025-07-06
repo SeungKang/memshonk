@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -68,11 +67,6 @@ func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 		return nil, err
 	}
 
-	eventPub := events.NewPublisher[AttachEvent](s.Events())
-	done := make(chan struct{})
-	_ = eventPub.Send(ctx, AttachEvent{Pid: pid, Done: done})
-	<-done
-
 	obj, err := s.Process().ExeObject(ctx)
 	if err != nil {
 		return nil, err
@@ -94,9 +88,4 @@ func (o AttachCommandResult) Serialize() []byte {
 		o.ExeObj.Name,
 		o.PID,
 		o.ExeObj.BaseAddr))
-}
-
-type AttachEvent struct {
-	Pid  int
-	Done chan struct{}
 }

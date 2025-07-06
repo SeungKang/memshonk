@@ -64,16 +64,20 @@ type attachedProcess interface {
 
 func NewCtl(exeName string, eventGroups *events.Groups) *Ctl {
 	return &Ctl{
-		exeName: exeName,
-		events:  eventGroups,
+		exeName:       exeName,
+		attachEvents:  events.NewPublisher[AttachedEvent](eventGroups),
+		detachEvents:  events.NewPublisher[DetachedEvent](eventGroups),
+		processExited: events.NewPublisher[ProcessExitedEvent](eventGroups),
 	}
 }
 
 type Ctl struct {
-	exeName string
-	events  *events.Groups
-	rwMu    sync.RWMutex
-	current *processThread
+	exeName       string
+	attachEvents  *events.Publisher[AttachedEvent]
+	detachEvents  *events.Publisher[DetachedEvent]
+	processExited *events.Publisher[ProcessExitedEvent]
+	rwMu          sync.RWMutex
+	current       *processThread
 }
 
 func (o *Ctl) Attach(ctx context.Context) (int, error) {
@@ -109,8 +113,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 			o.exeName)
 	}
 
-	exitPub := events.NewPublisher[ProcessExitedEvent](o.events)
-	exitMon := newExitMonitor(exitPub)
+	exitMon := newExitMonitor(o.processExited)
 
 	proc, err := newProcessThread(exeName, possiblePID, exitMon)
 	if err != nil {
@@ -119,6 +122,13 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	}
 
 	o.current = proc
+
+	ack := make(chan struct{})
+	_ = o.attachEvents.Send(ctx, AttachedEvent{
+		Pid:   possiblePID,
+		Acked: ack,
+	})
+	<-ack
 
 	return possiblePID, nil
 }
@@ -285,6 +295,12 @@ func (o *Ctl) Detach(ctx context.Context) error {
 	err := o.current.Close(ctx)
 
 	o.current = nil
+
+	ack := make(chan struct{})
+	_ = o.detachEvents.Send(ctx, DetachedEvent{
+		Acked: ack,
+	})
+	<-ack
 
 	return err
 }

@@ -59,8 +59,8 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			cmdSchema, session))
 	}
 
-	attachEvents := events.NewSubscriber[commands.AttachEvent](session.Events())
-	detachEvents := events.NewSubscriber[commands.DetachEvent](session.Events())
+	attachEvents := events.NewSubscriber[progctl.AttachedEvent](session.Events())
+	detachEvents := events.NewSubscriber[progctl.DetachedEvent](session.Events())
 	exitedEvents := events.NewSubscriber[progctl.ProcessExitedEvent](session.Events())
 
 	go func() {
@@ -75,11 +75,11 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			case e := <-attachEvents.RecvCh():
 				sh.setPrompt(e.Pid)
 
-				close(e.Done)
+				close(e.Acked)
 			case e := <-detachEvents.RecvCh():
 				sh.setPrompt(0)
 
-				close(e.Done)
+				close(e.Acked)
 			case e := <-exitedEvents.RecvCh():
 				sh.setPrompt(0)
 				log.Printf("process exited - %v", e.Reason)

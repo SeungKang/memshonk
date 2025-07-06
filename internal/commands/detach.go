@@ -2,8 +2,6 @@ package commands
 
 import (
 	"context"
-
-	"github.com/SeungKang/memshonk/internal/events"
 )
 
 const (
@@ -37,14 +35,5 @@ func (o DetachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 		return nil, err
 	}
 
-	eventPub := events.NewPublisher[DetachEvent](s.Events())
-	done := make(chan struct{})
-	_ = eventPub.Send(ctx, DetachEvent{Done: done})
-	<-done
-
 	return nil, nil
-}
-
-type DetachEvent struct {
-	Done chan struct{}
 }

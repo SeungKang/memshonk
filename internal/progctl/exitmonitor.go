@@ -42,7 +42,3 @@ func (o *ExitMonitor) SetExited(err error) {
 		close(o.c)
 	})
 }
-
-type ProcessExitedEvent struct {
-	Reason error
-}

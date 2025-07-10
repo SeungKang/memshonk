@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/dl"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
@@ -39,18 +40,22 @@ var _ plugins.Ctl = (*Ctl)(nil)
 
 func NewCtl(args plugins.CtlConfig) (*Ctl, error) {
 	ctl := &Ctl{
-		process:       args.Process,
-		callbacksList: newGoCallbacksList(args.Process),
+		loadedEvents:   events.NewPublisher[plugins.LoadedEvent](args.Events),
+		unloadedEvents: events.NewPublisher[plugins.UnloadedEvent](args.Events),
+		process:        args.Process,
+		callbacksList:  newGoCallbacksList(args.Process),
 	}
 
 	return ctl, nil
 }
 
 type Ctl struct {
-	process       plugins.Process
-	callbacksList *goCallbacksList
-	rwMu          sync.RWMutex
-	plugins       []*Plugin
+	loadedEvents   *events.Publisher[plugins.LoadedEvent]
+	unloadedEvents *events.Publisher[plugins.UnloadedEvent]
+	process        plugins.Process
+	callbacksList  *goCallbacksList
+	rwMu           sync.RWMutex
+	plugins        []*Plugin
 }
 
 func (o *Ctl) PrettyString(indent string) string {
@@ -183,6 +188,8 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 
 	o.addPlugin(libPlugin)
 
+	_ = o.loadedEvents.Send(context.Background(), plugins.LoadedEvent{Plugin: libPlugin})
+
 	return libPlugin, nil
 }
 
@@ -212,6 +219,8 @@ func (o *Ctl) unload(name string) error {
 			if err != nil {
 				return fmt.Errorf("failed to unload plugin - %w", err)
 			}
+
+			_ = o.unloadedEvents.Send(context.Background(), plugins.UnloadedEvent{Plugin: o.plugins[i]})
 
 			o.callbacksList.deregister(o.plugins[i].callbacks)
 		} else {

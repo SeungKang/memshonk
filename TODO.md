@@ -21,6 +21,7 @@
 - support for custom plugin commands
   - ex. lineup - makes all enemies lineup in front of player
   - ex. coords - prints x,y,z coords of all enemies
+- add context as arguments to plugin.load and plugin.unload
 
 ### mskit
 

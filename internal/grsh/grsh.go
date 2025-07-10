@@ -10,6 +10,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/desertbit/grumble"
 	"github.com/fatih/color"
@@ -62,11 +63,15 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	attachEvents := events.NewSubscriber[progctl.AttachedEvent](session.Events())
 	detachEvents := events.NewSubscriber[progctl.DetachedEvent](session.Events())
 	exitedEvents := events.NewSubscriber[progctl.ProcessExitedEvent](session.Events())
+	loadedEvents := events.NewSubscriber[plugins.LoadedEvent](session.Events())
+	unloadedEvents := events.NewSubscriber[plugins.UnloadedEvent](session.Events())
 
 	go func() {
 		defer attachEvents.Unsubscribe()
 		defer detachEvents.Unsubscribe()
 		defer exitedEvents.Unsubscribe()
+		defer loadedEvents.Unsubscribe()
+		defer unloadedEvents.Unsubscribe()
 
 		for {
 			select {
@@ -83,6 +88,10 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			case e := <-exitedEvents.RecvCh():
 				sh.setPrompt(0)
 				log.Printf("process exited - %v", e.Reason)
+			case e := <-loadedEvents.RecvCh():
+				_ = e
+			case e := <-unloadedEvents.RecvCh():
+				_ = e
 			}
 		}
 	}()

@@ -22,6 +22,7 @@
   - ex. lineup - makes all enemies lineup in front of player
   - ex. coords - prints x,y,z coords of all enemies
 - add context as arguments to plugin.load and plugin.unload
+- investigate order of unload and load events being out of order
 
 ### mskit
 

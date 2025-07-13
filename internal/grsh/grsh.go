@@ -89,14 +89,38 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 				sh.setPrompt(0)
 				log.Printf("process exited - %v", e.Reason)
 			case e := <-loadedEvents.RecvCh():
-				_ = e
+				grumbleApp.AddCommand(newPluginCommand(e.Plugin))
 			case e := <-unloadedEvents.RecvCh():
-				_ = e
+				grumbleApp.Commands().Remove(e.Plugin.Name())
 			}
 		}
 	}()
 
 	return sh, nil
+}
+
+func newPluginCommand(plugin plugins.Plugin) *grumble.Command {
+	return &grumble.Command{
+		Name:     plugin.Name(),
+		Help:     "TODO",
+		LongHelp: "",
+		Args: func(args *grumble.Args) {
+			args.String("command", "name of command to run")
+			args.StringList("args", "command arguments", grumble.Default([]string{}))
+		},
+		Run: func(c *grumble.Context) error {
+			commandName := c.Args.String("command")
+			commandArgs := c.Args.StringList("args")
+
+			output, err := plugin.RunCommand(commandName, commandArgs)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(output))
+			return nil
+		},
+	}
 }
 
 type Shell struct {

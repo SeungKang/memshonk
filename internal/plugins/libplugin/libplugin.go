@@ -25,6 +25,7 @@ type Plugin struct {
 	optUnloadFn func()
 	optDebugFn  func(bool)
 	parsers     []*parserFnConfig
+	commands    []*commandFnConfig
 	unloadRwMu  sync.RWMutex
 	lib         *dl.Library
 }
@@ -71,6 +72,49 @@ func (o *Plugin) loadParsers() error {
 	return nil
 }
 
+func (o *Plugin) loadCommands() error {
+	var getCommandsFn func() uintptr
+
+	_, err := findFirstFunc(
+		[]string{commandsFnName},
+		&getCommandsFn,
+		o.lib)
+	if err != nil {
+		return nil
+	}
+
+	commandsFnsStr := stringFromSharedBufRef(getCommandsFn(), o.Free)
+
+	if commandsFnsStr == "" {
+		return nil
+	}
+
+	commandNames := strings.Split(commandsFnsStr, " ")
+	sort.Strings(commandNames)
+
+	commands := make([]*commandFnConfig, len(commandNames))
+
+	for i, commandFnName := range commandNames {
+		cmd := &commandFnConfig{
+			name:      commandFnName,
+			allocFn:   o.allocFn,
+			freeBufFn: o.Free,
+		}
+
+		err := o.lib.Func(commandFnName, &cmd.commandFn)
+		if err != nil {
+			return fmt.Errorf("failed to find command fn %q - %w",
+				commandFnName, err)
+		}
+
+		commands[i] = cmd
+	}
+
+	o.commands = commands
+
+	return nil
+}
+
 func (o *Plugin) PrettyString(indent string) string {
 	buf := bytes.Buffer{}
 
@@ -110,6 +154,23 @@ func (o *Plugin) PrettyString(indent string) string {
 	buf.WriteString("parsers:")
 
 	if len(o.parsers) == 0 {
+		buf.WriteString(" (none)\n")
+	} else {
+		if indent != "" {
+			buf.WriteString(indent)
+		}
+		buf.WriteByte('\n')
+
+		buf.WriteString(o.ParsersPrettyString(indent+"  ") + "\n")
+	}
+
+	if indent != "" {
+		buf.WriteString(indent)
+	}
+
+	buf.WriteString("commands:")
+
+	if len(o.commands) == 0 {
 		buf.WriteString(" (none)")
 	} else {
 		if indent != "" {
@@ -117,7 +178,7 @@ func (o *Plugin) PrettyString(indent string) string {
 		}
 		buf.WriteByte('\n')
 
-		buf.WriteString(o.ParsersPrettyString(indent + "  "))
+		buf.WriteString(o.CommandsPrettyString(indent + "  "))
 	}
 
 	return buf.String()
@@ -138,6 +199,28 @@ func (o *Plugin) ParsersPrettyString(indent string) string {
 		buf.WriteString(s.name)
 
 		if i != len(o.parsers)-1 {
+			buf.WriteString("\n")
+		}
+	}
+
+	return buf.String()
+}
+
+func (o *Plugin) CommandsPrettyString(indent string) string {
+	if len(o.commands) == 0 {
+		return ""
+	}
+
+	buf := bytes.Buffer{}
+
+	for i, s := range o.commands {
+		if indent != "" {
+			buf.WriteString(indent)
+		}
+
+		buf.WriteString(s.name)
+
+		if i != len(o.commands)-1 {
 			buf.WriteString("\n")
 		}
 	}
@@ -228,6 +311,30 @@ func (o *Plugin) getParser(name string) (*parserFnConfig, bool) {
 	return nil, false
 }
 
+func (o *Plugin) RunCommand(name string, args []string) ([]byte, error) {
+	if o.optUnloadFn != nil {
+		o.unloadRwMu.RLock()
+		defer o.unloadRwMu.RUnlock()
+	}
+
+	command, hasIt := o.getCommand(name)
+	if !hasIt {
+		return nil, fmt.Errorf("unknown command: %q", name)
+	}
+
+	return command.run(args)
+}
+
+func (o *Plugin) getCommand(name string) (*commandFnConfig, bool) {
+	for i := range o.commands {
+		if name == o.commands[i].name {
+			return o.commands[i], true
+		}
+	}
+
+	return nil, false
+}
+
 func (o *Plugin) isUnloaded() error {
 	if o.lib == nil {
 		return errors.New("library was unloaded")
@@ -294,4 +401,39 @@ func (o *parserFnConfig) run(addr uintptr) ([]byte, error) {
 	}
 
 	return bytesFromSharedBufRef(strPtr, o.freeBufFn), nil
+}
+
+type commandFnConfig struct {
+	name      string
+	commandFn func(argsListPtr uintptr, outputStrPtr *uintptr) uintptr
+	allocFn   func(uint32) uintptr
+	freeBufFn func(SharedBuf)
+}
+
+func (o *commandFnConfig) PrettyString(indent string) string {
+	buf := bytes.Buffer{}
+
+	if indent != "" {
+		buf.WriteString(indent)
+	}
+	buf.WriteString(o.name)
+
+	return buf.String()
+}
+
+func (o *commandFnConfig) run(args []string) ([]byte, error) {
+	argsNull := []byte(strings.Join(args, "\x00") + "\x00")
+	argsSharedBuf := sharedBufFromPtr(o.allocFn(uint32(len(argsNull))))
+	argsSharedBuf.WriteBytes(argsNull)
+
+	var outputPtr uintptr
+
+	result := o.commandFn(argsSharedBuf.Pointer(), &outputPtr)
+	if result != 0 {
+		msg := stringFromSharedBufRef(result, o.freeBufFn)
+
+		return nil, fmt.Errorf("command failed: %s", msg)
+	}
+
+	return bytesFromSharedBufRef(outputPtr, o.freeBufFn), nil
 }

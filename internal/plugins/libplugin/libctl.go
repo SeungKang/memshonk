@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/dl"
+	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
@@ -31,9 +31,10 @@ const (
 
 // Optional functions for library-based plugins.
 const (
-	unloadFnName  = "unload"
-	debugFnName   = "debug"
-	parsersFnName = "parsers_v0"
+	unloadFnName   = "unload"
+	debugFnName    = "debug"
+	parsersFnName  = "parsers_v0"
+	commandsFnName = "commands_v0"
 )
 
 var _ plugins.Ctl = (*Ctl)(nil)
@@ -289,6 +290,11 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	err = plugin.loadParsers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load parsers - %w", err)
+	}
+
+	err = plugin.loadCommands()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load commands - %w", err)
 	}
 
 	return plugin, nil

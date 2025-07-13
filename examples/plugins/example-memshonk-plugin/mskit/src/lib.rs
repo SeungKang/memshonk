@@ -114,6 +114,8 @@ pub trait SharedBufRef {
     fn reclaim_vec(self) -> Vec<u8>;
 
     fn reclaim_error(self) -> Box<dyn Error>;
+
+    fn reclaim_null_string_vec(self) -> Vec<String>;
 }
 
 impl SharedBufRef for *mut u8 {
@@ -121,6 +123,14 @@ impl SharedBufRef for *mut u8 {
         let vec = self.reclaim_vec();
 
         String::from_utf8_lossy(&vec).into()
+    }
+
+    fn reclaim_null_string_vec(self) -> Vec<String> {
+        let vec = self.reclaim_vec();
+
+        vec.split(|i|*i==0x00)
+            .map(|s| String::from_utf8_lossy(s).into_owned())
+            .collect()
     }
 
     fn reclaim_vec(self) -> Vec<u8> {

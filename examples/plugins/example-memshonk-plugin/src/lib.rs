@@ -1,6 +1,6 @@
 use core::ptr;
 
-use mskit::ShareableType;
+use mskit::{ShareableType, SharedBufRef};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
@@ -15,6 +15,11 @@ extern "C" fn unload() {}
 #[no_mangle]
 extern "C" fn parsers_v0() -> *mut u8 {
     "example_parser broken_parser".share()
+}
+
+#[no_mangle]
+extern "C" fn commands_v0() -> *mut u8 {
+    "example_command".share()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,4 +66,20 @@ extern "C" fn broken_parser(_: usize, str_ptr: *mut *mut u8) -> *mut u8 {
 
 fn _broken_parser(_: *mut *mut u8) -> Result<(), Box<dyn Error>> {
     Err("whoops, this is broken")?
+}
+
+#[no_mangle]
+extern "C" fn example_command(args: *mut u8, output_ptr: *mut *mut u8) -> *mut u8 {
+    match _example_command(args.reclaim_null_string_vec()) {
+        Ok(str) => {
+            unsafe { *output_ptr = str.share() };
+
+            ptr::null_mut()
+        }
+        Err(err) => err.share(),
+    }
+}
+
+fn _example_command(args: Vec<String>) -> Result<String, Box<dyn Error>> {
+    Ok(args.join(" "))
 }

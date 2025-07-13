@@ -43,6 +43,8 @@ type Plugin interface {
 
 	RunParser(id string, targetAddr uintptr) ([]byte, error)
 
+	RunCommand(name string, args []string) ([]byte, error)
+
 	PrettyString(indent string) string
 }
 

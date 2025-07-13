@@ -66,6 +66,10 @@ func (o *SharedBuf) Pointer() uintptr {
 	return o.ptr
 }
 
+func (o *SharedBuf) WriteBytes(b []byte) {
+	copy(o.data, b)
+}
+
 func (o *SharedBuf) WriteString(str string) {
 	for i := uint32(0); i < uint32(len(str)); i++ {
 		o.data[i] = str[i]

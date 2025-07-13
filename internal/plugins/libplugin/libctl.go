@@ -31,10 +31,11 @@ const (
 
 // Optional functions for library-based plugins.
 const (
-	unloadFnName   = "unload"
-	debugFnName    = "debug"
-	parsersFnName  = "parsers_v0"
-	commandsFnName = "commands_v0"
+	unloadFnName      = "unload"
+	debugFnName       = "debug"
+	parsersFnName     = "parsers_v0"
+	commandsFnName    = "commands_v0"
+	descriptionFnName = "description_v0"
 )
 
 var _ plugins.Ctl = (*Ctl)(nil)
@@ -286,6 +287,12 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	_ = args.lib.Func(unloadFnName, &plugin.optUnloadFn)
 
 	_ = args.lib.Func(debugFnName, &plugin.optDebugFn)
+
+	var getDescriptionFn func() uintptr
+	_ = args.lib.Func(descriptionFnName, &getDescriptionFn)
+	if getDescriptionFn != nil {
+		plugin.desc = stringFromSharedBufRef(getDescriptionFn(), plugin.Free)
+	}
 
 	err = plugin.loadParsers()
 	if err != nil {

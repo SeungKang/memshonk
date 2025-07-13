@@ -19,6 +19,7 @@ type Plugin struct {
 	name        string
 	loadedAt    time.Time
 	version     uint16
+	desc        string
 	callbacks   *goCallbacks
 	allocFn     func(uint32) uintptr
 	freeMemFn   func(uintptr)
@@ -141,6 +142,11 @@ func (o *Plugin) PrettyString(indent string) string {
 	if indent != "" {
 		buf.WriteString(indent)
 	}
+	buf.WriteString(fmt.Sprintf("description: %s\n", o.desc))
+
+	if indent != "" {
+		buf.WriteString(indent)
+	}
 	buf.WriteString(fmt.Sprintf("unloadable: %t\n", o.optUnloadFn != nil))
 
 	if indent != "" {
@@ -238,6 +244,10 @@ func (o *Plugin) Name() string {
 
 func (o *Plugin) Version() uint16 {
 	return o.version
+}
+
+func (o *Plugin) Description() string {
+	return o.desc
 }
 
 func (o *Plugin) EnableDebug() {

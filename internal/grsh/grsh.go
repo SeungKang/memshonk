@@ -100,9 +100,14 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 }
 
 func newPluginCommand(plugin plugins.Plugin) *grumble.Command {
+	description := plugin.Description()
+	if description == "" {
+		description = "a custom plugin"
+	}
+
 	return &grumble.Command{
 		Name:     plugin.Name(),
-		Help:     "TODO",
+		Help:     description,
 		LongHelp: "",
 		Args: func(args *grumble.Args) {
 			args.String("command", "name of command to run")

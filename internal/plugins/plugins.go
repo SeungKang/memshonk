@@ -37,6 +37,8 @@ type Plugin interface {
 
 	Version() uint16
 
+	Description() string
+
 	EnableDebug()
 
 	DisableDebug()

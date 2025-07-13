@@ -10,6 +10,11 @@ extern "C" fn version() -> u16 {
 }
 
 #[no_mangle]
+extern "C" fn description_v0() -> *mut u8 {
+    "this is an example memshonk plugin".share()
+}
+
+#[no_mangle]
 extern "C" fn unload() {}
 
 #[no_mangle]

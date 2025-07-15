@@ -21,7 +21,6 @@ func BuiltinCommands() []CommandSchema {
 		FindCommandSchema(),
 		VmmapCommandSchema(),
 		PluginsCommandSchema(),
-		ParserCommandSchema(),
 	}
 }
 

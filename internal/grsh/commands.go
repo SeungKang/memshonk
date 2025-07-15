@@ -3,9 +3,12 @@ package grsh
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/desertbit/grumble"
 )
 
@@ -132,4 +135,64 @@ func flagToGrumble(flag commands.FlagSchema, gflags *grumble.Flags) {
 		panic(fmt.Sprintf("TODO: unsupported flag type: %T",
 			flag.DataType))
 	}
+}
+
+func newPluginCommand(plugin plugins.Plugin, session *app.Session) *grumble.Command {
+	description := plugin.Description()
+	if description == "" {
+		description = "a custom plugin"
+	}
+
+	grumbleCommand := &grumble.Command{
+		Name: plugin.Name(),
+		Help: description,
+	}
+
+	_ = plugin.IterCommands(func(cmd plugins.Command) error {
+		grumbleCommand.AddCommand(&grumble.Command{
+			Name:      cmd.Name(),
+			Help:      "TODO",
+			HelpGroup: "commands",
+			Args: func(args *grumble.Args) {
+				args.StringList("args", "command arguments", grumble.Default([]string{}))
+			},
+			Run: func(c *grumble.Context) error {
+				commandArgs := c.Args.StringList("args")
+
+				cmd := commands.NewCommandFromPlugin(cmd, plugin, commandArgs)
+
+				return session.RunCommand(context.TODO(), cmd)
+			},
+		})
+
+		return nil
+	})
+
+	_ = plugin.IterParsers(func(parser plugins.Parser) error {
+		grumbleCommand.AddCommand(&grumble.Command{
+			Name:      parser.Name(),
+			Help:      "TODO",
+			HelpGroup: "parsers",
+			Args: func(args *grumble.Args) {
+				args.String("addr", "memory address of data to parse", grumble.Default(""))
+			},
+			Run: func(c *grumble.Context) error {
+				addrStr := strings.TrimPrefix(c.Args.String("addr"), "0x")
+
+				addr, err := strconv.ParseUint(addrStr, 16, 64)
+				if err != nil {
+					return fmt.Errorf("failed to parse address %q - %w",
+						addrStr, err)
+				}
+
+				cmd := commands.NewParserFromPlugin(parser, plugin, uintptr(addr))
+
+				return session.RunCommand(context.TODO(), cmd)
+			},
+		})
+
+		return nil
+	})
+
+	return grumbleCommand
 }

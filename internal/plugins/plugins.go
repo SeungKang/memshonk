@@ -43,11 +43,23 @@ type Plugin interface {
 
 	DisableDebug()
 
-	RunParser(id string, targetAddr uintptr) ([]byte, error)
+	IterParsers(func(Parser) error) error
 
-	RunCommand(name string, args []string) ([]byte, error)
+	IterCommands(func(Command) error) error
 
 	PrettyString(indent string) string
+}
+
+type Parser interface {
+	Name() string
+
+	Run(ctx context.Context, targetAddr uintptr) ([]byte, error)
+}
+
+type Command interface {
+	Name() string
+
+	Run(ctx context.Context, args []string) ([]byte, error)
 }
 
 type PluginConfig struct {

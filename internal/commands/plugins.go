@@ -120,3 +120,61 @@ func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
 
 	return nil
 }
+
+func NewCommandFromPlugin(cmd plugins.Command, plugin plugins.Plugin, args []string) *CommandFromPlugin {
+	return &CommandFromPlugin{
+		cmd:        cmd,
+		pluginName: plugin.Name(),
+		cmdName:    cmd.Name(),
+		args:       args,
+	}
+}
+
+type CommandFromPlugin struct {
+	cmd        plugins.Command
+	pluginName string
+	cmdName    string
+	args       []string
+}
+
+func (o CommandFromPlugin) Name() string {
+	return o.cmd.Name() + "::" + o.cmdName
+}
+
+func (o CommandFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandResult, error) {
+	output, err := o.cmd.Run(ctx, o.args)
+	if err != nil {
+		return nil, err
+	}
+
+	return HumanCommandResult(output), nil
+}
+
+func NewParserFromPlugin(parser plugins.Parser, plugin plugins.Plugin, arg uintptr) *ParserFromPlugin {
+	return &ParserFromPlugin{
+		parser:     parser,
+		pluginName: plugin.Name(),
+		parserName: parser.Name(),
+		arg:        arg,
+	}
+}
+
+type ParserFromPlugin struct {
+	parser     plugins.Parser
+	pluginName string
+	parserName string
+	arg        uintptr
+}
+
+func (o ParserFromPlugin) Name() string {
+	return o.parser.Name() + "::" + o.parserName
+}
+
+func (o ParserFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandResult, error) {
+	output, err := o.parser.Run(ctx, o.arg)
+	if err != nil {
+		return nil, err
+	}
+
+	return HumanCommandResult(output), nil
+}

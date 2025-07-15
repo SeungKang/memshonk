@@ -2,6 +2,7 @@ package libplugin
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -25,8 +26,8 @@ type Plugin struct {
 	freeMemFn   func(uintptr)
 	optUnloadFn func()
 	optDebugFn  func(bool)
-	parsers     []*parserFnConfig
-	commands    []*commandFnConfig
+	parsers     []*parser
+	commands    []*command
 	unloadRwMu  sync.RWMutex
 	lib         *dl.Library
 }
@@ -51,12 +52,16 @@ func (o *Plugin) loadParsers() error {
 	parserNames := strings.Split(parserFnsStr, " ")
 	sort.Strings(parserNames)
 
-	parsers := make([]*parserFnConfig, len(parserNames))
+	parsers := make([]*parser, len(parserNames))
 
 	for i, parserFnName := range parserNames {
-		par := &parserFnConfig{
+		par := &parser{
 			name:      parserFnName,
 			freeBufFn: o.Free,
+		}
+
+		if o.optUnloadFn != nil {
+			par.parentMu = &o.unloadRwMu
 		}
 
 		err := o.lib.Func(parserFnName, &par.parseFn)
@@ -93,13 +98,17 @@ func (o *Plugin) loadCommands() error {
 	commandNames := strings.Split(commandsFnsStr, " ")
 	sort.Strings(commandNames)
 
-	commands := make([]*commandFnConfig, len(commandNames))
+	commands := make([]*command, len(commandNames))
 
 	for i, commandFnName := range commandNames {
-		cmd := &commandFnConfig{
+		cmd := &command{
 			name:      commandFnName,
 			allocFn:   o.allocFn,
 			freeBufFn: o.Free,
+		}
+
+		if o.optUnloadFn != nil {
+			cmd.parentMu = &o.unloadRwMu
 		}
 
 		err := o.lib.Func(commandFnName, &cmd.commandFn)
@@ -297,52 +306,36 @@ func (o *Plugin) Free(buf SharedBuf) {
 	}
 }
 
-func (o *Plugin) RunParser(name string, targetAddr uintptr) ([]byte, error) {
+func (o *Plugin) IterParsers(fn func(plugins.Parser) error) error {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
 	}
 
-	parser, hasIt := o.getParser(name)
-	if !hasIt {
-		return nil, fmt.Errorf("unknown parser: %q", name)
-	}
-
-	return parser.run(targetAddr)
-}
-
-func (o *Plugin) getParser(name string) (*parserFnConfig, bool) {
 	for i := range o.parsers {
-		if name == o.parsers[i].name {
-			return o.parsers[i], true
+		err := fn(o.parsers[i])
+		if err != nil {
+			return err
 		}
 	}
 
-	return nil, false
+	return nil
 }
 
-func (o *Plugin) RunCommand(name string, args []string) ([]byte, error) {
+func (o *Plugin) IterCommands(fn func(plugins.Command) error) error {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
 	}
 
-	command, hasIt := o.getCommand(name)
-	if !hasIt {
-		return nil, fmt.Errorf("unknown command: %q", name)
-	}
-
-	return command.run(args)
-}
-
-func (o *Plugin) getCommand(name string) (*commandFnConfig, bool) {
 	for i := range o.commands {
-		if name == o.commands[i].name {
-			return o.commands[i], true
+		err := fn(o.commands[i])
+		if err != nil {
+			return err
 		}
 	}
 
-	return nil, false
+	return nil
 }
 
 func (o *Plugin) isUnloaded() error {
@@ -383,13 +376,18 @@ func (o *Plugin) Unload() error {
 	return nil
 }
 
-type parserFnConfig struct {
+type parser struct {
 	name      string
 	parseFn   func(addr uintptr, dstStrPtr *uintptr) uintptr
 	freeBufFn func(SharedBuf)
+	parentMu  *sync.RWMutex
 }
 
-func (o *parserFnConfig) PrettyString(indent string) string {
+func (o *parser) Name() string {
+	return o.name
+}
+
+func (o *parser) PrettyString(indent string) string {
 	buf := bytes.Buffer{}
 
 	if indent != "" {
@@ -400,7 +398,12 @@ func (o *parserFnConfig) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *parserFnConfig) run(addr uintptr) ([]byte, error) {
+func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
+	if o.parentMu != nil {
+		o.parentMu.RLock()
+		defer o.parentMu.RUnlock()
+	}
+
 	var strPtr uintptr
 
 	result := o.parseFn(addr, &strPtr)
@@ -413,14 +416,19 @@ func (o *parserFnConfig) run(addr uintptr) ([]byte, error) {
 	return bytesFromSharedBufRef(strPtr, o.freeBufFn), nil
 }
 
-type commandFnConfig struct {
+type command struct {
 	name      string
 	commandFn func(argsListPtr uintptr, outputStrPtr *uintptr) uintptr
 	allocFn   func(uint32) uintptr
 	freeBufFn func(SharedBuf)
+	parentMu  *sync.RWMutex
 }
 
-func (o *commandFnConfig) PrettyString(indent string) string {
+func (o *command) Name() string {
+	return o.name
+}
+
+func (o *command) PrettyString(indent string) string {
 	buf := bytes.Buffer{}
 
 	if indent != "" {
@@ -431,7 +439,12 @@ func (o *commandFnConfig) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *commandFnConfig) run(args []string) ([]byte, error) {
+func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
+	if o.parentMu != nil {
+		o.parentMu.RLock()
+		defer o.parentMu.RUnlock()
+	}
+
 	argsNull := []byte(strings.Join(args, "\x00") + "\x00")
 	argsSharedBuf := sharedBufFromPtr(o.allocFn(uint32(len(argsNull))))
 	argsSharedBuf.WriteBytes(argsNull)

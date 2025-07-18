@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 serde_json = "1.0.140"
 serde = { version = "1.0.219", features = ["derive"] }
 mskit = { version = "0.1.0", path = "mskit" }
+argparse = "0.2.2"

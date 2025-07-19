@@ -170,7 +170,7 @@ func (c *Commands) parse(
 		cmds = append(cmds, cmd)
 		cur = &cmd.commands
 
-		if !cmd.DoNotParseArgs {
+		if !cmd.SkipArgParsing {
 			// Parse the command flags.
 			fg := make(FlagMap)
 
@@ -187,7 +187,7 @@ func (c *Commands) parse(
 
 	rest = args
 
-	if skipFlagMaps || len(cmds) > 0 && cmds[len(cmds)-1].DoNotParseArgs {
+	if skipFlagMaps || len(cmds) > 0 && cmds[len(cmds)-1].SkipArgParsing {
 		return
 	}
 

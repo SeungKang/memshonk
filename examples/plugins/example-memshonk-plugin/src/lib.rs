@@ -1,9 +1,8 @@
 use core::ptr;
 
-use argparse::{Store, StoreTrue};
+use argparse::Store;
 use mskit::{ShareableType, SharedBufRef};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::error::Error;
 use std::str::FromStr;
 
@@ -90,8 +89,8 @@ extern "C" fn example_command(args: *mut u8, output_ptr: *mut *mut u8) -> *mut u
 
 fn _example_command(mut arg_list: Vec<String>) -> Result<String, Box<dyn Error>> {
     let mut temp: Vec<String> = Vec::new();
-    temp.push("".into());
-    arg_list.append(&mut temp);
+    temp.push("example_command".into());
+    temp.append(&mut arg_list);
 
     let mut args = ExampleCommandArgs {
         addr: HexAddr(0),
@@ -99,6 +98,7 @@ fn _example_command(mut arg_list: Vec<String>) -> Result<String, Box<dyn Error>>
     };
 
     let mut parser = argparse::ArgumentParser::new();
+
     parser
         .refer(&mut args.addr)
         .add_option(&["--addr"], Store, "the address to write to");
@@ -109,9 +109,10 @@ fn _example_command(mut arg_list: Vec<String>) -> Result<String, Box<dyn Error>>
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    if parser.parse(arg_list, &mut stdout, &mut stderr).is_err() {
+
+    if parser.parse(temp, &mut stdout, &mut stderr).is_err() {
         if stdout.is_empty() {
-            return Err(format!("{}", String::from_utf8(stderr).unwrap()))?;
+            return Err(String::from_utf8(stderr).unwrap())?;
         }
 
         return Ok(String::from_utf8(stdout)?);
@@ -172,7 +173,7 @@ impl Clone for HexValue {
     }
 }
 
-fn hex_to_bytes(mut s: &str) -> Option<Vec<u8>> {
+fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
     (0..s.len())
         .step_by(2)
         .map(|i| {

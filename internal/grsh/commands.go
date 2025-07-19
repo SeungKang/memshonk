@@ -150,16 +150,12 @@ func newPluginCommand(plugin plugins.Plugin, session *app.Session) *grumble.Comm
 
 	_ = plugin.IterCommands(func(cmd plugins.Command) error {
 		grumbleCommand.AddCommand(&grumble.Command{
-			Name:      cmd.Name(),
-			Help:      "TODO",
-			HelpGroup: "commands",
-			Args: func(args *grumble.Args) {
-				args.StringList("args", "command arguments", grumble.Default([]string{}))
-			},
+			Name:           cmd.Name(),
+			Help:           "TODO",
+			HelpGroup:      "commands",
+			SkipArgParsing: true,
 			Run: func(c *grumble.Context) error {
-				commandArgs := c.Args.StringList("args")
-
-				cmd := commands.NewCommandFromPlugin(cmd, plugin, commandArgs)
+				cmd := commands.NewCommandFromPlugin(cmd, plugin, c.UnparsedArgs)
 
 				return session.RunCommand(context.TODO(), cmd)
 			},

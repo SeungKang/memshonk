@@ -176,5 +176,9 @@ func (o ParserFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandResu
 		return nil, err
 	}
 
+	if len(output) == 0 {
+		return nil, nil
+	}
+
 	return HumanCommandResult(output), nil
 }

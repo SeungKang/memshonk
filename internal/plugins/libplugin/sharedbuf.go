@@ -81,7 +81,13 @@ func (o *SharedBuf) CopyString() string {
 }
 
 func (o *SharedBuf) CopyBytes() []byte {
-	tmp := make([]byte, len(o.data))
+	dataLen := len(o.data)
+
+	if dataLen == 0 {
+		return nil
+	}
+
+	tmp := make([]byte, dataLen)
 
 	for i := range o.data {
 		tmp[i] = o.data[i]

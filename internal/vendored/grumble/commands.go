@@ -170,34 +170,40 @@ func (c *Commands) parse(
 		cmds = append(cmds, cmd)
 		cur = &cmd.commands
 
-		// Parse the command flags.
-		fg := make(FlagMap)
-		args, err = cmd.flags.parse(args, fg)
-		if err != nil {
-			return
-		}
+		if !cmd.DoNotParseArgs {
+			// Parse the command flags.
+			fg := make(FlagMap)
 
-		if !skipFlagMaps {
-			fgs = append(fgs, fg)
-		}
-	}
+			args, err = cmd.flags.parse(args, fg)
+			if err != nil {
+				return
+			}
 
-	if !skipFlagMaps {
-		// Merge all the flag maps without default values.
-		flagsMap = make(FlagMap)
-		for i := len(fgs) - 1; i >= 0; i-- {
-			flagsMap.copyMissingValues(fgs[i], false)
+			if !skipFlagMaps {
+				fgs = append(fgs, fg)
+			}
 		}
-		flagsMap.copyMissingValues(parentFlagMap, false)
-
-		// Now include default values. This will ensure, that default values have
-		// lower rank.
-		for i := len(fgs) - 1; i >= 0; i-- {
-			flagsMap.copyMissingValues(fgs[i], true)
-		}
-		flagsMap.copyMissingValues(parentFlagMap, true)
 	}
 
 	rest = args
+
+	if skipFlagMaps || len(cmds) > 0 && cmds[len(cmds)-1].DoNotParseArgs {
+		return
+	}
+
+	// Merge all the flag maps without default values.
+	flagsMap = make(FlagMap)
+	for i := len(fgs) - 1; i >= 0; i-- {
+		flagsMap.copyMissingValues(fgs[i], false)
+	}
+	flagsMap.copyMissingValues(parentFlagMap, false)
+
+	// Now include default values. This will ensure, that default values have
+	// lower rank.
+	for i := len(fgs) - 1; i >= 0; i-- {
+		flagsMap.copyMissingValues(fgs[i], true)
+	}
+	flagsMap.copyMissingValues(parentFlagMap, true)
+
 	return
 }

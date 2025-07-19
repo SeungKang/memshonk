@@ -35,16 +35,20 @@ type Context struct {
 	// Args contains all command line arguments.
 	Args ArgMap
 
+	// UnparsedArgs contains any unparsed arguments.
+	UnparsedArgs []string
+
 	// Cmd is the currently executing command.
 	Command *Command
 }
 
-func newContext(a *App, cmd *Command, flags FlagMap, args ArgMap) *Context {
+func newContext(a *App, cmd *Command, flags FlagMap, args ArgMap, unparsed []string) *Context {
 	return &Context{
-		App:     a,
-		Command: cmd,
-		Flags:   flags,
-		Args:    args,
+		App:          a,
+		Command:      cmd,
+		Flags:        flags,
+		Args:         args,
+		UnparsedArgs: unparsed,
 	}
 }
 

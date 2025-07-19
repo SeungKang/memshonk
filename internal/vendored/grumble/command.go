@@ -58,6 +58,9 @@ type Command struct {
 	// Define all command arguments within this function.
 	Args func(a *Args)
 
+	// SkipArgParsing skips all argument parsing if set to true.
+	SkipArgParsing bool
+
 	// Function to execute for the command.
 	Run func(c *Context) error
 

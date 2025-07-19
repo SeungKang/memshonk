@@ -257,26 +257,32 @@ func (a *App) RunCommand(args []string) error {
 	// The last command is the final command.
 	cmd := cmds[len(cmds)-1]
 
-	// Print the command help if the command run function is nil or if the help flag is set.
-	if fg.Bool("help") || cmd.Run == nil {
-		a.printCommandHelp(a, cmd, a.isShell)
-		return nil
-	}
+	var cmdArgMap ArgMap
 
-	// Parse the arguments.
-	cmdArgMap := make(ArgMap)
-	args, err = cmd.args.parse(args, cmdArgMap)
-	if err != nil {
-		return err
-	}
+	if !cmd.SkipArgParsing {
+		// Print the command help if the command run
+		// function is nil or if the help flag is set.
+		if fg.Bool("help") || cmd.Run == nil {
+			a.printCommandHelp(a, cmd, a.isShell)
+			return nil
+		}
 
-	// Check, if values from the argument string are not consumed (and therefore invalid).
-	if len(args) > 0 {
-		return fmt.Errorf("invalid usage of command '%s' (unconsumed input '%s'), try 'help'", cmd.Name, strings.Join(args, " "))
+		// Parse the arguments.
+		cmdArgMap = make(ArgMap)
+		args, err = cmd.args.parse(args, cmdArgMap)
+		if err != nil {
+			return err
+		}
+
+		// Check, if values from the argument string are
+		// not consumed (and therefore invalid).
+		if len(args) > 0 {
+			return fmt.Errorf("invalid usage of command '%s' (unconsumed input '%s'), try 'help'", cmd.Name, strings.Join(args, " "))
+		}
 	}
 
 	// Create the context and pass the rest args.
-	ctx := newContext(a, cmd, fg, cmdArgMap)
+	ctx := newContext(a, cmd, fg, cmdArgMap, args)
 
 	// Run the command.
 	err = cmd.Run(ctx)

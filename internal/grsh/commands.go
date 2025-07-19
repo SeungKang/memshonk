@@ -173,12 +173,19 @@ func newPluginCommand(plugin plugins.Plugin, session *app.Session) *grumble.Comm
 				args.String("addr", "memory address of data to parse", grumble.Default(""))
 			},
 			Run: func(c *grumble.Context) error {
-				addrStr := strings.TrimPrefix(c.Args.String("addr"), "0x")
+				var addr uint64
+				addrStr := c.Args.String("addr")
 
-				addr, err := strconv.ParseUint(addrStr, 16, 64)
-				if err != nil {
-					return fmt.Errorf("failed to parse address %q - %w",
-						addrStr, err)
+				if addrStr != "" {
+					var err error
+
+					addrStr = strings.TrimPrefix(c.Args.String("addr"), "0x")
+
+					addr, err = strconv.ParseUint(addrStr, 16, 64)
+					if err != nil {
+						return fmt.Errorf("failed to parse address %q - %w",
+							addrStr, err)
+					}
 				}
 
 				cmd := commands.NewParserFromPlugin(parser, plugin, uintptr(addr))

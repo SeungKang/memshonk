@@ -179,7 +179,7 @@ func newPluginCommand(plugin plugins.Plugin, session *app.Session) *grumble.Comm
 				if addrStr != "" {
 					var err error
 
-					addrStr = strings.TrimPrefix(c.Args.String("addr"), "0x")
+					addrStr = strings.TrimPrefix(addrStr, "0x")
 
 					addr, err = strconv.ParseUint(addrStr, 16, 64)
 					if err != nil {

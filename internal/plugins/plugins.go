@@ -10,6 +10,7 @@ import (
 var (
 	ErrPluginsDisabled      = errors.New("plugins are disabled")
 	ErrPluginNotLoaded      = errors.New("plugin is not loaded (please check that its name is correct)")
+	ErrPluginUnloaded       = errors.New("plugin was unloaded")
 	ErrExecOnReloadDisabled = errors.New("exec on reload is disabled")
 )
 

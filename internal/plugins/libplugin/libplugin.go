@@ -29,6 +29,7 @@ type Plugin struct {
 	parsers     []*parser
 	commands    []*command
 	unloadRwMu  sync.RWMutex
+	unloaded    bool
 	lib         *dl.Library
 }
 
@@ -62,6 +63,7 @@ func (o *Plugin) loadParsers() error {
 
 		if o.optUnloadFn != nil {
 			par.parentMu = &o.unloadRwMu
+			par.parentUnl = &o.unloaded
 		}
 
 		err := o.lib.Func(parserFnName, &par.parseFn)
@@ -109,6 +111,7 @@ func (o *Plugin) loadCommands() error {
 
 		if o.optUnloadFn != nil {
 			cmd.parentMu = &o.unloadRwMu
+			cmd.parentUnl = &o.unloaded
 		}
 
 		err := o.lib.Func(commandFnName, &cmd.commandFn)
@@ -286,9 +289,8 @@ func (o *Plugin) Alloc(sizeBytes uint32) (SharedBuf, error) {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
 
-		err := o.isUnloaded()
-		if err != nil {
-			return SharedBuf{}, errors.New("plugin was unloaded")
+		if o.unloaded {
+			return SharedBuf{}, plugins.ErrPluginUnloaded
 		}
 	}
 
@@ -310,6 +312,10 @@ func (o *Plugin) IterParsers(fn func(plugins.Parser) error) error {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
+
+		if o.unloaded {
+			return plugins.ErrPluginUnloaded
+		}
 	}
 
 	for i := range o.parsers {
@@ -326,6 +332,10 @@ func (o *Plugin) IterCommands(fn func(plugins.Command) error) error {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
 		defer o.unloadRwMu.RUnlock()
+
+		if o.unloaded {
+			return plugins.ErrPluginUnloaded
+		}
 	}
 
 	for i := range o.commands {
@@ -333,14 +343,6 @@ func (o *Plugin) IterCommands(fn func(plugins.Command) error) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func (o *Plugin) isUnloaded() error {
-	if o.lib == nil {
-		return errors.New("library was unloaded")
 	}
 
 	return nil
@@ -354,24 +356,28 @@ func (o *Plugin) Unload() error {
 	o.unloadRwMu.Lock()
 	defer o.unloadRwMu.Unlock()
 
-	if o.lib == nil {
+	if o.unloaded {
 		return errors.New("already unloaded")
 	}
 
+	o.unloaded = true
+
 	o.optUnloadFn()
-
-	err := o.lib.Release()
-	if err != nil {
-		return fmt.Errorf("failed to release underlying library - %w", err)
-	}
-
-	o.lib = nil
 
 	o.optUnloadFn = func() {}
 	o.allocFn = func(uint32) uintptr { return 0 }
 	o.freeMemFn = func(uintptr) {}
 	o.parsers = nil
+	o.commands = nil
 	o.optDebugFn = nil
+
+	err := o.lib.Release()
+
+	o.lib = nil
+
+	if err != nil {
+		return fmt.Errorf("failed to release underlying library - %w", err)
+	}
 
 	return nil
 }
@@ -381,6 +387,7 @@ type parser struct {
 	parseFn   func(addr uintptr, dstStrPtr *uintptr) uintptr
 	freeBufFn func(SharedBuf)
 	parentMu  *sync.RWMutex
+	parentUnl *bool
 }
 
 func (o *parser) Name() string {
@@ -402,6 +409,10 @@ func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
 	if o.parentMu != nil {
 		o.parentMu.RLock()
 		defer o.parentMu.RUnlock()
+
+		if *o.parentUnl {
+			return nil, plugins.ErrPluginUnloaded
+		}
 	}
 
 	var strPtr uintptr
@@ -422,6 +433,7 @@ type command struct {
 	allocFn   func(uint32) uintptr
 	freeBufFn func(SharedBuf)
 	parentMu  *sync.RWMutex
+	parentUnl *bool
 }
 
 func (o *command) Name() string {
@@ -443,6 +455,10 @@ func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
 	if o.parentMu != nil {
 		o.parentMu.RLock()
 		defer o.parentMu.RUnlock()
+
+		if *o.parentUnl {
+			return nil, plugins.ErrPluginUnloaded
+		}
 	}
 
 	argsNull := []byte(strings.Join(args, "\x00") + "\x00")

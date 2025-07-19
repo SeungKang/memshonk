@@ -147,6 +147,10 @@ func (o CommandFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandRes
 		return nil, err
 	}
 
+	if len(output) == 0 {
+		return nil, nil
+	}
+
 	return HumanCommandResult(output), nil
 }
 

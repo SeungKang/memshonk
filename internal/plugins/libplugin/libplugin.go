@@ -349,15 +349,15 @@ func (o *Plugin) IterCommands(fn func(plugins.Command) error) error {
 }
 
 func (o *Plugin) Unload() error {
-	if o.optUnloadFn == nil {
-		return errors.New("plugin is not designed to be unloaded")
-	}
-
 	o.unloadRwMu.Lock()
 	defer o.unloadRwMu.Unlock()
 
 	if o.unloaded {
 		return errors.New("already unloaded")
+	}
+
+	if o.optUnloadFn == nil {
+		return errors.New("plugin is not designed to be unloaded")
 	}
 
 	o.unloaded = true

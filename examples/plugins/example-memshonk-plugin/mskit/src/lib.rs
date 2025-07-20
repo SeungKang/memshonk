@@ -3,10 +3,12 @@ use core::ffi::c_void;
 use std::{error::Error, io::Write, sync::OnceLock};
 
 static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
-type ReadFromProcessSig = extern "C" fn(pluginAddr: *mut c_void, size: usize, procAddr: usize) -> *mut u8;
+type ReadFromProcessSig =
+    extern "C" fn(pluginAddr: *mut c_void, size: usize, procAddr: usize) -> *mut u8;
 
 static WRITE_TO_PROCESS: OnceLock<WriteToProcessSig> = OnceLock::new();
-type WriteToProcessSig = extern "C" fn(procAddr: usize, size: usize, pluginAddr: *mut c_void) -> *mut u8;
+type WriteToProcessSig =
+    extern "C" fn(procAddr: usize, size: usize, pluginAddr: *mut c_void) -> *mut u8;
 
 #[no_mangle]
 extern "C" fn alloc_v0(size: u32) -> *mut u8 {

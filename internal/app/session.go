@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
@@ -53,6 +55,10 @@ func (o *Session) Plugins() (plugins.Ctl, bool) {
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
+	var cancelFn func()
+	ctx, cancelFn = signal.NotifyContext(ctx, syscall.SIGINT)
+	defer cancelFn()
+
 	result, err := cmd.Run(ctx, o.io, o)
 	if err != nil {
 		return err

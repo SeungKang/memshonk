@@ -35,7 +35,7 @@ struct ExampleStruct {
 }
 
 #[no_mangle]
-extern "C" fn example_parser(addr: usize, str_ptr: *mut *mut u8) -> *mut u8 {
+extern "C" fn example_parser(_: usize, addr: usize, str_ptr: *mut *mut u8) -> *mut u8 {
     match _example_parser(addr) {
         Ok(str) => {
             unsafe { *str_ptr = str.share() };
@@ -64,19 +64,19 @@ fn _example_parser(addr: usize) -> Result<String, Box<dyn Error>> {
 }
 
 #[no_mangle]
-extern "C" fn broken_parser(_: usize, str_ptr: *mut *mut u8) -> *mut u8 {
-    match _broken_parser(str_ptr) {
+extern "C" fn broken_parser(_: usize, _: usize, _: *mut *mut u8) -> *mut u8 {
+    match _broken_parser() {
         Ok(_) => ptr::null_mut(),
         Err(err) => err.share(),
     }
 }
 
-fn _broken_parser(_: *mut *mut u8) -> Result<(), Box<dyn Error>> {
+fn _broken_parser() -> Result<(), Box<dyn Error>> {
     Err("whoops, this is broken")?
 }
 
 #[no_mangle]
-extern "C" fn example_command(args: *mut u8, output_ptr: *mut *mut u8) -> *mut u8 {
+extern "C" fn example_command(_: usize, args: *mut u8, output_ptr: *mut *mut u8) -> *mut u8 {
     match _example_command(args.reclaim_null_string_vec()) {
         Ok(str) => {
             unsafe { *output_ptr = str.share() };

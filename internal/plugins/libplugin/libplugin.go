@@ -384,7 +384,7 @@ func (o *Plugin) Unload() error {
 
 type parser struct {
 	name      string
-	parseFn   func(addr uintptr, dstStrPtr *uintptr) uintptr
+	parseFn   func(cancel uintptr, addr uintptr, dstStrPtr *uintptr) uintptr
 	freeBufFn func(SharedBuf)
 	parentMu  *sync.RWMutex
 	parentUnl *bool
@@ -417,7 +417,7 @@ func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
 
 	var strPtr uintptr
 
-	result := o.parseFn(addr, &strPtr)
+	result := o.parseFn(0, addr, &strPtr)
 	if result != 0 {
 		msg := stringFromSharedBufRef(result, o.freeBufFn)
 
@@ -429,7 +429,7 @@ func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
 
 type command struct {
 	name      string
-	commandFn func(argsListPtr uintptr, outputStrPtr *uintptr) uintptr
+	commandFn func(cancel uintptr, argsListPtr uintptr, outputStrPtr *uintptr) uintptr
 	allocFn   func(uint32) uintptr
 	freeBufFn func(SharedBuf)
 	parentMu  *sync.RWMutex
@@ -475,7 +475,7 @@ func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
 
 	var outputPtr uintptr
 
-	result := o.commandFn(argsPtr, &outputPtr)
+	result := o.commandFn(0, argsPtr, &outputPtr)
 	if result != 0 {
 		msg := stringFromSharedBufRef(result, o.freeBufFn)
 

@@ -1,0 +1,2 @@
+[General]
+ExeName = vim.exe

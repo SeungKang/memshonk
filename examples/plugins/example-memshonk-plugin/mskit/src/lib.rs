@@ -113,29 +113,42 @@ impl ShareableType for SharedBufOwned {
 }
 
 pub trait SharedBufRef {
-    fn reclaim_vec(self) -> Vec<u8>;
+    fn reclaim_vec(self) -> Option<Vec<u8>>;
 
     fn reclaim_error(self) -> Box<dyn Error>;
 
-    fn reclaim_null_string_vec(self) -> Vec<String>;
+    fn reclaim_null_string_vec(self) -> Option<Vec<String>>;
 }
 
 impl SharedBufRef for *mut u8 {
     fn reclaim_error(self) -> Box<dyn Error> {
         let vec = self.reclaim_vec();
+        if vec.is_none() {
+            return "error message shared buf is null".into();
+        }
 
-        String::from_utf8_lossy(&vec).into()
+        String::from_utf8_lossy(&vec.unwrap()).into()
     }
 
-    fn reclaim_null_string_vec(self) -> Vec<String> {
+    fn reclaim_null_string_vec(self) -> Option<Vec<String>> {
         let vec = self.reclaim_vec();
+        if vec.is_none() {
+            return None;
+        }
 
-        vec.split(|i|*i==0x00)
-            .map(|s| String::from_utf8_lossy(s).into_owned())
-            .collect()
+        Some(
+            vec.unwrap()
+                .split(|i| *i == 0x00)
+                .map(|s| String::from_utf8_lossy(s).into_owned())
+                .collect(),
+        )
     }
 
-    fn reclaim_vec(self) -> Vec<u8> {
+    fn reclaim_vec(self) -> Option<Vec<u8>> {
+        if self.is_null() {
+            return None;
+        }
+
         let size_slice = unsafe { std::slice::from_raw_parts(self, 4) };
 
         let size = u32::from_le_bytes(size_slice.try_into().unwrap()) as usize + 4;
@@ -146,6 +159,6 @@ impl SharedBufRef for *mut u8 {
 
         vec.drain(0..4);
 
-        vec
+        Some(vec)
     }
 }

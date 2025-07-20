@@ -461,13 +461,21 @@ func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
 		}
 	}
 
-	argsNull := []byte(strings.Join(args, "\x00") + "\x00")
+	tmp := make([]string, 1+len(args))
+
+	tmp[0] = o.name
+	copy(tmp[1:], args)
+
+	argsNull := []byte(strings.Join(tmp, "\x00"))
+
 	argsSharedBuf := sharedBufFromPtr(o.allocFn(uint32(len(argsNull))))
 	argsSharedBuf.WriteBytes(argsNull)
 
+	argsPtr := argsSharedBuf.Pointer()
+
 	var outputPtr uintptr
 
-	result := o.commandFn(argsSharedBuf.Pointer(), &outputPtr)
+	result := o.commandFn(argsPtr, &outputPtr)
 	if result != 0 {
 		msg := stringFromSharedBufRef(result, o.freeBufFn)
 

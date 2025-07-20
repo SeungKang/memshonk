@@ -87,10 +87,12 @@ extern "C" fn example_command(args: *mut u8, output_ptr: *mut *mut u8) -> *mut u
     }
 }
 
-fn _example_command(mut arg_list: Vec<String>) -> Result<String, Box<dyn Error>> {
-    let mut temp: Vec<String> = Vec::new();
-    temp.push("example_command".into());
-    temp.append(&mut arg_list);
+fn _example_command(args_list: Option<Vec<String>>) -> Result<String, Box<dyn Error>> {
+    if args_list.is_none() {
+        return Err("please specify at least one argument")?;
+    }
+
+    let args_list = args_list.unwrap();
 
     let mut args = ExampleCommandArgs {
         addr: HexAddr(0),
@@ -110,7 +112,7 @@ fn _example_command(mut arg_list: Vec<String>) -> Result<String, Box<dyn Error>>
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
 
-    if parser.parse(temp, &mut stdout, &mut stderr).is_err() {
+    if parser.parse(args_list, &mut stdout, &mut stderr).is_err() {
         if stdout.is_empty() {
             return Err(String::from_utf8(stderr).unwrap())?;
         }

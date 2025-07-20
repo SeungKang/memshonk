@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,31 +32,12 @@ type Plugin struct {
 	lib         *dl.Library
 }
 
-func (o *Plugin) loadParsers() error {
-	var getParsersFn func() uintptr
+func (o *Plugin) loadParsers(symbols []pluginSymbolInfo) error {
+	parsers := make([]*parser, len(symbols))
 
-	_, err := findFirstFunc(
-		[]string{parsersFnName},
-		&getParsersFn,
-		o.lib)
-	if err != nil {
-		return nil
-	}
-
-	parserFnsStr := stringFromSharedBufRef(getParsersFn(), o.Free)
-
-	if parserFnsStr == "" {
-		return nil
-	}
-
-	parserNames := strings.Split(parserFnsStr, " ")
-	sort.Strings(parserNames)
-
-	parsers := make([]*parser, len(parserNames))
-
-	for i, parserFnName := range parserNames {
+	for i, sym := range symbols {
 		par := &parser{
-			name:      parserFnName,
+			name:      sym.finalName,
 			freeBufFn: o.Free,
 		}
 
@@ -66,10 +46,10 @@ func (o *Plugin) loadParsers() error {
 			par.parentUnl = &o.unloaded
 		}
 
-		err := o.lib.Func(parserFnName, &par.parseFn)
+		err := o.lib.Func(sym.symName, &par.parseFn)
 		if err != nil {
 			return fmt.Errorf("failed to find parser fn %q - %w",
-				parserFnName, err)
+				sym.symName, err)
 		}
 
 		parsers[i] = par
@@ -80,31 +60,12 @@ func (o *Plugin) loadParsers() error {
 	return nil
 }
 
-func (o *Plugin) loadCommands() error {
-	var getCommandsFn func() uintptr
+func (o *Plugin) loadCommands(symbols []pluginSymbolInfo) error {
+	commands := make([]*command, len(symbols))
 
-	_, err := findFirstFunc(
-		[]string{commandsFnName},
-		&getCommandsFn,
-		o.lib)
-	if err != nil {
-		return nil
-	}
-
-	commandsFnsStr := stringFromSharedBufRef(getCommandsFn(), o.Free)
-
-	if commandsFnsStr == "" {
-		return nil
-	}
-
-	commandNames := strings.Split(commandsFnsStr, " ")
-	sort.Strings(commandNames)
-
-	commands := make([]*command, len(commandNames))
-
-	for i, commandFnName := range commandNames {
+	for i, sym := range symbols {
 		cmd := &command{
-			name:      commandFnName,
+			name:      sym.finalName,
 			allocFn:   o.allocFn,
 			freeBufFn: o.Free,
 		}
@@ -114,10 +75,10 @@ func (o *Plugin) loadCommands() error {
 			cmd.parentUnl = &o.unloaded
 		}
 
-		err := o.lib.Func(commandFnName, &cmd.commandFn)
+		err := o.lib.Func(sym.symName, &cmd.commandFn)
 		if err != nil {
 			return fmt.Errorf("failed to find command fn %q - %w",
-				commandFnName, err)
+				sym.symName, err)
 		}
 
 		commands[i] = cmd

@@ -19,24 +19,14 @@ extern "C" fn description_v0() -> *mut u8 {
 #[no_mangle]
 extern "C" fn unload() {}
 
-#[no_mangle]
-extern "C" fn parsers_v0() -> *mut u8 {
-    "example_parser broken_parser".share()
-}
-
-#[no_mangle]
-extern "C" fn commands_v0() -> *mut u8 {
-    "example_command".share()
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct ExampleStruct {
     data: String,
 }
 
 #[no_mangle]
-extern "C" fn example_parser(_: usize, addr: usize, str_ptr: *mut *mut u8) -> *mut u8 {
-    match _example_parser(addr) {
+extern "C" fn example_parser_mspar(_: usize, addr: usize, str_ptr: *mut *mut u8) -> *mut u8 {
+    match example_parser(addr) {
         Ok(str) => {
             unsafe { *str_ptr = str.share() };
 
@@ -46,7 +36,7 @@ extern "C" fn example_parser(_: usize, addr: usize, str_ptr: *mut *mut u8) -> *m
     }
 }
 
-fn _example_parser(addr: usize) -> Result<String, Box<dyn Error>> {
+fn example_parser(addr: usize) -> Result<String, Box<dyn Error>> {
     let data = mskit::read_from_process(24, addr)?;
 
     let tmp = ExampleStruct {
@@ -64,20 +54,20 @@ fn _example_parser(addr: usize) -> Result<String, Box<dyn Error>> {
 }
 
 #[no_mangle]
-extern "C" fn broken_parser(_: usize, _: usize, _: *mut *mut u8) -> *mut u8 {
-    match _broken_parser() {
+extern "C" fn broken_parser_mspar(_: usize, _: usize, _: *mut *mut u8) -> *mut u8 {
+    match broken_parser() {
         Ok(_) => ptr::null_mut(),
         Err(err) => err.share(),
     }
 }
 
-fn _broken_parser() -> Result<(), Box<dyn Error>> {
+fn broken_parser() -> Result<(), Box<dyn Error>> {
     Err("whoops, this is broken")?
 }
 
 #[no_mangle]
-extern "C" fn example_command(_: usize, args: *mut u8, output_ptr: *mut *mut u8) -> *mut u8 {
-    match _example_command(args.reclaim_null_string_vec()) {
+extern "C" fn example_command_mscmd(_: usize, args: *mut u8, output_ptr: *mut *mut u8) -> *mut u8 {
+    match example_command(args.reclaim_null_string_vec()) {
         Ok(str) => {
             unsafe { *output_ptr = str.share() };
 
@@ -87,7 +77,7 @@ extern "C" fn example_command(_: usize, args: *mut u8, output_ptr: *mut *mut u8)
     }
 }
 
-fn _example_command(args_list: Option<Vec<String>>) -> Result<String, Box<dyn Error>> {
+fn example_command(args_list: Option<Vec<String>>) -> Result<String, Box<dyn Error>> {
     if args_list.is_none() {
         return Err("please specify at least one argument")?;
     }

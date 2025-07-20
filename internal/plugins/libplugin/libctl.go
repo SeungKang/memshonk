@@ -13,11 +13,14 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/dl"
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/exedata"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
 const (
-	pluginNamespaceSep = "::"
+	appName = "memshonk"
+
+	pluginFnSuffix = "_ms"
 )
 
 // Required functions for library-based plugins.
@@ -33,8 +36,6 @@ const (
 const (
 	unloadFnName      = "unload"
 	debugFnName       = "debug"
-	parsersFnName     = "parsers_v0"
-	commandsFnName    = "commands_v0"
 	descriptionFnName = "description_v0"
 )
 
@@ -162,12 +163,17 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 		name = before
 	}
 
-	name = strings.TrimSuffix(name, "-memshonk")
-	name = strings.TrimSuffix(name, "_memshonk")
+	name = strings.TrimSuffix(name, "-"+appName)
+	name = strings.TrimSuffix(name, "_"+appName)
 
 	_, alreadyLoaded := o.isLoaded(name)
 	if alreadyLoaded {
 		return nil, fmt.Errorf("plugin is already loaded (%q)", name)
+	}
+
+	symbols, err := relevantibrarySymbols(absFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get plugin symbols from library file - %w", err)
 	}
 
 	lib, err := dl.Open(absFilePath)
@@ -181,6 +187,7 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 		config:   config,
 		filePath: absFilePath,
 		name:     name,
+		symbols:  symbols,
 		lib:      lib,
 	})
 	if err != nil {
@@ -193,6 +200,87 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 	_ = o.loadedEvents.Send(context.Background(), plugins.LoadedEvent{Plugin: libPlugin})
 
 	return libPlugin, nil
+}
+
+func relevantibrarySymbols(libFilePath string) (pluginSymbols, error) {
+	libExe, err := exedata.ParsePathForCurrentPlatform(libFilePath, exedata.ParserOptions{})
+	if err != nil {
+		return pluginSymbols{}, err
+	}
+
+	var syms pluginSymbols
+
+	const cmdSuffix = pluginFnSuffix + "cmd"
+	const parserSuffix = pluginFnSuffix + "par"
+
+	for _, sym := range libExe.Symbols() {
+		switch {
+		case strings.HasSuffix(sym.Name, cmdSuffix):
+			cut, err := cleanupLibraySymbol(sym.Name, cmdSuffix)
+			if err != nil {
+				return pluginSymbols{}, err
+			}
+
+			syms.commands = append(syms.commands, pluginSymbolInfo{
+				symName:   sym.Name,
+				finalName: cut,
+			})
+		case strings.HasSuffix(sym.Name, parserSuffix):
+			cut, err := cleanupLibraySymbol(sym.Name, parserSuffix)
+			if err != nil {
+				return pluginSymbols{}, err
+			}
+
+			syms.parsers = append(syms.parsers, pluginSymbolInfo{
+				symName:   sym.Name,
+				finalName: cut,
+			})
+		}
+	}
+
+	sort.SliceStable(syms.commands, func(i int, j int) bool {
+		return syms.commands[i].finalName == syms.commands[j].finalName
+	})
+
+	sort.SliceStable(syms.parsers, func(i int, j int) bool {
+		return syms.parsers[i].finalName == syms.parsers[j].finalName
+	})
+
+	return syms, nil
+}
+
+func cleanupLibraySymbol(symName string, suffix string) (string, error) {
+	// symName: abcd_foo
+	//          01234567 (len: 8)
+	//
+	// suufix:  _foo (len: 4)
+	//
+	// [0 : 8 - 4]
+	// [0 : 4] == abcd
+	//            0123
+	cut := symName[0 : len(symName)-len(suffix)]
+
+	// Some executable formats add a "_" to the start of
+	// exported symbols like macho (or maybe that is an
+	// Apple thing... idk).
+	cut = strings.TrimPrefix(cut, "_")
+
+	if cut == "" {
+		return "", fmt.Errorf("library symbol %q is invalid (results in empty string)",
+			symName)
+	}
+
+	return cut, nil
+}
+
+type pluginSymbols struct {
+	commands []pluginSymbolInfo
+	parsers  []pluginSymbolInfo
+}
+
+type pluginSymbolInfo struct {
+	symName   string
+	finalName string
 }
 
 func (o *Ctl) addPlugin(plugin *Plugin) {
@@ -243,6 +331,7 @@ type setupPluginArgs struct {
 	config   plugins.PluginConfig
 	filePath string
 	name     string
+	symbols  pluginSymbols
 	lib      *dl.Library
 }
 
@@ -289,19 +378,24 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	_ = args.lib.Func(debugFnName, &plugin.optDebugFn)
 
 	var getDescriptionFn func() uintptr
+
 	_ = args.lib.Func(descriptionFnName, &getDescriptionFn)
 	if getDescriptionFn != nil {
 		plugin.desc = stringFromSharedBufRef(getDescriptionFn(), plugin.Free)
 	}
 
-	err = plugin.loadParsers()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load parsers - %w", err)
+	if len(args.symbols.parsers) > 0 {
+		err = plugin.loadParsers(args.symbols.parsers)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load parsers - %w", err)
+		}
 	}
 
-	err = plugin.loadCommands()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load commands - %w", err)
+	if len(args.symbols.commands) > 0 {
+		err = plugin.loadCommands(args.symbols.commands)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load commands - %w", err)
+		}
 	}
 
 	return plugin, nil
@@ -332,12 +426,4 @@ func findFirstFunc(funcNames []string, goFnPtr interface{}, lib *dl.Library) (st
 
 	return "", fmt.Errorf("failed to find functions matching: %q (no additional info available)",
 		funcNames)
-}
-
-func separateNamespace(str string) (string, string, bool) {
-	return strings.Cut(str, pluginNamespaceSep)
-}
-
-func strUsesNamespaceSep(str string) bool {
-	return strings.Contains(str, pluginNamespaceSep)
 }

@@ -171,7 +171,7 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 		return nil, fmt.Errorf("plugin is already loaded (%q)", name)
 	}
 
-	symbols, err := relevantibrarySymbols(absFilePath)
+	symbols, err := relevantLibrarySymbols(absFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get plugin symbols from library file - %w", err)
 	}
@@ -202,7 +202,7 @@ func (o *Ctl) load(config plugins.PluginConfig) (plugins.Plugin, error) {
 	return libPlugin, nil
 }
 
-func relevantibrarySymbols(libFilePath string) (pluginSymbols, error) {
+func relevantLibrarySymbols(libFilePath string) (pluginSymbols, error) {
 	libExe, err := exedata.ParsePathForCurrentPlatform(libFilePath, exedata.ParserOptions{})
 	if err != nil {
 		return pluginSymbols{}, err
@@ -216,7 +216,7 @@ func relevantibrarySymbols(libFilePath string) (pluginSymbols, error) {
 	for _, sym := range libExe.Symbols() {
 		switch {
 		case strings.HasSuffix(sym.Name, cmdSuffix):
-			cut, err := cleanupLibraySymbol(sym.Name, cmdSuffix)
+			cut, err := cleanupLibrarySymbol(sym.Name, cmdSuffix)
 			if err != nil {
 				return pluginSymbols{}, err
 			}
@@ -226,7 +226,7 @@ func relevantibrarySymbols(libFilePath string) (pluginSymbols, error) {
 				finalName: cut,
 			})
 		case strings.HasSuffix(sym.Name, parserSuffix):
-			cut, err := cleanupLibraySymbol(sym.Name, parserSuffix)
+			cut, err := cleanupLibrarySymbol(sym.Name, parserSuffix)
 			if err != nil {
 				return pluginSymbols{}, err
 			}
@@ -249,7 +249,7 @@ func relevantibrarySymbols(libFilePath string) (pluginSymbols, error) {
 	return syms, nil
 }
 
-func cleanupLibraySymbol(symName string, suffix string) (string, error) {
+func cleanupLibrarySymbol(symName string, suffix string) (string, error) {
 	// symName: abcd_foo
 	//          01234567 (len: 8)
 	//

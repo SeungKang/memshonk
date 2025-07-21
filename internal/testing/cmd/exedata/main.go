@@ -40,11 +40,11 @@ func mainWithError() error {
 
 	switch *targetOs {
 	case "darwin":
-		exe, err = exedata.ParseMachoCurrentArch(file)
+		exe, err = exedata.ParseMachoCurrentArch(file, exedata.ParserOptions{})
 	case "windows":
-		exe, err = exedata.ParsePe(file)
+		exe, err = exedata.ParsePe(file, exedata.ParserOptions{})
 	default:
-		exe, err = exedata.ParseElf(file)
+		exe, err = exedata.ParseElf(file, exedata.ParserOptions{})
 	}
 
 	if err != nil {

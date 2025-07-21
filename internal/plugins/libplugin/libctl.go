@@ -339,10 +339,12 @@ type setupPluginArgs struct {
 
 func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	var versionFn func() uint16
+	var version uint16
 
-	err := args.lib.Func(versionFnName, &versionFn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get version function in library - %w", err)
+	_ = args.lib.Func(versionFnName, &versionFn)
+
+	if versionFn != nil {
+		version = versionFn()
 	}
 
 	plugin := &Plugin{
@@ -351,8 +353,10 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 		name:     args.name,
 		loadedAt: time.Now(),
 		filePath: args.filePath,
-		version:  versionFn(),
+		version:  version,
 	}
+
+	var err error
 
 	plugin.callbacks, err = o.callbacksList.register(plugin)
 	if err != nil {

@@ -1,6 +1,13 @@
 use core::ffi::c_void;
 
-use std::{error::Error, io::Write, sync::OnceLock};
+use std::{
+    error::Error,
+    io::Write,
+    sync::{
+        mpsc::{self},
+        OnceLock,
+    },
+};
 
 static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
 type ReadFromProcessSig =
@@ -160,5 +167,65 @@ impl SharedBufRef for *mut u8 {
         vec.drain(0..4);
 
         Some(vec)
+    }
+}
+
+pub struct Ctx {
+    sender: mpsc::Sender<bool>,
+    receiver: mpsc::Receiver<bool>,
+}
+
+impl Ctx {
+    #[no_mangle]
+    extern "C" fn new_ctx_v0() -> Box<Ctx> {
+        Self::new()
+    }
+
+    #[no_mangle]
+    extern "C" fn cancel_ctx_v0(ptr: *mut Ctx) {
+        if let Some(ctx) = Self::from_ptr(ptr) {
+            drop(ctx.sender);
+        };
+    }
+
+    fn new() -> Box<Self> {
+        let (tx, rx) = mpsc::channel();
+
+        Box::new(Ctx {
+            sender: tx,
+            receiver: rx,
+        })
+    }
+
+    pub fn from_ptr(ptr: *mut Ctx) -> Option<Box<Self>> {
+        if ptr.is_null() {
+            return None;
+        }
+
+        Some(unsafe { Box::from_raw(ptr) })
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        match self.receiver.try_recv() {
+            Ok(_) => true,
+            Err(e) => match e {
+                mpsc::TryRecvError::Empty => false,
+                mpsc::TryRecvError::Disconnected => true,
+            },
+        }
+    }
+
+    pub fn is_cancelled_timeout(&self, duration: std::time::Duration) -> bool {
+        match self.receiver.recv_timeout(duration) {
+            Ok(_) => true,
+            Err(e) => match e {
+                mpsc::RecvTimeoutError::Disconnected => true,
+                mpsc::RecvTimeoutError::Timeout => false,
+            },
+        }
+    }
+
+    pub fn chan(&self) -> &mpsc::Receiver<bool> {
+        &self.receiver
     }
 }

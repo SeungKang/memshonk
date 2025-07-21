@@ -174,3 +174,45 @@ fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
         })
         .collect()
 }
+
+#[no_mangle]
+extern "C" fn example_loop_command_mscmd(
+    ctx: *mut mskit::Ctx,
+    args: *mut u8,
+    output_ptr: *mut *mut u8,
+) -> *mut u8 {
+    let args = args.reclaim_null_string_vec();
+
+    match example_loop_command(mskit::Ctx::from_ptr(ctx), args) {
+        Ok(str) => {
+            unsafe { *output_ptr = str.share() };
+
+            ptr::null_mut()
+        }
+        Err(err) => err.share(),
+    }
+}
+
+fn example_loop_command(
+    ctx: Option<Box<mskit::Ctx>>,
+    args_list: Option<Vec<String>>,
+) -> Result<String, Box<dyn Error>> {
+    let out = match args_list {
+        Some(args) => args.join(" "),
+        None => "example".into(),
+    };
+
+    if ctx.is_none() {
+        return Err("ctx is none")?;
+    }
+
+    let ctx = ctx.unwrap();
+
+    loop {
+        println!("this will output until cancellation: {out}");
+
+        if ctx.is_cancelled_timeout(std::time::Duration::from_secs(1)) {
+            return Ok("".into());
+        }
+    }
+}

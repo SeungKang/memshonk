@@ -37,6 +37,8 @@ const (
 	unloadFnName      = "unload"
 	debugFnName       = "debug"
 	descriptionFnName = "description_v0"
+	newCtxFnName      = "new_ctx_v0"
+	cancelCtxFnName   = "cancel_ctx_v0"
 )
 
 var _ plugins.Ctl = (*Ctl)(nil)
@@ -376,6 +378,15 @@ func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
 	_ = args.lib.Func(unloadFnName, &plugin.optUnloadFn)
 
 	_ = args.lib.Func(debugFnName, &plugin.optDebugFn)
+
+	_ = args.lib.Func(newCtxFnName, &plugin.optNewCtxFn)
+
+	if plugin.optNewCtxFn != nil {
+		err = args.lib.Func(cancelCtxFnName, &plugin.optCanCtxFn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup cancel ctx fn - %w", err)
+		}
+	}
 
 	var getDescriptionFn func() uintptr
 

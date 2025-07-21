@@ -23,6 +23,8 @@ type Plugin struct {
 	callbacks   *goCallbacks
 	allocFn     func(uint32) uintptr
 	freeMemFn   func(uintptr)
+	optNewCtxFn func() uintptr
+	optCanCtxFn func(uintptr)
 	optUnloadFn func()
 	optDebugFn  func(bool)
 	parsers     []*parser
@@ -39,6 +41,7 @@ func (o *Plugin) loadParsers(symbols []pluginSymbolInfo) error {
 		par := &parser{
 			name:      sym.finalName,
 			freeBufFn: o.Free,
+			newCtxFn:  o.maybeNewCtx,
 		}
 
 		if o.optUnloadFn != nil {
@@ -68,6 +71,7 @@ func (o *Plugin) loadCommands(symbols []pluginSymbolInfo) error {
 			name:      sym.finalName,
 			allocFn:   o.allocFn,
 			freeBufFn: o.Free,
+			newCtxFn:  o.maybeNewCtx,
 		}
 
 		if o.optUnloadFn != nil {
@@ -116,6 +120,11 @@ func (o *Plugin) PrettyString(indent string) string {
 		buf.WriteString(indent)
 	}
 	buf.WriteString(fmt.Sprintf("description: %s\n", o.desc))
+
+	if indent != "" {
+		buf.WriteString(indent)
+	}
+	buf.WriteString(fmt.Sprintf("context-type: %t\n", o.optNewCtxFn != nil))
 
 	if indent != "" {
 		buf.WriteString(indent)
@@ -269,6 +278,47 @@ func (o *Plugin) Free(buf SharedBuf) {
 	}
 }
 
+func (o *Plugin) maybeNewCtx(ctx context.Context) (uintptr, func()) {
+	if o.optNewCtxFn == nil {
+		return 0, nil
+	}
+
+	ptr := o.optNewCtxFn()
+	if ptr == 0 {
+		return 0, nil
+	}
+
+	giveUp := make(chan struct{})
+
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-giveUp:
+		}
+
+		if o.optUnloadFn != nil {
+			o.unloadRwMu.RLock()
+			defer o.unloadRwMu.RUnlock()
+
+			if o.unloaded {
+				return
+			}
+		}
+
+		o.optCanCtxFn(ptr)
+	}()
+
+	once := &sync.Once{}
+
+	cancelFn := func() {
+		once.Do(func() {
+			close(giveUp)
+		})
+	}
+
+	return ptr, cancelFn
+}
+
 func (o *Plugin) IterParsers(fn func(plugins.Parser) error) error {
 	if o.optUnloadFn != nil {
 		o.unloadRwMu.RLock()
@@ -347,6 +397,7 @@ type parser struct {
 	name      string
 	parseFn   func(cancel uintptr, addr uintptr, dstStrPtr *uintptr) uintptr
 	freeBufFn func(SharedBuf)
+	newCtxFn  func(context.Context) (uintptr, func())
 	parentMu  *sync.RWMutex
 	parentUnl *bool
 }
@@ -366,7 +417,7 @@ func (o *parser) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
+func (o *parser) Run(ctx context.Context, addr uintptr) ([]byte, error) {
 	if o.parentMu != nil {
 		o.parentMu.RLock()
 		defer o.parentMu.RUnlock()
@@ -376,9 +427,14 @@ func (o *parser) Run(_ context.Context, addr uintptr) ([]byte, error) {
 		}
 	}
 
+	ctxPtr, cancelFn := o.newCtxFn(ctx)
+	if cancelFn != nil {
+		defer cancelFn()
+	}
+
 	var strPtr uintptr
 
-	result := o.parseFn(0, addr, &strPtr)
+	result := o.parseFn(ctxPtr, addr, &strPtr)
 	if result != 0 {
 		msg := stringFromSharedBufRef(result, o.freeBufFn)
 
@@ -393,6 +449,7 @@ type command struct {
 	commandFn func(cancel uintptr, argsListPtr uintptr, outputStrPtr *uintptr) uintptr
 	allocFn   func(uint32) uintptr
 	freeBufFn func(SharedBuf)
+	newCtxFn  func(context.Context) (uintptr, func())
 	parentMu  *sync.RWMutex
 	parentUnl *bool
 }
@@ -412,7 +469,7 @@ func (o *command) PrettyString(indent string) string {
 	return buf.String()
 }
 
-func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
+func (o *command) Run(ctx context.Context, args []string) ([]byte, error) {
 	if o.parentMu != nil {
 		o.parentMu.RLock()
 		defer o.parentMu.RUnlock()
@@ -420,6 +477,11 @@ func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
 		if *o.parentUnl {
 			return nil, plugins.ErrPluginUnloaded
 		}
+	}
+
+	ctxPtr, cancelFn := o.newCtxFn(ctx)
+	if cancelFn != nil {
+		defer cancelFn()
 	}
 
 	tmp := make([]string, 1+len(args))
@@ -436,7 +498,7 @@ func (o *command) Run(_ context.Context, args []string) ([]byte, error) {
 
 	var outputPtr uintptr
 
-	result := o.commandFn(0, argsPtr, &outputPtr)
+	result := o.commandFn(ctxPtr, argsPtr, &outputPtr)
 	if result != 0 {
 		msg := stringFromSharedBufRef(result, o.freeBufFn)
 

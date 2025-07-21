@@ -29,6 +29,7 @@
 - helper function for reading a pointer from process
 - helper function for reading data from process using a pointer to a Vec<u8>
 - investigate rust macro to generate ffi functions
+- look into Ctx memory leak
 
 ## parser
 

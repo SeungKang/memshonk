@@ -14,16 +14,16 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var _ attachedProcess = (*windowsProcess)(nil)
+var _ attachedProcess = (*processWindows)(nil)
 
-func attach(exeName string, pid int, exitMon *ExitMonitor) (*windowsProcess, error) {
+func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, error) {
 	handle, err := kernel32.GetReadWriteHandle(pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open process memory - %w",
 			err)
 	}
 
-	proc := &windowsProcess{
+	proc := &processWindows{
 		handle:  handle,
 		pid:     pid,
 		exitMon: exitMon,
@@ -74,7 +74,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*windowsProcess, err
 	return proc, nil
 }
 
-type windowsProcess struct {
+type processWindows struct {
 	handle  syscall.Handle
 	pid     int
 	is32b   bool
@@ -82,7 +82,7 @@ type windowsProcess struct {
 	exitMon *ExitMonitor
 }
 
-func (o *windowsProcess) isAlive() error {
+func (o *processWindows) isAlive() error {
 	var exitStatus uint32
 	err := syscall.GetExitCodeProcess(o.handle, &exitStatus)
 	if err != nil {
@@ -98,27 +98,27 @@ func (o *windowsProcess) isAlive() error {
 	return fmt.Errorf("process exited with status: %d", exitStatus)
 }
 
-func (o *windowsProcess) ExitMonitor() *ExitMonitor {
+func (o *processWindows) ExitMonitor() *ExitMonitor {
 	return o.exitMon
 }
 
-func (o *windowsProcess) PID() int {
+func (o *processWindows) PID() int {
 	return o.pid
 }
 
-func (o *windowsProcess) ExeObj() memory.Object {
+func (o *processWindows) ExeObj() memory.Object {
 	return o.exeObj
 }
 
-func (o *windowsProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+func (o *processWindows) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
 	return kernel32.ReadProcessMemory(o.handle, addr, uintptr(sizeBytes))
 }
 
-func (o *windowsProcess) WriteBytes(b []byte, addr uintptr) error {
+func (o *processWindows) WriteBytes(b []byte, addr uintptr) error {
 	return kernel32.WriteProcessMemory(o.handle, addr, b)
 }
 
-func (o *windowsProcess) ReadPtr(at uintptr) (uintptr, error) {
+func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
 	if o.is32b {
 		return kernel32.ReadPtr(o.handle, at, 4, binary.LittleEndian)
 	} else {
@@ -126,7 +126,7 @@ func (o *windowsProcess) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *windowsProcess) Regions() (memory.Regions, error) {
+func (o *processWindows) Regions() (memory.Regions, error) {
 	objs, err := o.objects()
 	if err != nil {
 		return memory.Regions{}, fmt.Errorf("failed to get objects - %w", err)
@@ -177,7 +177,7 @@ func (o *windowsProcess) Regions() (memory.Regions, error) {
 	return regions, nil
 }
 
-func (o *windowsProcess) objects() (MappedObjects, error) {
+func (o *processWindows) objects() (MappedObjects, error) {
 	objs := MappedObjects{}
 
 	objectID := memory.ObjectID(0)
@@ -276,15 +276,15 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 	return region
 }
 
-func (o *windowsProcess) Suspend() error {
+func (o *processWindows) Suspend() error {
 	return nil
 }
 
-func (o *windowsProcess) Resume() error {
+func (o *processWindows) Resume() error {
 	return nil
 }
 
-func (o *windowsProcess) Close() error {
+func (o *processWindows) Close() error {
 	o.exitMon.SetExited(ErrDetached)
 
 	return syscall.CloseHandle(o.handle)

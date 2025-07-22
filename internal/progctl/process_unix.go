@@ -12,10 +12,10 @@ import (
 	"github.com/SeungKang/memshonk/internal/ptrace"
 )
 
-var _ attachedProcess = (*unixProcess)(nil)
+var _ attachedProcess = (*processUnix)(nil)
 
-func attach(exeName string, pid int, exitMon *ExitMonitor) (*unixProcess, error) {
-	proc := &unixProcess{
+func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error) {
+	proc := &processUnix{
 		pid:     pid,
 		ptrace:  ptrace.New(pid),
 		endian:  binary.LittleEndian,
@@ -61,7 +61,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*unixProcess, error)
 	return proc, nil
 }
 
-type unixProcess struct {
+type processUnix struct {
 	pid     int
 	ptrace  *ptrace.Tracer
 	stopped bool
@@ -71,19 +71,19 @@ type unixProcess struct {
 	exitMon *ExitMonitor
 }
 
-func (o *unixProcess) ExitMonitor() *ExitMonitor {
+func (o *processUnix) ExitMonitor() *ExitMonitor {
 	return o.exitMon
 }
 
-func (o *unixProcess) PID() int {
+func (o *processUnix) PID() int {
 	return o.pid
 }
 
-func (o *unixProcess) ExeObj() memory.Object {
+func (o *processUnix) ExeObj() memory.Object {
 	return o.exeObj
 }
 
-func (o *unixProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+func (o *processUnix) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
 	needToResume := false
 
 	if !o.stopped {
@@ -109,7 +109,7 @@ func (o *unixProcess) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) 
 	return b, peakErr
 }
 
-func (o *unixProcess) WriteBytes(b []byte, addr uintptr) error {
+func (o *processUnix) WriteBytes(b []byte, addr uintptr) error {
 	needToResume := false
 
 	if !o.stopped {
@@ -133,7 +133,7 @@ func (o *unixProcess) WriteBytes(b []byte, addr uintptr) error {
 	return pokeErr
 }
 
-func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {
+func (o *processUnix) ReadPtr(at uintptr) (uintptr, error) {
 	if o.is32b {
 		b, err := o.ReadBytes(at, 4)
 		if err != nil {
@@ -161,7 +161,7 @@ func (o *unixProcess) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *unixProcess) Suspend() error {
+func (o *processUnix) Suspend() error {
 	err := o.ptrace.AttachAndWaitStopped()
 	if err != nil {
 		return fmt.Errorf("failed to attach to process - %w", err)
@@ -172,7 +172,7 @@ func (o *unixProcess) Suspend() error {
 	return nil
 }
 
-func (o *unixProcess) Resume() error {
+func (o *processUnix) Resume() error {
 	err := o.ptrace.Detach()
 	if err != nil {
 		return fmt.Errorf("failed to ptrace detach - %w", err)
@@ -183,7 +183,7 @@ func (o *unixProcess) Resume() error {
 	return nil
 }
 
-func (o *unixProcess) Close() error {
+func (o *processUnix) Close() error {
 	// TODO: on linux the process needs to be stopped according to the
 	// PTRACE_DETACH section in the linux manual page unsure what other
 	// unix-like operating systems require

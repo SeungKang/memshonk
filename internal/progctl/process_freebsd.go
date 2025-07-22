@@ -9,7 +9,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-func (o *unixProcess) Regions() (memory.Regions, error) {
+func (o *processUnix) Regions() (memory.Regions, error) {
 	needToResume := false
 
 	if !o.stopped {

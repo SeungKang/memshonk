@@ -171,33 +171,30 @@ impl SharedBufRef for *mut u8 {
 }
 
 pub struct Ctx {
-    sender: mpsc::Sender<bool>,
     receiver: mpsc::Receiver<bool>,
 }
 
 impl Ctx {
     #[no_mangle]
-    extern "C" fn new_ctx_v0() -> Box<Ctx> {
-        Self::new()
+    extern "C" fn new_ctx_v0(ctx_out: *mut *mut Ctx, closer_out: *mut *mut CtxCloser) {
+        let (ctx, closer) = Self::new();
+
+        unsafe { *ctx_out = Box::into_raw(ctx) };
+
+        unsafe { *closer_out = Box::into_raw(closer) };
     }
 
-    #[no_mangle]
-    extern "C" fn cancel_ctx_v0(ptr: *mut Ctx) {
-        if let Some(ctx) = Self::from_ptr(ptr) {
-            drop(ctx.sender);
-        };
+    fn new() -> (Box<Self>, Box<CtxCloser>) {
+        let (send, recv) = mpsc::channel();
+
+        let ctx = Box::new(Ctx { receiver: recv });
+
+        let closer = CtxCloser::new(send);
+
+        (ctx, closer)
     }
 
-    fn new() -> Box<Self> {
-        let (tx, rx) = mpsc::channel();
-
-        Box::new(Ctx {
-            sender: tx,
-            receiver: rx,
-        })
-    }
-
-    pub fn from_ptr(ptr: *mut Ctx) -> Option<Box<Self>> {
+    pub fn from_ptr(ptr: *mut Self) -> Option<Box<Self>> {
         if ptr.is_null() {
             return None;
         }
@@ -227,5 +224,24 @@ impl Ctx {
 
     pub fn chan(&self) -> &mpsc::Receiver<bool> {
         &self.receiver
+    }
+}
+
+struct CtxCloser {
+    _sender: mpsc::Sender<bool>,
+}
+
+impl CtxCloser {
+    #[no_mangle]
+    extern "C" fn cancel_ctx_v0(ptr: *mut Self) {
+        if ptr.is_null() {
+            return;
+        }
+
+        _ = unsafe { Box::from_raw(ptr) };
+    }
+
+    fn new(sender: mpsc::Sender<bool>) -> Box<Self> {
+        Box::new(Self { _sender: sender })
     }
 }

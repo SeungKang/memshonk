@@ -23,7 +23,7 @@ type Plugin struct {
 	callbacks   *goCallbacks
 	allocFn     func(uint32) uintptr
 	freeMemFn   func(uintptr)
-	optNewCtxFn func() uintptr
+	optNewCtxFn func(*uintptr, *uintptr)
 	optCanCtxFn func(uintptr)
 	optUnloadFn func()
 	optDebugFn  func(bool)
@@ -283,8 +283,11 @@ func (o *Plugin) maybeNewCtx(ctx context.Context) (uintptr, func()) {
 		return 0, nil
 	}
 
-	ptr := o.optNewCtxFn()
-	if ptr == 0 {
+	var ctxPtr uintptr
+	var ctxCloserPtr uintptr
+
+	o.optNewCtxFn(&ctxPtr, &ctxCloserPtr)
+	if ctxPtr == 0 {
 		return 0, nil
 	}
 
@@ -305,7 +308,7 @@ func (o *Plugin) maybeNewCtx(ctx context.Context) (uintptr, func()) {
 			}
 		}
 
-		o.optCanCtxFn(ptr)
+		o.optCanCtxFn(ctxCloserPtr)
 	}()
 
 	once := &sync.Once{}
@@ -316,7 +319,7 @@ func (o *Plugin) maybeNewCtx(ctx context.Context) (uintptr, func()) {
 		})
 	}
 
-	return ptr, cancelFn
+	return ctxPtr, cancelFn
 }
 
 func (o *Plugin) IterParsers(fn func(plugins.Parser) error) error {

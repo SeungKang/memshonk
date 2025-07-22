@@ -79,7 +79,7 @@ func mainWithError() error {
 	}
 
 	ctx, cancelFn := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+		syscall.SIGQUIT, syscall.SIGTERM)
 	defer cancelFn()
 
 	eventGroups := events.NewGroups()

@@ -101,6 +101,7 @@ struct SharedBufOwned(Vec<u8>);
 
 impl SharedBufOwned {
     fn new(size: u32) -> Self {
+        // TODO: Use a Box to ensure heap allocation.
         let mut buf: Vec<u8> = Vec::with_capacity(size as usize + 4);
 
         _ = buf.write(&u32::to_le_bytes(size)).unwrap();
@@ -194,12 +195,12 @@ impl Ctx {
         (ctx, closer)
     }
 
-    pub fn from_ptr(ptr: *mut Self) -> Option<Box<Self>> {
+    pub fn from_ptr(ptr: *mut Self) -> Self {
         if ptr.is_null() {
-            return None;
+            panic!("mskit: Ctx::from_ptr - Ctx pointer is null");
         }
 
-        Some(unsafe { Box::from_raw(ptr) })
+        unsafe { *Box::from_raw(ptr) }
     }
 
     pub fn is_cancelled(&self) -> bool {
@@ -238,6 +239,10 @@ impl CtxCloser {
             return;
         }
 
+        // The object is automatically deallocated after Box::from_raw runs.
+        // Refer to this post by stackoverflow users Thomas and Joyce Babu
+        // for details:
+        // https://stackoverflow.com/a/66197558
         _ = unsafe { Box::from_raw(ptr) };
     }
 

@@ -139,14 +139,10 @@ impl SharedBufRef for *mut u8 {
     }
 
     fn reclaim_null_string_vec(self) -> Option<Vec<String>> {
-        let vec = self.reclaim_vec();
-        if vec.is_none() {
-            return None;
-        }
+        let vec = self.reclaim_vec()?;
 
         Some(
-            vec.unwrap()
-                .split(|i| *i == 0x00)
+            vec.split(|i| *i == 0x00)
                 .map(|s| String::from_utf8_lossy(s).into_owned())
                 .collect(),
         )
@@ -206,9 +202,9 @@ impl Ctx {
     pub fn is_cancelled(&self) -> bool {
         match self.receiver.try_recv() {
             Ok(_) => true,
-            Err(e) => match e {
-                mpsc::TryRecvError::Empty => false,
+            Err(err) => match err {
                 mpsc::TryRecvError::Disconnected => true,
+                mpsc::TryRecvError::Empty => false,
             },
         }
     }
@@ -216,7 +212,7 @@ impl Ctx {
     pub fn is_cancelled_timeout(&self, duration: std::time::Duration) -> bool {
         match self.receiver.recv_timeout(duration) {
             Ok(_) => true,
-            Err(e) => match e {
+            Err(err) => match err {
                 mpsc::RecvTimeoutError::Disconnected => true,
                 mpsc::RecvTimeoutError::Timeout => false,
             },

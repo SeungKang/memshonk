@@ -194,19 +194,13 @@ extern "C" fn example_loop_command_mscmd(
 }
 
 fn example_loop_command(
-    ctx: Option<Box<mskit::Ctx>>,
+    ctx: mskit::Ctx,
     args_list: Option<Vec<String>>,
 ) -> Result<String, Box<dyn Error>> {
     let out = match args_list {
         Some(args) => args.join(" "),
         None => "example".into(),
     };
-
-    if ctx.is_none() {
-        return Err("ctx is none")?;
-    }
-
-    let ctx = ctx.unwrap();
 
     loop {
         println!("this will output until cancellation: {out}");

@@ -9,14 +9,6 @@ use std::{
     },
 };
 
-static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
-type ReadFromProcessSig =
-    extern "C" fn(pluginAddr: *mut c_void, size: usize, procAddr: usize) -> *mut u8;
-
-static WRITE_TO_PROCESS: OnceLock<WriteToProcessSig> = OnceLock::new();
-type WriteToProcessSig =
-    extern "C" fn(procAddr: usize, size: usize, pluginAddr: *mut c_void) -> *mut u8;
-
 #[no_mangle]
 extern "C" fn alloc_v0(size: u32) -> *mut u8 {
     SharedBufOwned::new(size).share()
@@ -30,6 +22,9 @@ extern "C" fn free_v0(buf: *mut u8) {
 
     drop(buf.reclaim_vec());
 }
+
+static READ_FROM_PROCESS: OnceLock<ReadFromProcessSig> = OnceLock::new();
+type ReadFromProcessSig = extern "C" fn(pluginAddr: *mut c_void, size: usize, procAddr: usize) -> *mut u8;
 
 #[no_mangle]
 extern "C" fn set_read_from_process_v0(func_ptr: ReadFromProcessSig) -> u32 {
@@ -50,6 +45,9 @@ pub fn read_from_process(size: usize, src_adr: usize) -> Result<Vec<u8>, Box<dyn
 
     Ok(dst)
 }
+
+static WRITE_TO_PROCESS: OnceLock<WriteToProcessSig> = OnceLock::new();
+type WriteToProcessSig = extern "C" fn(procAddr: usize, size: usize, pluginAddr: *mut c_void) -> *mut u8;
 
 #[no_mangle]
 extern "C" fn set_write_to_process_v0(func_ptr: WriteToProcessSig) -> u32 {

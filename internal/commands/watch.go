@@ -18,7 +18,6 @@ const (
 func WatchCommandSchema() CommandSchema {
 	return CommandSchema{
 		Name:      watchCommandName,
-		Aliases:   []string{"w"},
 		ShortHelp: "watch data at an address for changes",
 		NonFlags: []NonFlagSchema{
 			{

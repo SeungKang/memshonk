@@ -23,13 +23,16 @@
   - ex. coords - prints x,y,z coords of all enemies
 - add context as arguments to plugin.load and plugin.unload
 - investigate order of unload and load events being out of order
+- improve plugin user experience when unloading / reloading
+  (i.e., be able to load a previously-unloaded plugin using
+  only its name - maybe we can have a name -> plugin info
+  cache?)
 
 ### mskit
 
 - helper function for reading a pointer from process
 - helper function for reading data from process using a pointer to a Vec<u8>
 - investigate rust macro to generate ffi functions
-- look into Ctx memory leak
 
 ## parser
 
@@ -78,3 +81,8 @@
 ## events
 
 - move event and grsh into app or session and implement state for those events
+
+
+## shell
+
+- reverse search (ctrl+r) and selecting an entry does not save to history

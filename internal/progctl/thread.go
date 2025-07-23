@@ -2,16 +2,19 @@ package progctl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 func newProcessThread(exeName string, pid int, exitMon *ExitMonitor) (*processThread, error) {
 	thread := &processThread{
-		callbacks: make(chan *processThreadCallback),
-		exitMon:   exitMon,
+		callbacks:  make(chan *processThreadCallback),
+		addWatcher: make(chan *Watcher),
+		exitMon:    exitMon,
 	}
 
 	attachResult := make(chan error, 1)
@@ -29,9 +32,10 @@ func newProcessThread(exeName string, pid int, exitMon *ExitMonitor) (*processTh
 // we did this because on linux ptrace operations need to be executed by the same thread
 // https://stackoverflow.com/questions/16767832/ptrace-not-recognizing-child-process
 type processThread struct {
-	exitMon   *ExitMonitor
-	callbacks chan *processThreadCallback
-	process   attachedProcess
+	exitMon    *ExitMonitor
+	callbacks  chan *processThreadCallback
+	addWatcher chan *Watcher
+	process    attachedProcess
 }
 
 type processThreadCallback struct {
@@ -61,6 +65,17 @@ func (o *processThread) Do(ctx context.Context, fn func(process attachedProcess)
 	}
 }
 
+func (o *processThread) AddWatcher(ctx context.Context, watcher *Watcher) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-o.callbacks:
+		return errors.New("process thread exited")
+	case o.addWatcher <- watcher:
+		return nil
+	}
+}
+
 func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -73,15 +88,40 @@ func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
 	}
 	close(attachResult)
 
+	watchers := make(map[*Watcher]struct{})
+
+	runWatchers := time.NewTicker(time.Hour)
+	defer runWatchers.Stop()
+
+	runWatchers.Stop()
+
 	for {
 		select {
 		case cb, isOpen := <-o.callbacks:
 			if !isOpen {
 				return
 			}
+
 			err := cb.fn(o.process)
+
 			cb.err = err
 			close(cb.done)
+		case watcher := <-o.addWatcher:
+			watchers[watcher] = struct{}{}
+
+			if len(watchers) == 1 {
+				runWatchers.Reset(50 * time.Millisecond)
+			}
+		case <-runWatchers.C:
+			for watcher := range watchers {
+				if !watcher.run(o.process) {
+					delete(watchers, watcher)
+				}
+			}
+
+			if len(watchers) == 0 {
+				runWatchers.Stop()
+			}
 		}
 	}
 }

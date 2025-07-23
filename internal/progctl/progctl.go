@@ -33,6 +33,8 @@ type Process interface {
 
 	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
 
+	Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error)
+
 	Suspend(ctx context.Context) error
 
 	Resume(ctx context.Context) error
@@ -256,6 +258,29 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) e
 	return o.current.Do(ctx, func(process attachedProcess) error {
 		return process.WriteBytes(data, addr)
 	})
+}
+
+func (o *Ctl) Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if o.current == nil {
+		return nil, ErrNotAttached
+	}
+
+	addr, err := o.resolvePointer(ctx, ptr)
+	if err != nil {
+		return nil, err
+	}
+
+	watcher := newWatcher(ctx, addr, sizeBytes)
+
+	err = o.current.AddWatcher(ctx, watcher)
+	if err != nil {
+		return nil, err
+	}
+
+	return watcher, nil
 }
 
 func (o *Ctl) Suspend(ctx context.Context) error {

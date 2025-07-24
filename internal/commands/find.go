@@ -2,7 +2,9 @@ package commands
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/memory"
@@ -18,40 +20,35 @@ func FindCommandSchema() CommandSchema {
 		Name:      findCommandName,
 		Aliases:   []string{"f"},
 		ShortHelp: "find a pattern in memory",
+		Flags: []FlagSchema{
+			{
+				Short:      "e",
+				Long:       "encoding",
+				Desc:       "Optional: Specify encoding format of pattern",
+				DataType:   "",
+				DefaultVal: "pattern",
+			},
+		},
 		NonFlags: []NonFlagSchema{
 			{
 				Name:     "pattern",
 				Desc:     "byte pattern to search for",
-				DefValue: "",
-				DataType: "",
-			},
-			{
-				Name:     "start",
-				Desc:     "the address to start searching from",
-				DataType: "",
-				DefValue: "",
-			},
-			{
-				Name:     "end",
-				Desc:     "the address to stop searching at",
-				DataType: "",
-				DefValue: "",
+				DataType: []string{},
+				DefValue: nil,
 			},
 		},
 		CreateFn: func(c CommandConfig) (Command, error) {
 			return NewFindCommand(FindCommandArgs{
-				Pattern:   c.NonFlags.String("pattern"),
-				StartAddr: c.NonFlags.String("start"),
-				EndAddr:   c.NonFlags.String("end"),
+				EncodingFormat: c.Flags.String("encoding"),
+				Pattern:        c.NonFlags.StringList("pattern"),
 			}), nil
 		},
 	}
 }
 
 type FindCommandArgs struct {
-	Pattern   string
-	StartAddr string
-	EndAddr   string
+	EncodingFormat string
+	Pattern        []string
 }
 
 func NewFindCommand(args FindCommandArgs) FindCommand {
@@ -69,7 +66,29 @@ func (o FindCommand) Name() string {
 }
 
 func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
-	err := s.Process().Suspend(ctx)
+	var parsedPattern memory.ParsedPattern
+	var err error
+	stringList := strings.Join(o.args.Pattern, " ")
+
+	// TODO: Document encoding formats
+	encodingFormat := o.args.EncodingFormat
+	switch encodingFormat {
+	case "string", "utf8":
+		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
+	case "wstringle", "utf16le", "wstring", "utf16":
+		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.LittleEndian)
+	case "wstringbe", "utf16be":
+		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.BigEndian)
+	case "pattern":
+		parsedPattern, err = memory.ParsePattern(stringList)
+	default:
+		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.Process().Suspend(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to suspend process - %w", err)
 	}
@@ -95,7 +114,11 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 	fmt.Fprint(inOut.Stderr, "searching")
 
 	err = regions.Iter(func(i int, region memory.Region) error {
-		matchedAddrs, err := o.searchRegion(region, inOut, process)
+		if !region.Readable {
+			return nil
+		}
+
+		matchedAddrs, err := o.searchRegion(parsedPattern, region, inOut, process)
 		if err != nil {
 			return err
 		}
@@ -127,11 +150,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 	return matches, nil
 }
 
-func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progctl.Process) ([]memory.Pointer, error) {
-	if !region.Readable {
-		return nil, nil
-	}
-
+func (o FindCommand) searchRegion(parsedPattern memory.ParsedPattern, region memory.Region, inOut IO, process progctl.Process) ([]memory.Pointer, error) {
 	reader, err := memory.NewBufferedReader(
 		process,
 		memory.AbsoluteAddrPointer(region.BaseAddr),
@@ -140,7 +159,7 @@ func (o FindCommand) searchRegion(region memory.Region, inOut IO, process progct
 		return nil, err
 	}
 
-	matches, err := memory.FindAllReader(o.args.Pattern, reader)
+	matches, err := memory.FindAllReader(parsedPattern, reader)
 	if err != nil {
 		// TODO ignoring error
 		return nil, nil

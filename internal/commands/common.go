@@ -56,10 +56,15 @@ type ArgDataTypeSchema struct {
 
 type CommandConfig struct {
 	NonFlags ArgFetcher
-	Flags    ArgFetcher
+	Flags    FlagFetcher
 }
 
 type ArgFetcher interface {
+	FlagFetcher
+	StringList(argID string) []string
+}
+
+type FlagFetcher interface {
 	String(argID string) string
 	Int(argID string) int
 	Int64(argID string) int64

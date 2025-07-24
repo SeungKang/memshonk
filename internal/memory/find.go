@@ -3,18 +3,15 @@ package memory
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf16"
 )
 
-func FindAllReader(pattern string, reader *BufferedReader) ([]Pointer, error) {
-	parsedPattern, err := ParsePattern(pattern)
-	if err != nil {
-		return nil, err
-	}
-
+func FindAllReader(parsedPattern ParsedPattern, reader *BufferedReader) ([]Pointer, error) {
 	needLength := uint64(parsedPattern.Length)
 	reader.SetAdvanceBy(1)
 
@@ -50,6 +47,43 @@ type ParsedPattern struct {
 type PatternPart struct {
 	bytes     []byte
 	wildcards int
+}
+
+func ParsePatternFromUtf8(s string) (ParsedPattern, error) {
+	return ParsedPattern{
+		Parts: []PatternPart{
+			{
+				bytes: []byte(s),
+			},
+		},
+		Length: len(s),
+	}, nil
+}
+
+func ParsePatternFromUtf16(s string, endianness binary.ByteOrder) (ParsedPattern, error) {
+	b := stringToUTF16Bytes(s, endianness)
+
+	return ParsedPattern{
+		Parts: []PatternPart{
+			{
+				bytes: b,
+			},
+		},
+		Length: len(b),
+	}, nil
+}
+
+func stringToUTF16Bytes(s string, endianness binary.ByteOrder) []byte {
+	// Encode string to UTF-16 (as []uint16)
+	utf16Units := utf16.Encode([]rune(s))
+
+	// Convert UTF-16 code units to byte slice (little endian)
+	b := make([]byte, len(utf16Units)*2)
+	for i, v := range utf16Units {
+		endianness.PutUint16(b[i*2:], v)
+	}
+
+	return b
 }
 
 func ParsePattern(pattern string) (ParsedPattern, error) {

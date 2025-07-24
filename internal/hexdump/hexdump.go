@@ -19,16 +19,16 @@ type Config struct {
 func Dump(ctx context.Context, config Config) error {
 	bufR := bufio.NewReader(config.Src)
 	bufW := bufio.NewWriter(config.Dst)
-	offset := int64(-1)
-	row := make([]byte, 16)
-
 	defer bufW.Flush()
+
+	offset := int64(-1) // TODO
+	row := make([]byte, 16)
 
 	for {
 		b, err := bufR.ReadByte()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return dumpRow(bufW, offset, row, config.Colors)
+				return dumpRow(bufW, offset, row, config.Colors, false)
 			}
 
 			return err
@@ -39,14 +39,15 @@ func Dump(ctx context.Context, config Config) error {
 		row[rowOffset] = b
 
 		if offset > 0 && rowOffset == 15 {
-			if err := dumpRow(bufW, offset, row, config.Colors); err != nil {
+			err := dumpRow(bufW, offset, row, config.Colors, true)
+			if err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func dumpRow(w io.Writer, offset int64, row []byte, colors Colors) error {
+func dumpRow(w io.Writer, offset int64, row []byte, colors Colors, addNewline bool) error {
 	rowLen := int(offset%16 + 1)
 
 	s := fmt.Sprintf("%08x", offset-int64(rowLen)+1) + "   "
@@ -78,7 +79,11 @@ func dumpRow(w io.Writer, offset int64, row []byte, colors Colors) error {
 		}
 	}
 
-	s += "|\n"
+	if addNewline {
+		s += "|\n"
+	} else {
+		s += "|"
+	}
 
 	_, err := fmt.Fprint(w, s)
 

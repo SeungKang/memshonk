@@ -8,7 +8,10 @@ import (
 )
 
 func TestFindAll_Reader(t *testing.T) {
-	pattern := "8B 45 ?? C7 00 00 00 ?? ?? 5D C2 08 00 8B 4D"
+	parsedPattern, err := ParsePattern("8B 45 ?? C7 00 00 00 ?? ?? 5D C2 08 00 8B 4D")
+	if err != nil {
+		t.Fatalf("failed to parse pattern - %v", err)
+	}
 
 	fakeProcess := &fakeReader{}
 
@@ -25,7 +28,7 @@ func TestFindAll_Reader(t *testing.T) {
 		t.Fatalf("want no error, got %v", err)
 	}
 
-	matches, err := FindAllReader(pattern, reader)
+	matches, err := FindAllReader(parsedPattern, reader)
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -40,7 +43,10 @@ func TestFindAll_Reader(t *testing.T) {
 }
 
 func TestFindAll_Reader2(t *testing.T) {
-	pattern := "?? 45 ??"
+	parsedPattern, err := ParsePattern("?? 45 ??")
+	if err != nil {
+		t.Fatalf("failed to parse pattern - %v", err)
+	}
 
 	fakeProcess := &fakeReader{}
 
@@ -57,7 +63,7 @@ func TestFindAll_Reader2(t *testing.T) {
 		t.Fatalf("want no error, got %v", err)
 	}
 
-	matches, err := FindAllReader(pattern, reader)
+	matches, err := FindAllReader(parsedPattern, reader)
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -83,18 +89,18 @@ func (o *fakeReader) ResolvePointer(_ context.Context, ptr Pointer) (uintptr, er
 	return 0, nil
 }
 
-func (o *fakeReader) ReadFromAddr(_ context.Context, ptr Pointer, size uint64) ([]byte, error) {
+func (o *fakeReader) ReadFromAddr(_ context.Context, ptr Pointer, size uint64) ([]byte, uintptr, error) {
 	addr := ptr.FirstAddr()
 
 	offset := uint64(addr)
 	if offset > uint64(len(o.data)) {
-		return nil, errors.New("invalid offset")
+		return nil, 0, errors.New("invalid offset")
 	}
 
 	upto := offset + size
 	if upto > uint64(len(o.data)) {
-		return nil, errors.New("size out of range")
+		return nil, 0, errors.New("size out of range")
 	}
 
-	return o.data[offset:upto], nil
+	return o.data[offset:upto], addr, nil
 }

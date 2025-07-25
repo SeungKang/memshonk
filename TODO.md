@@ -82,7 +82,7 @@
 
 - move event and grsh into app or session and implement state for those events
 
-
 ## shell
 
 - reverse search (ctrl+r) and selecting an entry does not save to history
+- disable color (needs to be a Session-level setting)

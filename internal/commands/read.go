@@ -1,12 +1,13 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"strings"
 
+	"github.com/SeungKang/memshonk/internal/hexdump"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -77,10 +78,24 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 	encodingFormat := o.args.EncodingFormat
 	switch encodingFormat {
 	case "hexdump":
-		fmtFn = func(b []byte, _ uintptr) (string, error) {
-			return strings.TrimSpace(hex.Dump(b)), nil
+		info, err := s.Process().ExeInfo(ctx)
+		if err != nil {
+			return nil, err
 		}
 
+		fmtFn = func(b []byte, from uintptr) (string, error) {
+			var out bytes.Buffer
+
+			err = hexdump.Dump(ctx, hexdump.Config{
+				Src:          bytes.NewReader(b),
+				Dst:          &out,
+				Colors:       hexdump.NewColors(),
+				OptStartOff:  uint64(from),
+				OptOffColPad: info.Bits / 4, // 32 == 8, 64 = 16.
+			})
+
+			return out.String(), nil
+		}
 	case "hex":
 		fmtFn = func(b []byte, _ uintptr) (string, error) {
 			return hex.EncodeToString(b), nil

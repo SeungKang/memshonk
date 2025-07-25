@@ -89,6 +89,10 @@ func (o *Watcher) run(proc attachedProcess) bool {
 		Data: b,
 	}:
 		return true
+	default:
+		// Allow write failures in case peer Go routine
+		// is falling behind or is unresponsive.
+		return true
 	}
 }
 

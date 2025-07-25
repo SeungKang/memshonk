@@ -39,8 +39,8 @@ func Dump(ctx context.Context, config Config) error {
 		n, err := bufR.Read(rowArgs.row)
 
 		if n > 0 {
-			rowArgs.offset += uint64(n) - 1
-			rowArgs.rowOffset = uint16(n) - 1
+			rowArgs.totalLen += uint64(n)
+			rowArgs.rowLen = uint16(n)
 
 			dErr := dumpRow(rowArgs)
 			if dErr != nil {
@@ -62,23 +62,27 @@ type dumpRowArgs struct {
 	writer    io.Writer
 	maxRowLen uint16
 	colors    Colors
-	offset    uint64
+	totalLen  uint64
 	row       []byte
-	rowOffset uint16
+	rowLen    uint16
 }
 
 func dumpRow(args dumpRowArgs) error {
-	rowLen := args.rowOffset + 1
-
+	// 1. 16
+	//    total = 16
+	//    rowLen = 16
+	// 2. 8
+	//    total = 24
+	//    rowLen = 8
 	var s string
-	if args.offset > uint64(args.maxRowLen) {
-		s = "\n"
+	if args.totalLen > uint64(args.maxRowLen) {
+		s = fmt.Sprintf("\n%08x", args.totalLen-uint64(args.rowLen)) + "   "
+	} else {
+		s = fmt.Sprintf("%08x", 0) + "   "
 	}
 
-	s += fmt.Sprintf("%08x", args.offset-uint64(args.rowOffset)) + "   "
-
 	for i := uint16(0); i < args.maxRowLen; i++ {
-		if i < rowLen {
+		if i < args.rowLen {
 			s += args.colors.HexChar(args.row[i]) + " "
 		} else {
 			s += "   "
@@ -92,7 +96,7 @@ func dumpRow(args dumpRowArgs) error {
 	s += " |"
 
 	for i := uint16(0); i < args.maxRowLen; i++ {
-		if i < rowLen {
+		if i < args.rowLen {
 			b := byte('.')
 
 			if args.row[i] >= 0x21 && args.row[i] <= 0x7e {

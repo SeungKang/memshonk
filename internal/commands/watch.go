@@ -55,6 +55,11 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 		return nil, err
 	}
 
+	exeInfo, err := s.Process().ExeInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	watcher, err := s.Process().Watch(ctx, ptr, o.SizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create memory watcher - %w", err)
@@ -66,9 +71,11 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	var dst bytes.Buffer
 
 	hexdumpConfig := hexdump.Config{
-		Src:    &src,
-		Dst:    &dst,
-		Colors: hexdump.NewColors(),
+		Src:          &src,
+		Dst:          &dst,
+		Colors:       hexdump.NewColors(),
+		OptStartOff:  uint64(watcher.Addr()),
+		OptOffColPad: exeInfo.Bits / 4, // 32 == 8, 64 == 16.
 	}
 
 	goterm.Clear()

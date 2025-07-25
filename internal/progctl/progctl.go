@@ -29,9 +29,9 @@ type Process interface {
 
 	ResolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, error)
 
-	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, error)
+	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, uintptr, error)
 
-	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) error
+	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) (uintptr, error)
 
 	Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error)
 
@@ -224,17 +224,17 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 	return addr, nil
 }
 
-func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, error) {
+func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, uintptr, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return nil, ErrNotAttached
+		return nil, 0, ErrNotAttached
 	}
 
 	addr, err := o.resolvePointer(ctx, from)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve pointer - %w", err)
+		return nil, 0, fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
 	var buf []byte
@@ -244,23 +244,23 @@ func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 		return err
 	})
 
-	return buf, err
+	return buf, addr, err
 }
 
-func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) error {
+func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) (uintptr, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return ErrNotAttached
+		return 0, ErrNotAttached
 	}
 
 	addr, err := o.resolvePointer(ctx, to)
 	if err != nil {
-		return fmt.Errorf("failed to resolve pointer - %w", err)
+		return 0, fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
-	return o.current.Do(ctx, func(process attachedProcess) error {
+	return addr, o.current.Do(ctx, func(process attachedProcess) error {
 		return process.WriteBytes(data, addr)
 	})
 }

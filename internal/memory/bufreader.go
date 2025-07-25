@@ -9,7 +9,7 @@ import (
 type ReadFromAddr interface {
 	ResolvePointer(ctx context.Context, ptr Pointer) (uintptr, error)
 
-	ReadFromAddr(ctx context.Context, addr Pointer, size uint64) ([]byte, error)
+	ReadFromAddr(ctx context.Context, addr Pointer, size uint64) ([]byte, uintptr, error)
 }
 
 func NewBufferedReader(readFrom ReadFromAddr, start Pointer, size uint64) (*BufferedReader, error) {
@@ -153,7 +153,7 @@ func (o *BufferedReader) read(ctx context.Context, need uint64) error {
 		o.readerDone = true
 	}
 
-	b, err := o.reader.ReadFromAddr(ctx, o.readPtr, readSizeBytes)
+	b, _, err := o.reader.ReadFromAddr(ctx, o.readPtr, readSizeBytes)
 	switch {
 	case err == nil:
 		o.readRemain -= readSizeBytes

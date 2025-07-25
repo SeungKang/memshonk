@@ -126,7 +126,7 @@ func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) (CommandResult, 
 		return nil, err
 	}
 
-	err = s.Process().WriteToAddr(ctx, data, ptr)
+	_, err = s.Process().WriteToAddr(ctx, data, ptr)
 	if err != nil {
 		return nil, err
 	}

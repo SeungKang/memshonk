@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"runtime"
 	"time"
-
-	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 func newProcessThread(exeName string, pid int, exitMon *ExitMonitor) (*processThread, error) {
@@ -134,8 +132,8 @@ func (o *processThread) PID() int {
 	return o.process.PID()
 }
 
-func (o *processThread) ExeObj() memory.Object {
-	return o.process.ExeObj()
+func (o *processThread) ExeObj() ExeInfo {
+	return o.process.ExeInfo()
 }
 
 func (o *processThread) Close(ctx context.Context) error {

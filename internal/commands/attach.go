@@ -67,14 +67,14 @@ func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRes
 		return nil, err
 	}
 
-	obj, err := s.Process().ExeObject(ctx)
+	info, err := s.Process().ExeInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return AttachCommandResult{
 		PID:    pid,
-		ExeObj: obj,
+		ExeObj: info.Obj,
 	}, nil
 }
 

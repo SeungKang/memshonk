@@ -23,7 +23,7 @@ var (
 type Process interface {
 	Attach(ctx context.Context) (int, error)
 
-	ExeObject(ctx context.Context) (memory.Object, error)
+	ExeInfo(ctx context.Context) (ExeInfo, error)
 
 	Regions(ctx context.Context) (memory.Regions, error)
 
@@ -47,7 +47,7 @@ type attachedProcess interface {
 
 	PID() int
 
-	ExeObj() memory.Object
+	ExeInfo() ExeInfo
 
 	ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error)
 
@@ -135,15 +135,20 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	return possiblePID, nil
 }
 
-func (o *Ctl) ExeObject(ctx context.Context) (memory.Object, error) {
+func (o *Ctl) ExeInfo(context.Context) (ExeInfo, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
 	if o.current == nil {
-		return memory.Object{}, ErrNotAttached
+		return ExeInfo{}, ErrNotAttached
 	}
 
-	return o.current.ExeObj(), nil
+	return o.current.process.ExeInfo(), nil
+}
+
+type ExeInfo struct {
+	Bits uint8
+	Obj  memory.Object
 }
 
 func (o *Ctl) Regions(ctx context.Context) (memory.Regions, error) {
@@ -184,7 +189,7 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 		return ptr.FirstAddr(), nil
 	}
 
-	baseAddr := o.current.ExeObj().BaseAddr
+	baseAddr := o.current.ExeObj().Obj.BaseAddr
 
 	if ptr.OptModule != "" {
 		regions, err := o.regions(ctx)

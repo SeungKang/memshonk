@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/ptrace"
 )
 
@@ -30,7 +29,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error)
 			err)
 	}
 
-	proc.exeObj, err = regions.FirstObjectMatching(exeName)
+	proc.exeInfo.Obj, err = regions.FirstObjectMatching(exeName)
 	if err != nil {
 		proc.Close()
 
@@ -38,17 +37,19 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error)
 			err)
 	}
 
-	elfType, err := elfFileType(proc.exeObj.Path)
+	elfType, err := elfFileType(proc.exeInfo.Obj.Path)
 	if err != nil {
 		proc.Close()
 
 		return nil, fmt.Errorf("failed to get elf file type for %q - %w",
-			proc.exeObj.Path, err)
+			proc.exeInfo.Obj.Path, err)
 	}
 
 	switch elfType {
 	case 32:
-		proc.is32b = true
+		proc.exeInfo.Bits = 32
+	default:
+		proc.exeInfo.Bits = 64
 	}
 
 	// TODO: exit monitor
@@ -66,8 +67,7 @@ type processUnix struct {
 	ptrace  *ptrace.Tracer
 	stopped bool
 	endian  binary.ByteOrder
-	is32b   bool
-	exeObj  memory.Object
+	exeInfo ExeInfo
 	exitMon *ExitMonitor
 }
 
@@ -79,8 +79,8 @@ func (o *processUnix) PID() int {
 	return o.pid
 }
 
-func (o *processUnix) ExeObj() memory.Object {
-	return o.exeObj
+func (o *processUnix) ExeInfo() ExeInfo {
+	return o.exeInfo
 }
 
 func (o *processUnix) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
@@ -134,7 +134,7 @@ func (o *processUnix) WriteBytes(b []byte, addr uintptr) error {
 }
 
 func (o *processUnix) ReadPtr(at uintptr) (uintptr, error) {
-	if o.is32b {
+	if o.exeInfo.Bits == 32 {
 		b, err := o.ReadBytes(at, 4)
 		if err != nil {
 			return 0, err

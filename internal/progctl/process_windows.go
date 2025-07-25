@@ -29,12 +29,18 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 		exitMon: exitMon,
 	}
 
-	proc.is32b, err = kernel32.IsProcess32Bit(proc.handle)
+	is32bit, err := kernel32.IsProcess32Bit(proc.handle)
 	if err != nil {
 		proc.Close()
 
 		return nil, fmt.Errorf("failed to determine if process is 32 bit - %w",
 			err)
+	}
+
+	if is32bit {
+		proc.exeInfo.Bits = 32
+	} else {
+		proc.exeInfo.Bits = 64
 	}
 
 	regions, err := proc.Regions()
@@ -45,7 +51,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 			err)
 	}
 
-	proc.exeObj, err = regions.FirstObjectMatching(exeName)
+	proc.exeInfo.Obj, err = regions.FirstObjectMatching(exeName)
 	if err != nil {
 		proc.Close()
 
@@ -77,8 +83,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 type processWindows struct {
 	handle  syscall.Handle
 	pid     int
-	is32b   bool
-	exeObj  memory.Object
+	exeInfo ExeInfo
 	exitMon *ExitMonitor
 }
 
@@ -106,8 +111,8 @@ func (o *processWindows) PID() int {
 	return o.pid
 }
 
-func (o *processWindows) ExeObj() memory.Object {
-	return o.exeObj
+func (o *processWindows) ExeInfo() ExeInfo {
+	return o.exeInfo
 }
 
 func (o *processWindows) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
@@ -119,7 +124,7 @@ func (o *processWindows) WriteBytes(b []byte, addr uintptr) error {
 }
 
 func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
-	if o.is32b {
+	if o.exeInfo.Bits == 32 {
 		return kernel32.ReadPtr(o.handle, at, 4, binary.LittleEndian)
 	} else {
 		return kernel32.ReadPtr(o.handle, at, 8, binary.LittleEndian)

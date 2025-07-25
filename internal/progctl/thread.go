@@ -89,9 +89,15 @@ func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
 	watchers := make(map[*Watcher]struct{})
 
 	runWatchers := time.NewTicker(time.Hour)
-	defer runWatchers.Stop()
-
 	runWatchers.Stop()
+
+	defer func() {
+		runWatchers.Stop()
+
+		for w := range watchers {
+			w.stop()
+		}
+	}()
 
 	for {
 		select {

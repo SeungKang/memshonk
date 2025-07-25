@@ -22,18 +22,17 @@ func newWatcher(ctx context.Context, addr uintptr, size uint64) *Watcher {
 type Watcher struct {
 	addr      uintptr
 	size      uint64
-	once      sync.Once
+	readsOnce sync.Once
 	reads     chan WatcherReadResult
 	cancelled <-chan struct{}
+	canFnOnce sync.Once
 	cancelFn  func()
 	lastRead  []byte
 	lastErr   error
 }
 
 func (o *Watcher) Close() error {
-	o.cancelFn()
-
-	o.stop()
+	o.canFnOnce.Do(o.cancelFn)
 
 	return nil
 }
@@ -53,6 +52,8 @@ func (o *Watcher) Err() error {
 func (o *Watcher) run(proc attachedProcess) bool {
 	select {
 	case <-o.cancelled:
+		o.lastErr = context.Canceled
+
 		o.stop()
 
 		return false
@@ -79,6 +80,8 @@ func (o *Watcher) run(proc attachedProcess) bool {
 
 	select {
 	case <-o.cancelled:
+		o.lastErr = context.Canceled
+
 		o.stop()
 
 		return false
@@ -90,12 +93,11 @@ func (o *Watcher) run(proc attachedProcess) bool {
 }
 
 func (o *Watcher) stop() {
-	o.once.Do(func() {
+	o.readsOnce.Do(func() {
 		close(o.reads)
 	})
 }
 
 type WatcherReadResult struct {
 	Data []byte
-	Err  error
 }

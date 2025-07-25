@@ -15,7 +15,9 @@ type Config struct {
 	Dst    io.Writer
 	Colors Colors
 
-	OptRowLen uint16
+	OptRowLen    uint16
+	OptStartOff  uint64
+	OptOffColPad uint8
 }
 
 func Dump(ctx context.Context, config Config) error {
@@ -28,11 +30,20 @@ func Dump(ctx context.Context, config Config) error {
 		maxRowLen = 16
 	}
 
+	var offsetPadStr string
+	if config.OptOffColPad == 0 {
+		offsetPadStr = "8"
+	} else {
+		offsetPadStr = strconv.FormatUint(uint64(config.OptOffColPad), 10)
+	}
+
 	rowArgs := dumpRowArgs{
 		writer:    bufW,
 		row:       make([]byte, maxRowLen),
 		maxRowLen: maxRowLen,
 		colors:    config.Colors,
+		padOffCol: offsetPadStr,
+		adjustOff: config.OptStartOff,
 	}
 
 	for {
@@ -65,6 +76,8 @@ type dumpRowArgs struct {
 	totalLen  uint64
 	row       []byte
 	rowLen    uint16
+	padOffCol string
+	adjustOff uint64
 }
 
 func dumpRow(args dumpRowArgs) error {
@@ -75,10 +88,13 @@ func dumpRow(args dumpRowArgs) error {
 	//    total = 24
 	//    rowLen = 8
 	var s string
+
 	if args.totalLen > uint64(args.maxRowLen) {
-		s = fmt.Sprintf("\n%08x", args.totalLen-uint64(args.rowLen)) + "   "
+		s = fmt.Sprintf("\n%0"+args.padOffCol+"x   ",
+			(args.totalLen-uint64(args.rowLen))+args.adjustOff)
 	} else {
-		s = fmt.Sprintf("%08x", 0) + "   "
+		s = fmt.Sprintf("%0"+args.padOffCol+"x   ",
+			args.adjustOff)
 	}
 
 	for i := uint16(0); i < args.maxRowLen; i++ {

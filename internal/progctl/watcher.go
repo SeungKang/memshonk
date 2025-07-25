@@ -38,6 +38,10 @@ func (o *Watcher) Close() error {
 	return nil
 }
 
+func (o *Watcher) Addr() uintptr {
+	return o.addr
+}
+
 func (o *Watcher) Results() <-chan WatcherReadResult {
 	return o.reads
 }

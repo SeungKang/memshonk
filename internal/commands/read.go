@@ -93,6 +93,9 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 				OptStartOff:  uint64(from),
 				OptOffColPad: info.Bits / 4, // 32 == 8, 64 = 16.
 			})
+			if err != nil {
+				return "", err
+			}
 
 			return out.String(), nil
 		}

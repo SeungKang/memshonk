@@ -40,7 +40,6 @@ func FindCommandSchema() CommandSchema {
 		CreateFn: func(c CommandConfig) (Command, error) {
 			return FindCommand{
 				EncodingFormat: c.Flags.String("encoding"),
-				Monitor:        c.Flags.Bool("monitor"),
 				Pattern:        c.NonFlags.StringList("pattern"),
 			}, nil
 		},
@@ -49,7 +48,6 @@ func FindCommandSchema() CommandSchema {
 
 type FindCommand struct {
 	EncodingFormat string
-	Monitor        bool
 	Pattern        []string
 }
 

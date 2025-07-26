@@ -96,6 +96,14 @@ func nonFlagToGrumble(nonFlag commands.NonFlagSchema, gargs *grumble.Args) {
 
 func flagToGrumble(flag commands.FlagSchema, gflags *grumble.Flags) {
 	switch flag.DataType.(type) {
+	case bool:
+		var def bool
+		if flag.DefaultVal != nil {
+			def = flag.DefaultVal.(bool)
+		}
+
+		gflags.Bool(flag.Short, flag.Long, def, flag.Desc)
+
 	case string:
 		var def string
 		if flag.DefaultVal != nil {

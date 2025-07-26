@@ -87,11 +87,11 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 			var out bytes.Buffer
 
 			err = hexdump.Dump(ctx, hexdump.Config{
-				Src:          bytes.NewReader(b),
-				Dst:          &out,
-				Colors:       hexdump.NewColors(),
-				OptStartOff:  uint64(from),
-				OptOffColPad: info.Bits / 4, // 32 == 8, 64 = 16.
+				Src:            bytes.NewReader(b),
+				Dst:            &out,
+				Colors:         hexdump.NewColors(),
+				OptStartOffset: uint64(from),
+				OptOffsetBits:  info.Bits,
 			})
 			if err != nil {
 				return "", err

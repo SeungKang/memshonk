@@ -21,10 +21,10 @@ type Config struct {
 	Dst    io.Writer
 	Colors Colors
 
-	OptTitle     string
-	OptRowLen    uint16
-	OptStartOff  uint64
-	OptOffColPad uint8
+	OptTitle       string
+	OptRowLen      uint16
+	OptStartOffset uint64
+	OptOffsetBits  uint8
 }
 
 func (o Config) OutputLen(totalInputBytes uint64) (int, int, error) {
@@ -56,10 +56,11 @@ func Dump(ctx context.Context, config Config) error {
 	}
 
 	var offsetPadStr string
-	if config.OptOffColPad == 0 {
+	if config.OptOffsetBits == 0 {
 		offsetPadStr = defOffsetPadStr
 	} else {
-		offsetPadStr = strconv.FormatUint(uint64(config.OptOffColPad), 10)
+		// 32 == 8, 64 == 16.
+		offsetPadStr = strconv.FormatUint(uint64(config.OptOffsetBits/4), 10)
 	}
 
 	rowArgs := dumpRowArgs{
@@ -68,7 +69,7 @@ func Dump(ctx context.Context, config Config) error {
 		maxRowLen: maxRowLen,
 		colors:    config.Colors,
 		padOffCol: offsetPadStr,
-		adjustOff: config.OptStartOff,
+		adjustOff: config.OptStartOffset,
 	}
 
 	if config.OptTitle != "" {

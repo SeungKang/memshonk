@@ -110,11 +110,11 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	var dst bytes.Buffer
 
 	hexdumpConfig := hexdump.Config{
-		Src:          &src,
-		Dst:          &dst,
-		Colors:       hexdump.NewColors(),
-		OptTitle:     "placeholder",
-		OptOffColPad: exeInfo.Bits / 4, // 32 == 8, 64 == 16.
+		Src:           &src,
+		Dst:           &dst,
+		Colors:        hexdump.NewColors(),
+		OptTitle:      "placeholder",
+		OptOffsetBits: exeInfo.Bits,
 	}
 
 	_, numLinesPerHexdump, err := hexdumpConfig.OutputLen(o.SizeBytes)
@@ -152,7 +152,7 @@ loop:
 			row.write(numLinesPerHexdump, width, height)
 		}
 	case read := <-reads:
-		hexdumpConfig.OptStartOff = uint64(read.row.addr)
+		hexdumpConfig.OptStartOffset = uint64(read.row.addr)
 
 		if read.err != nil {
 			if errors.Is(read.err, context.Canceled) {

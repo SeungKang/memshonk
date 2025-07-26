@@ -189,7 +189,6 @@ loop:
 	}
 
 	goto loop
-
 }
 
 type watchReadEvent struct {
@@ -214,7 +213,6 @@ func (o watchCommandRow) write(numLinesPerHexdump int, width int, height int) {
 	goterm.MoveCursor(1, y)
 
 	// y = 10: 10+3 > 12
-	//           13 > 13
 	if y+numLinesPerHexdump > height {
 		i := len(o.output) - 1
 		numLines := numLinesPerHexdump

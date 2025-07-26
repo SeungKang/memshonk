@@ -37,8 +37,8 @@ func TestFindAll_Reader(t *testing.T) {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
 
-	if matches[0].FirstAddr() != 69 {
-		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].FirstAddr())
+	if matches[0].Addr.FirstAddr() != 69 {
+		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].Addr.FirstAddr())
 	}
 }
 
@@ -72,8 +72,9 @@ func TestFindAll_Reader2(t *testing.T) {
 		t.Fatalf("len(matches) = %d, want 1", len(matches))
 	}
 
-	if matches[0].FirstAddr() != 69 {
-		t.Fatalf("matches[0].Addrs[0] = %d, want 69", matches[0].FirstAddr())
+	if matches[0].Addr.FirstAddr() != 69 {
+		t.Fatalf("matches[0].Addrs[0] = %d, want 69",
+			matches[0].Addr.FirstAddr())
 	}
 }
 

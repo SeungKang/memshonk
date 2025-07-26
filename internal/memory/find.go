@@ -11,18 +11,27 @@ import (
 	"unicode/utf16"
 )
 
-func FindAllReader(parsedPattern ParsedPattern, reader *BufferedReader) ([]Pointer, error) {
+type FindResult struct {
+	Size uint64
+	Addr Pointer
+}
+
+func FindAllReader(parsedPattern ParsedPattern, reader *BufferedReader) ([]FindResult, error) {
 	needLength := uint64(parsedPattern.Length)
 	reader.SetAdvanceBy(1)
 
 	i := 0
 
-	var matches []Pointer
+	var matches []FindResult
+
 	for reader.Next(context.Background(), needLength) {
 		chunk := reader.Bytes()
 
-		if match(chunk, parsedPattern) {
-			matches = append(matches, reader.Addr())
+		if parsedPattern.Matches(chunk) {
+			matches = append(matches, FindResult{
+				Size: uint64(len(chunk)),
+				Addr: reader.Addr(),
+			})
 		}
 
 		i++
@@ -47,6 +56,23 @@ type ParsedPattern struct {
 type PatternPart struct {
 	bytes     []byte
 	wildcards int
+}
+
+func (o ParsedPattern) Matches(data []byte) bool {
+	if len(data) != o.Length {
+		return false
+	}
+
+	var pos int
+	for _, part := range o.Parts {
+		if !bytes.Equal(data[pos:pos+len(part.bytes)], part.bytes) {
+			return false
+		}
+
+		pos += len(part.bytes) + part.wildcards
+	}
+
+	return true
 }
 
 func ParsePatternFromUtf8(s string) (ParsedPattern, error) {
@@ -122,21 +148,4 @@ func ParsePattern(pattern string) (ParsedPattern, error) {
 		Parts:  result,
 		Length: len(parts),
 	}, nil
-}
-
-func match(data []byte, parsedPattern ParsedPattern) bool {
-	if len(data) != parsedPattern.Length {
-		return false
-	}
-
-	var pos int
-	for _, part := range parsedPattern.Parts {
-		if !bytes.Equal(data[pos:pos+len(part.bytes)], part.bytes) {
-			return false
-		}
-
-		pos += len(part.bytes) + part.wildcards
-	}
-
-	return true
 }

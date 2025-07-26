@@ -1,11 +1,11 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/progctl"
@@ -38,27 +38,19 @@ func FindCommandSchema() CommandSchema {
 			},
 		},
 		CreateFn: func(c CommandConfig) (Command, error) {
-			return NewFindCommand(FindCommandArgs{
+			return FindCommand{
 				EncodingFormat: c.Flags.String("encoding"),
+				Monitor:        c.Flags.Bool("monitor"),
 				Pattern:        c.NonFlags.StringList("pattern"),
-			}), nil
+			}, nil
 		},
 	}
 }
 
-type FindCommandArgs struct {
-	EncodingFormat string
-	Pattern        []string
-}
-
-func NewFindCommand(args FindCommandArgs) FindCommand {
-	return FindCommand{
-		args: args,
-	}
-}
-
 type FindCommand struct {
-	args FindCommandArgs
+	EncodingFormat string
+	Monitor        bool
+	Pattern        []string
 }
 
 func (o FindCommand) Name() string {
@@ -68,10 +60,10 @@ func (o FindCommand) Name() string {
 func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
 	var parsedPattern memory.ParsedPattern
 	var err error
-	stringList := strings.Join(o.args.Pattern, " ")
+	stringList := strings.Join(o.Pattern, " ")
 
 	// TODO: Document encoding formats
-	encodingFormat := o.args.EncodingFormat
+	encodingFormat := o.EncodingFormat
 	switch encodingFormat {
 	case "string", "utf8":
 		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
@@ -88,20 +80,6 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		return nil, err
 	}
 
-	err = s.Process().Suspend(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to suspend process - %w", err)
-	}
-	defer func() {
-		deferCtx, doneFn := context.WithTimeout(context.Background(), time.Second)
-		defer doneFn()
-
-		err := s.Process().Resume(deferCtx)
-		if err != nil {
-			fmt.Fprintf(inOut.Stderr, "failed to resume process - %s\n", err)
-		}
-	}()
-
 	regions, err := s.Process().Regions(ctx)
 	if err != nil {
 		return nil, err
@@ -109,7 +87,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 
 	process := s.Process()
 
-	var matches MemoryPointerListCommandResult
+	var matches FindCommandResult
 
 	fmt.Fprint(inOut.Stderr, "searching")
 
@@ -118,7 +96,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 			return nil
 		}
 
-		matchedAddrs, err := o.searchRegion(parsedPattern, region, inOut, process)
+		matchedAddrs, err := o.searchRegion(ctx, parsedPattern, region, process)
 		if err != nil {
 			return err
 		}
@@ -136,7 +114,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 			}
 		}
 
-		matches = append(matches, matchedAddrs...)
+		matches.results = append(matches.results, matchedAddrs...)
 
 		return nil
 	})
@@ -150,7 +128,14 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 	return matches, nil
 }
 
-func (o FindCommand) searchRegion(parsedPattern memory.ParsedPattern, region memory.Region, inOut IO, process progctl.Process) ([]memory.Pointer, error) {
+func (o FindCommand) searchRegion(ctx context.Context, parsedPattern memory.ParsedPattern, region memory.Region, process progctl.Process) ([]memory.FindResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		// Keep going.
+	}
+
 	reader, err := memory.NewBufferedReader(
 		process,
 		memory.AbsoluteAddrPointer(region.BaseAddr),
@@ -170,4 +155,22 @@ func (o FindCommand) searchRegion(parsedPattern memory.ParsedPattern, region mem
 	}
 
 	return nil, nil
+}
+
+type FindCommandResult struct {
+	results []memory.FindResult
+}
+
+func (o FindCommandResult) Serialize() []byte {
+	buf := bytes.Buffer{}
+
+	for i, u := range o.results {
+		buf.WriteString(u.Addr.String())
+
+		if i < len(o.results)-1 {
+			buf.WriteString(" ")
+		}
+	}
+
+	return buf.Bytes()
 }

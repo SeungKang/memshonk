@@ -2,6 +2,7 @@ package hexdump
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -10,14 +11,38 @@ import (
 	"strconv"
 )
 
+const (
+	defMaxRowLen    uint16 = 16
+	defOffsetPadStr        = "8"
+)
+
 type Config struct {
 	Src    io.Reader
 	Dst    io.Writer
 	Colors Colors
 
+	OptTitle     string
 	OptRowLen    uint16
 	OptStartOff  uint64
 	OptOffColPad uint8
+}
+
+func (o Config) OutputLen(totalInputBytes uint64) (int, int, error) {
+	if o.OptRowLen == 0 {
+		o.OptRowLen = defMaxRowLen
+	}
+
+	o.Src = bytes.NewReader(make([]byte, totalInputBytes))
+
+	var out bytes.Buffer
+	o.Dst = &out
+
+	err := Dump(context.Background(), o)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return out.Len(), bytes.Count(out.Bytes(), []byte{'\n'}), nil
 }
 
 func Dump(ctx context.Context, config Config) error {
@@ -27,12 +52,12 @@ func Dump(ctx context.Context, config Config) error {
 
 	maxRowLen := config.OptRowLen
 	if maxRowLen == 0 {
-		maxRowLen = 16
+		maxRowLen = defMaxRowLen
 	}
 
 	var offsetPadStr string
 	if config.OptOffColPad == 0 {
-		offsetPadStr = "8"
+		offsetPadStr = defOffsetPadStr
 	} else {
 		offsetPadStr = strconv.FormatUint(uint64(config.OptOffColPad), 10)
 	}
@@ -44,6 +69,13 @@ func Dump(ctx context.Context, config Config) error {
 		colors:    config.Colors,
 		padOffCol: offsetPadStr,
 		adjustOff: config.OptStartOff,
+	}
+
+	if config.OptTitle != "" {
+		_, err := bufW.WriteString(config.OptTitle + "\n")
+		if err != nil {
+			return err
+		}
 	}
 
 	for {

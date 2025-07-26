@@ -65,6 +65,7 @@ type ArgFetcher interface {
 }
 
 type FlagFetcher interface {
+	Bool(argID string) bool
 	String(argID string) string
 	Int(argID string) int
 	Int64(argID string) int64

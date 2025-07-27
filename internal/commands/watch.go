@@ -160,7 +160,7 @@ loop:
 			}
 
 			header := fmt.Sprintf("%#x (invalidated at %s - %s)\n",
-				read.row.addr, time.Now().Format(time.TimeOnly), err)
+				read.row.addr, time.Now().Format(time.TimeOnly), read.err)
 
 			after := strings.Index(read.row.output, "\n")
 

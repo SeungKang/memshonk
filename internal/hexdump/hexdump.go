@@ -63,10 +63,11 @@ func Dump(ctx context.Context, config Config) error {
 		offsetPadStr = strconv.FormatUint(uint64(config.OptOffsetBits/4), 10)
 	}
 
+	data := make([]byte, maxRowLen)
+
 	rowArgs := dumpRowArgs{
 		writer:    bufW,
-		row:       make([]byte, maxRowLen),
-		maxRowLen: maxRowLen,
+		dataCap:   cap(data),
 		colors:    config.Colors,
 		padOffCol: offsetPadStr,
 		adjustOff: config.OptStartOffset,
@@ -80,11 +81,11 @@ func Dump(ctx context.Context, config Config) error {
 	}
 
 	for {
-		n, err := bufR.Read(rowArgs.row)
+		n, err := bufR.Read(data)
 
 		if n > 0 {
 			rowArgs.totalLen += uint64(n)
-			rowArgs.rowLen = uint16(n)
+			rowArgs.data = data[0:n]
 
 			dErr := dumpRow(rowArgs)
 			if dErr != nil {
@@ -104,39 +105,37 @@ func Dump(ctx context.Context, config Config) error {
 
 type dumpRowArgs struct {
 	writer    io.Writer
-	maxRowLen uint16
 	colors    Colors
 	totalLen  uint64
-	row       []byte
-	rowLen    uint16
+	data      []byte
+	dataCap   int
 	padOffCol string
 	adjustOff uint64
 }
 
 func dumpRow(args dumpRowArgs) error {
-	// 1. 16
-	//    total = 16
-	//    rowLen = 16
-	// 2. 8
-	//    total = 24
-	//    rowLen = 8
 	var s string
 
-	if args.totalLen > uint64(args.maxRowLen) {
+	dataLen := len(args.data)
+
+	// offset section
+	if args.totalLen > uint64(args.dataCap) {
 		s = fmt.Sprintf("\n%0"+args.padOffCol+"x   ",
-			(args.totalLen-uint64(args.rowLen))+args.adjustOff)
+			(args.totalLen-uint64(dataLen))+args.adjustOff)
 	} else {
 		s = fmt.Sprintf("%0"+args.padOffCol+"x   ",
 			args.adjustOff)
 	}
 
-	for i := uint16(0); i < args.maxRowLen; i++ {
-		if i < args.rowLen {
-			s += args.colors.HexChar(args.row[i]) + " "
+	// hex characters section
+	for i := 0; i < args.dataCap; i++ {
+		if i < dataLen {
+			s += args.colors.HexChar(args.data[i]) + " "
 		} else {
 			s += "   "
 		}
 
+		// this puts an extra space between the chunks in the hex column
 		if (i+1)%4 == 0 {
 			s += " "
 		}
@@ -144,16 +143,17 @@ func dumpRow(args dumpRowArgs) error {
 
 	s += " |"
 
-	for i := uint16(0); i < args.maxRowLen; i++ {
-		if i < args.rowLen {
+	// human-readable section
+	for i := 0; i < args.dataCap; i++ {
+		if i < dataLen {
 			b := byte('.')
 
-			if args.row[i] >= 0x21 && args.row[i] <= 0x7e {
+			if args.data[i] >= 0x21 && args.data[i] <= 0x7e {
 				// Is ASCII (except space).
-				b = args.row[i]
+				b = args.data[i]
 			}
 
-			s += args.colors.Value(string(b), args.row[i])
+			s += args.colors.Value(string(b), args.data[i])
 		} else {
 			s += " "
 		}

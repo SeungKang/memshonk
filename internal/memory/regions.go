@@ -114,6 +114,10 @@ func (o Object) Matches(str string) bool {
 		return false
 	}
 
+	// On Windows, it appears that modules may have a different case
+	// than the file names (e.g., file: "AoMX.exe" module: "aomx.exe").
+	str = strings.ToLower(str)
+
 	return strings.Contains(o.Regions[0].Parent.FileName, str) ||
 		strings.Contains(o.Regions[0].Parent.FilePath, str)
 }

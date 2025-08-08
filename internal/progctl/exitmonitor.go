@@ -31,11 +31,12 @@ func (o *ExitMonitor) Err() error {
 
 func (o *ExitMonitor) SetExited(err error) {
 	o.once.Do(func() {
-		if err == nil {
-			err = ErrExitedNormally
+		switch err {
+		case ErrDetached:
+			// Do not send an event.
+		default:
+			_ = o.events.Send(context.Background(), ProcessExitedEvent{err})
 		}
-
-		_ = o.events.Send(context.Background(), ProcessExitedEvent{err})
 
 		o.err = err
 

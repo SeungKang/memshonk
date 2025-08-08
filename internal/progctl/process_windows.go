@@ -23,40 +23,45 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 			err)
 	}
 
-	proc := &processWindows{
-		handle:  handle,
-		pid:     pid,
-		exitMon: exitMon,
-	}
-
-	is32bit, err := kernel32.IsProcess32Bit(proc.handle)
+	is32bit, err := kernel32.IsProcess32Bit(handle)
 	if err != nil {
-		proc.Close()
+		_ = syscall.CloseHandle(handle)
 
 		return nil, fmt.Errorf("failed to determine if process is 32 bit - %w",
 			err)
 	}
 
+	var bits uint8
 	if is32bit {
-		proc.exeInfo.Bits = 32
+		bits = 32
 	} else {
-		proc.exeInfo.Bits = 64
+		bits = 64
 	}
 
-	regions, err := proc.Regions()
+	regions, err := regionsForProcHandle(handle)
 	if err != nil {
-		proc.Close()
+		_ = syscall.CloseHandle(handle)
 
 		return nil, fmt.Errorf("failed to get memory regions - %w",
 			err)
 	}
 
-	proc.exeInfo.Obj, err = regions.FirstObjectMatching(exeName)
+	exeObj, err := regions.FirstObjectMatching(exeName)
 	if err != nil {
-		proc.Close()
+		_ = syscall.CloseHandle(handle)
 
 		return nil, fmt.Errorf("failed to get mapped object for exe - %w",
 			err)
+	}
+
+	proc := &processWindows{
+		handle:  handle,
+		pid:     pid,
+		exitMon: exitMon,
+		exeInfo: ExeInfo{
+			Bits: bits,
+			Obj:  exeObj,
+		},
 	}
 
 	go func() {
@@ -132,7 +137,11 @@ func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
 }
 
 func (o *processWindows) Regions() (memory.Regions, error) {
-	objs, err := o.objects()
+	return regionsForProcHandle(o.handle)
+}
+
+func regionsForProcHandle(procHandle syscall.Handle) (memory.Regions, error) {
+	objs, err := objectsForProcHandle(procHandle)
 	if err != nil {
 		return memory.Regions{}, fmt.Errorf("failed to get objects - %w", err)
 	}
@@ -140,7 +149,7 @@ func (o *processWindows) Regions() (memory.Regions, error) {
 	var regions memory.Regions
 
 	err = kernel32.IterVirtualMemory(
-		o.handle,
+		procHandle,
 		func(i int, info kernel32.MEMORY_BASIC_INFORMATION) error {
 			region := memBasicInfoToRegion(info)
 
@@ -182,7 +191,7 @@ func (o *processWindows) Regions() (memory.Regions, error) {
 	return regions, nil
 }
 
-func (o *processWindows) objects() (MappedObjects, error) {
+func objectsForProcHandle(procHandle syscall.Handle) (MappedObjects, error) {
 	objs := MappedObjects{}
 
 	objectID := memory.ObjectID(0)
@@ -191,7 +200,7 @@ func (o *processWindows) objects() (MappedObjects, error) {
 	// entry that has a non-zero base address :)
 	// TODO add option to log weird stuff we are seeing, attach -v
 	err := kernel32.IterProcessModules(
-		o.handle,
+		procHandle,
 		func(_ int, _ uint, module kernel32.Module) error {
 			if module.BaseAddr == 0 {
 				return nil

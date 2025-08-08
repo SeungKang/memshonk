@@ -23,7 +23,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error)
 
 	regions, err := proc.Regions()
 	if err != nil {
-		proc.Close()
+		_ = proc.Close()
 
 		return nil, fmt.Errorf("failed to get memory regions - %w",
 			err)
@@ -31,7 +31,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error)
 
 	proc.exeInfo.Obj, err = regions.FirstObjectMatching(exeName)
 	if err != nil {
-		proc.Close()
+		_ = proc.Close()
 
 		return nil, fmt.Errorf("failed to get mapped object for exe - %w",
 			err)
@@ -39,7 +39,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processUnix, error)
 
 	elfType, err := elfFileType(proc.exeInfo.Obj.Path)
 	if err != nil {
-		proc.Close()
+		_ = proc.Close()
 
 		return nil, fmt.Errorf("failed to get elf file type for %q - %w",
 			proc.exeInfo.Obj.Path, err)
@@ -184,6 +184,8 @@ func (o *processUnix) Resume() error {
 }
 
 func (o *processUnix) Close() error {
+	o.exitMon.SetExited(ErrDetached)
+
 	// TODO: on linux the process needs to be stopped according to the
 	// PTRACE_DETACH section in the linux manual page unsure what other
 	// unix-like operating systems require

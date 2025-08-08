@@ -81,7 +81,7 @@ func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
 	var err error
 	o.process, err = attach(exeName, pid, o.exitMon)
 	if err != nil {
-		attachResult <- fmt.Errorf("failed to attach process - %w", err)
+		attachResult <- fmt.Errorf("attach failure - %w", err)
 		return
 	}
 	close(attachResult)

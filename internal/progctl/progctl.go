@@ -115,9 +115,9 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 			o.exeName)
 	}
 
-	exitMon := newExitMonitor(o.processExited)
+	unexpectedExitMon := newExitMonitor(o.processExited)
 
-	proc, err := newProcessThread(exeName, possiblePID, exitMon)
+	proc, err := newProcessThread(exeName, possiblePID, unexpectedExitMon)
 	if err != nil {
 		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
 			possiblePID, exeName, err)

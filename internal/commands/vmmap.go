@@ -86,7 +86,7 @@ func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s Sess
 	var out bytes.Buffer
 
 	err := regions.IterObjects(func(object memory.Object) error {
-		if !object.Matches(o.args.searchStr) {
+		if !object.NameOrPathContains(o.args.searchStr) {
 			return nil
 		}
 

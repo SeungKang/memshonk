@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -114,12 +115,41 @@ func (o Object) Matches(str string) bool {
 		return false
 	}
 
-	// On Windows, it appears that modules may have a different case
-	// than the file names (e.g., file: "AoMX.exe" module: "aomx.exe").
+	// On Windows, it appears that modules may have a different
+	// case than the file names. E.g., the file "AoMX.exe" may
+	// be represented by a module named: "aomx.exe").
 	str = strings.ToLower(str)
 
-	return strings.Contains(o.Regions[0].Parent.FileName, str) ||
-		strings.Contains(o.Regions[0].Parent.FilePath, str)
+	current := strings.ToLower(o.Regions[0].Parent.FileName)
+
+	return current == str
+}
+
+func (o Object) NameOrPathContains(str string) bool {
+	if len(o.Regions) == 0 {
+		return false
+	}
+
+	// On Windows, it appears that modules may have a different
+	// case than the file names. E.g., the file "AoMX.exe" may
+	// be represented by a module named: "aomx.exe").
+	str = strings.ToLower(str)
+
+	current := strings.ToLower(o.Regions[0].Parent.FileName)
+
+	if strings.Contains(current, str) {
+		return true
+	}
+
+	for _, part := range filepath.SplitList(o.Path) {
+		part = strings.ToLower(part)
+
+		if strings.Contains(part, str) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (o Object) String() string {

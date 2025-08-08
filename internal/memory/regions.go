@@ -115,9 +115,10 @@ func (o Object) Matches(str string) bool {
 		return false
 	}
 
-	// On Windows, it appears that modules may have a different
-	// case than the file names. E.g., the file "AoMX.exe" may
-	// be represented by a module named: "aomx.exe").
+	// On Windows, it appears that a process module may have
+	// a different case than its corresponding file's name.
+	// E.g., the file "AoMX.exe" may be represented by a module
+	// named: "aomx.exe".
 	str = strings.ToLower(str)
 
 	current := strings.ToLower(o.Regions[0].Parent.FileName)
@@ -130,9 +131,10 @@ func (o Object) NameOrPathContains(str string) bool {
 		return false
 	}
 
-	// On Windows, it appears that modules may have a different
-	// case than the file names. E.g., the file "AoMX.exe" may
-	// be represented by a module named: "aomx.exe").
+	// On Windows, it appears that a process module may have
+	// a different case than its corresponding file's name.
+	// E.g., the file "AoMX.exe" may be represented by a module
+	// named: "aomx.exe".
 	str = strings.ToLower(str)
 
 	current := strings.ToLower(o.Regions[0].Parent.FileName)

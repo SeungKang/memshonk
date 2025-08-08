@@ -85,7 +85,11 @@ func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s Sess
 
 	var out bytes.Buffer
 
-	err := regions.IterObjectsMatching(o.args.searchStr, func(object memory.Object) error {
+	err := regions.IterObjects(func(object memory.Object) error {
+		if !object.Matches(o.args.searchStr) {
+			return nil
+		}
+
 		if out.Len() > 0 {
 			out.WriteByte('\n')
 		}

@@ -272,7 +272,11 @@ func (o *Regions) FirstObjectMatching(str string) (Object, error) {
 	var match Object
 	var found bool
 
-	err := o.IterObjectsMatching(str, func(obj Object) error {
+	err := o.IterObjects(func(obj Object) error {
+		if !obj.Matches(str) {
+			return nil
+		}
+
 		found = true
 		match = obj
 
@@ -283,20 +287,17 @@ func (o *Regions) FirstObjectMatching(str string) (Object, error) {
 	}
 
 	if !found {
-		return Object{}, fmt.Errorf("failed to find a match for: %q", str)
+		searched := make([]string, len(o.objects))
+
+		for i := range o.objects {
+			searched[i] = o.objects[i].Name
+		}
+
+		return Object{}, fmt.Errorf("failed to find a match for an object named: %q (searched through: %q)",
+			str, searched)
 	}
 
 	return match, nil
-}
-
-func (o *Regions) IterObjectsMatching(str string, fn func(Object) error) error {
-	return o.IterObjects(func(obj Object) error {
-		if obj.Matches(str) {
-			return fn(obj)
-		}
-
-		return nil
-	})
 }
 
 func (o *Regions) IterObjects(fn func(Object) error) error {

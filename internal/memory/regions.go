@@ -9,10 +9,6 @@ import (
 	"strings"
 )
 
-var (
-	ErrStopIterating = errors.New("stop iterating")
-)
-
 const (
 	MemTypeUnknown MemoryType = iota
 	MemImage

@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -17,7 +16,7 @@ type FindResult struct {
 }
 
 func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *BufferedReader) ([]FindResult, error) {
-	needLength := uint64(parsedPattern.Length)
+	needLength := uint64(parsedPattern.length)
 	reader.SetAdvanceBy(1)
 
 	var matches []FindResult
@@ -44,55 +43,12 @@ func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *Buf
 	return nil, nil
 }
 
-type ParsedPattern struct {
-	Parts  []PatternPart
-	Length int
-}
-
-type PatternPart struct {
-	bytes     []byte
-	wildcards int
-}
-
-func (o ParsedPattern) Matches(data []byte) bool {
-	if len(data) != o.Length {
-		return false
-	}
-
-	var pos int
-	for _, part := range o.Parts {
-		if !bytes.Equal(data[pos:pos+len(part.bytes)], part.bytes) {
-			return false
-		}
-
-		pos += len(part.bytes) + part.wildcards
-	}
-
-	return true
-}
-
 func ParsePatternFromUtf8(s string) (ParsedPattern, error) {
-	return ParsedPattern{
-		Parts: []PatternPart{
-			{
-				bytes: []byte(s),
-			},
-		},
-		Length: len(s),
-	}, nil
+	return patternFromRawBytes([]byte(s)), nil
 }
 
 func ParsePatternFromUtf16(s string, endianness binary.ByteOrder) (ParsedPattern, error) {
-	b := stringToUTF16Bytes(s, endianness)
-
-	return ParsedPattern{
-		Parts: []PatternPart{
-			{
-				bytes: b,
-			},
-		},
-		Length: len(b),
-	}, nil
+	return patternFromRawBytes(stringToUTF16Bytes(s, endianness)), nil
 }
 
 func stringToUTF16Bytes(s string, endianness binary.ByteOrder) []byte {
@@ -109,39 +65,135 @@ func stringToUTF16Bytes(s string, endianness binary.ByteOrder) []byte {
 }
 
 func ParsePattern(pattern string) (ParsedPattern, error) {
-	parts := strings.Fields(pattern)
-	var result []PatternPart
-	current := PatternPart{}
+	var parts []PatternByte
 
-	for _, p := range parts {
-		if p == "??" {
-			current.wildcards++
-			continue
+	for _, field := range strings.Fields(pattern) {
+		field = strings.TrimPrefix(field, "0x")
+
+		partStrs := splitByStrLen(field, 2)
+
+		for _, partStr := range partStrs {
+			part, err := patternByteFromString(partStr)
+			if err != nil {
+				return ParsedPattern{}, fmt.Errorf("failed to parse pattern byte: %q - %w",
+					part, err)
+			}
+
+			parts = append(parts, part)
 		}
-
-		b, err := hex.DecodeString(strings.TrimPrefix(p, "0x"))
-		if err != nil {
-			return ParsedPattern{}, fmt.Errorf("failed to hex decode pattern: %q - %w", p, err)
-		}
-
-		if len(b) > 1 {
-			return ParsedPattern{}, errors.New("pattern part must be only one byte")
-		}
-
-		if current.wildcards > 0 {
-			result = append(result, current)
-			current = PatternPart{}
-		}
-
-		current.bytes = append(current.bytes, b[0])
-	}
-
-	if len(current.bytes) > 0 || current.wildcards > 0 {
-		result = append(result, current)
 	}
 
 	return ParsedPattern{
-		Parts:  result,
-		Length: len(parts),
+		parts:  parts,
+		length: len(parts),
 	}, nil
+}
+
+// Based on work by Igor Mikushkin:
+// https://stackoverflow.com/a/61469854
+func splitByStrLen(s string, chunkSize int) []string {
+	if len(s) == 0 {
+		return nil
+	}
+
+	if len(s) <= chunkSize {
+		return []string{s}
+	}
+
+	chunks := make([]string, 0, (len(s)-1)/chunkSize+1)
+	currentLen := 0
+	currentStart := 0
+
+	for i := range s {
+		if currentLen == chunkSize {
+			chunks = append(chunks, s[currentStart:i])
+			currentLen = 0
+			currentStart = i
+		}
+
+		currentLen++
+	}
+
+	chunks = append(chunks, s[currentStart:])
+
+	return chunks
+}
+
+func patternFromRawBytes(b []byte) ParsedPattern {
+	parts := make([]PatternByte, len(b))
+
+	for i := range b {
+		parts[i].b = b[i]
+	}
+
+	return ParsedPattern{
+		parts:  parts,
+		length: len(parts),
+	}
+}
+
+type ParsedPattern struct {
+	parts  []PatternByte
+	length int
+}
+
+func (o ParsedPattern) Matches(data []byte) bool {
+	if len(data) != o.length || len(data) == 0 || o.length == 0 {
+		return false
+	}
+
+	for i := range data {
+		if !o.parts[i].Matches(data[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func patternByteFromString(str string) (PatternByte, error) {
+	if len(str) > 2 {
+		return PatternByte{}, errors.New("pattern byte string is more than two characters")
+	}
+
+	if str == "??" {
+		return PatternByte{wildcard: true}, nil
+	}
+
+	if len(str) == 1 {
+		str = "0" + str
+	}
+
+	b, err := hex.DecodeString(str)
+	if err != nil {
+		return PatternByte{}, fmt.Errorf("hex decode failed - %w", err)
+	}
+
+	if len(b) > 1 {
+		return PatternByte{}, fmt.Errorf("pattern byte decoded to more than one byte (%d)",
+			len(b))
+	}
+
+	return PatternByte{b: b[0]}, nil
+}
+
+type PatternByte struct {
+	b        byte
+	wildcard bool
+}
+
+func (o PatternByte) Matches(data byte) bool {
+	if o.wildcard {
+		return true
+	}
+
+	return data == o.b
+}
+
+func (o PatternByte) String() string {
+	if o.wildcard {
+		return "??"
+	}
+
+	return hex.EncodeToString([]byte{o.b})
 }

@@ -142,7 +142,7 @@ func (o FindCommand) searchRegion(ctx context.Context, parsedPattern memory.Pars
 		return nil, err
 	}
 
-	matches, err := memory.FindAllReader(parsedPattern, reader)
+	matches, err := memory.FindAllReader(ctx, parsedPattern, reader)
 	if err != nil {
 		// TODO ignoring error
 		return nil, nil

@@ -16,15 +16,13 @@ type FindResult struct {
 	Addr Pointer
 }
 
-func FindAllReader(parsedPattern ParsedPattern, reader *BufferedReader) ([]FindResult, error) {
+func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *BufferedReader) ([]FindResult, error) {
 	needLength := uint64(parsedPattern.Length)
 	reader.SetAdvanceBy(1)
 
-	i := 0
-
 	var matches []FindResult
 
-	for reader.Next(context.Background(), needLength) {
+	for reader.Next(ctx, needLength) {
 		chunk := reader.Bytes()
 
 		if parsedPattern.Matches(chunk) {
@@ -33,12 +31,10 @@ func FindAllReader(parsedPattern ParsedPattern, reader *BufferedReader) ([]FindR
 				Addr: reader.Addr(),
 			})
 		}
-
-		i++
 	}
 
 	if reader.Err() != nil {
-		return nil, reader.Err()
+		return nil, fmt.Errorf("memory reader failed - %w", reader.Err())
 	}
 
 	if len(matches) > 0 {

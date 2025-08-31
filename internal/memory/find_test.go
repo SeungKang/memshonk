@@ -28,7 +28,9 @@ func TestFindAll_Reader(t *testing.T) {
 		t.Fatalf("want no error, got %v", err)
 	}
 
-	matches, err := FindAllReader(parsedPattern, reader)
+	ctx := context.Background()
+
+	matches, err := FindAllReader(ctx, parsedPattern, reader)
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}
@@ -63,7 +65,9 @@ func TestFindAll_Reader2(t *testing.T) {
 		t.Fatalf("want no error, got %v", err)
 	}
 
-	matches, err := FindAllReader(parsedPattern, reader)
+	ctx := context.Background()
+
+	matches, err := FindAllReader(ctx, parsedPattern, reader)
 	if err != nil {
 		t.Fatalf("want no error, got %v", err)
 	}

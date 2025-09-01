@@ -43,6 +43,7 @@
 
 ~~- `vmmap object_Name` shows object with that name and regions under it~~
 ~~- code needs to be cleaned up~~
+- fix the permissions are not showing up correctly
 
 ## progctl
 

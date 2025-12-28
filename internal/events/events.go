@@ -87,6 +87,29 @@ func (o *eventGroup[C]) Send(ctx context.Context, event C) error {
 	return nil
 }
 
+func (o *eventGroup[C]) SendAndWait(ctx context.Context, event C) error {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	ackable, isAckable := any(event).(Ackable)
+	if isAckable {
+		ackable.Acker().init(uint64(len(o.subs)))
+	}
+
+	for sub := range o.subs {
+		err := sub.send(ctx, event)
+		if err != nil {
+			return err
+		}
+	}
+
+	if isAckable {
+		ackable.Acker().Wait(ctx)
+	}
+
+	return nil
+}
+
 func (o *eventGroup[C]) Unsub(sub *Sub[C]) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
@@ -110,6 +133,10 @@ type Publisher[C comparable] struct {
 
 func (o *Publisher[C]) Send(ctx context.Context, event C) error {
 	return o.parent.Send(ctx, event)
+}
+
+func (o *Publisher[C]) SendAndWait(ctx context.Context, event C) error {
+	return o.parent.SendAndWait(ctx, event)
 }
 
 func NewSubscriber[C comparable](groups *Groups) *Sub[C] {
@@ -168,4 +195,48 @@ func typeToString(o interface{}) string {
 	}
 
 	return r.PkgPath() + "." + r.Name()
+}
+
+type Ackable interface {
+	Acker() *EventAcker
+}
+
+func NewAcker() *EventAcker {
+	return &EventAcker{}
+}
+
+type EventAcker struct {
+	numReceivers uint64
+	acked        chan struct{}
+	once         sync.Once
+	done         chan struct{}
+}
+
+func (o *EventAcker) init(numReceivers uint64) {
+	o.numReceivers = numReceivers
+	o.acked = make(chan struct{}, numReceivers)
+	o.once = sync.Once{}
+	o.done = make(chan struct{})
+}
+
+func (o *EventAcker) Ack() {
+	select {
+	case o.acked <- struct{}{}:
+	default:
+	}
+}
+
+func (o *EventAcker) Wait(ctx context.Context) {
+	o.once.Do(func() {
+		defer close(o.done)
+
+		for i := uint64(0); i < o.numReceivers; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-o.acked:
+				// Keep going.
+			}
+		}
+	})
 }

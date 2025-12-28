@@ -125,12 +125,10 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 	o.current = proc
 
-	ack := make(chan struct{})
-	_ = o.attachEvents.Send(ctx, AttachedEvent{
+	_ = o.attachEvents.SendAndWait(ctx, AttachedEvent{
 		Pid:   possiblePID,
-		Acked: ack,
+		acker: events.NewAcker(),
 	})
-	<-ack
 
 	return possiblePID, nil
 }
@@ -326,11 +324,9 @@ func (o *Ctl) Detach(ctx context.Context) error {
 
 	o.current = nil
 
-	ack := make(chan struct{})
-	_ = o.detachEvents.Send(ctx, DetachedEvent{
-		Acked: ack,
+	_ = o.detachEvents.SendAndWait(ctx, DetachedEvent{
+		acker: events.NewAcker(),
 	})
-	<-ack
 
 	return err
 }

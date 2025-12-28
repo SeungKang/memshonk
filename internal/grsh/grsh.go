@@ -85,11 +85,11 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			case e := <-attachEvents.RecvCh():
 				sh.setPrompt(e.Pid)
 
-				close(e.Acked)
+				e.Acker().Ack()
 			case e := <-detachEvents.RecvCh():
 				sh.setPrompt(0)
 
-				close(e.Acked)
+				e.Acker().Ack()
 			case e := <-exitedEvents.RecvCh():
 				sh.setPrompt(0)
 				log.Printf("process exited - %v", e.Reason)

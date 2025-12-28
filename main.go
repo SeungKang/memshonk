@@ -82,7 +82,6 @@ func mainWithError() error {
 	default:
 		return doServer(firstArg)
 	}
-
 }
 
 func doClient() error {
@@ -115,12 +114,23 @@ func doClient() error {
 
 	go io.Copy(conn, os.Stdin)
 
-	_, err = io.Copy(os.Stdout, conn)
-	if err != nil {
-		return fmt.Errorf("failed to copy data from conn to stdout - %w", err)
-	}
+	b := make([]byte, 1)
 
-	return nil
+	for {
+		_, err := conn.Read(b)
+		if err != nil {
+			return fmt.Errorf("failed to read from server - %w", err)
+		}
+
+		if b[0] == '\n' {
+			os.Stdout.Write([]byte{'\r'})
+		}
+
+		_, err = os.Stdout.Write(b)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func doServer(projectFilePath string) error {

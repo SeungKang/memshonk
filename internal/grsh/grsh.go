@@ -3,16 +3,15 @@ package grsh
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
+
 	"github.com/desertbit/grumble"
 	"github.com/desertbit/readline"
 	"github.com/fatih/color"
@@ -25,21 +24,8 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	// using the flag library).
 	os.Args = os.Args[0:1]
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user home dir - %w", err)
-	}
-
-	// TODO pass memshonk config directory path from main to this function
-	configDir := filepath.Join(homeDir, ".memshonk")
-	err = os.MkdirAll(configDir, 0o700)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make config directory at '%s' - %w", configDir, err)
-	}
-
-	grumbleApp := grumble.New(&grumble.Config{
+	grumbleConfig := &grumble.Config{
 		Name:        "memshonk",
-		HistoryFile: filepath.Join(configDir, "history"),
 		PromptColor: color.New(color.FgCyan),
 
 		// The default InterruptHandler calls os.Exit,
@@ -56,7 +42,16 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 		//
 		// 	return args, nil
 		// },
-	})
+	}
+
+	wsConfig := session.Project().WorkspaceConfig()
+
+	historyFilePath, historyEnabled := wsConfig.HistoryFilePath(session.ID())
+	if historyEnabled {
+		grumbleConfig.HistoryFile = historyFilePath
+	}
+
+	grumbleApp := grumble.New(grumbleConfig)
 
 	sh := &Shell{
 		ga:  grumbleApp,

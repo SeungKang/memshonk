@@ -20,9 +20,13 @@ func Setup() (Config, error) {
 
 	return Config{
 		DirPath: memshonkDir,
+
+		HistoryFileEnabled: true, // TODO: Make configurable.
 	}, nil
 }
 
 type Config struct {
 	DirPath string
+
+	HistoryFileEnabled bool
 }

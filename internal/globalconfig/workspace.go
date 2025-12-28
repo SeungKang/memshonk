@@ -31,6 +31,20 @@ type WorkspaceConfig struct {
 	config         *Config
 }
 
+func (o *WorkspaceConfig) HistoryFilePath(sessionID string) (string, bool) {
+	if !o.config.HistoryFileEnabled {
+		return "", false
+	}
+
+	var suffix string
+
+	if sessionID != "default" {
+		suffix = "-" + sessionID
+	}
+
+	return filepath.Join(o.HistoryDirPath, "history"+suffix), true
+}
+
 func (o *WorkspaceConfig) socketFilePath(projectName string) error {
 	workspaceDir, err := o.createWorkspacesDir(projectName)
 	if err != nil {

@@ -41,6 +41,13 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 		Name:        "memshonk",
 		HistoryFile: filepath.Join(configDir, "history"),
 		PromptColor: color.New(color.FgCyan),
+
+		// The default InterruptHandler calls os.Exit,
+		// which is not exactly ideal if a remote client
+		// decides to do ctrl+c.
+		InterruptHandler: func(*grumble.App, int) {},
+
+		// TODO:
 		// CommandPreProc: func(args []string) ([]string, error) {
 		// 	err := shvars.Replace(args, session.Variables())
 		// 	if err != nil {

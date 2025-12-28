@@ -56,6 +56,7 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	sh := &Shell{
 		ga:  grumbleApp,
 		ctx: ctx,
+		io:  session.IO(),
 	}
 
 	grumbleApp.OnInit(sh.onInit)
@@ -108,16 +109,25 @@ type Shell struct {
 	ga  *grumble.App
 	fm  grumble.FlagMap
 	ctx context.Context
+	io  app.SessionIO
 }
 
-func (o *Shell) Run(stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
-	config := &readline.Config{Stdin: stdin, Stdout: stdout, Stderr: stderr}
+func (o *Shell) Run() error {
+	config := &readline.Config{
+		Stdin:  o.io.Stdin,
+		Stdout: o.io.Stdout,
+		Stderr: o.io.Stderr,
+	}
+
+	// This must happen before calling readline.NewEx,
+	// because of course it matters :/
+	o.ga.SetReadlineDefaults(config)
+
 	rl, err := readline.NewEx(config)
 	if err != nil {
 		return err
 	}
 
-	o.ga.SetReadlineDefaults(config)
 	return o.ga.RunWithReadline(rl)
 }
 

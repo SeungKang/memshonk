@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/signal"
 	"syscall"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
-func newSession(id uint64, app *App, cmdIO commands.IO) *Session {
+func newSession(id string, app *App, sessionIO SessionIO) *Session {
 	return &Session{
 		id:  id,
 		app: app,
@@ -22,16 +23,30 @@ func newSession(id uint64, app *App, cmdIO commands.IO) *Session {
 			proj: app.project,
 			vars: &shvars.Variables{},
 		},
-		io: cmdIO,
+		io: sessionIO,
 	}
 }
 
 type Session struct {
-	id     uint64
+	id     string
 	app    *App
 	vars   *SessionVariables
 	cmdCtx *CommandContext
-	io     commands.IO
+	io     SessionIO
+}
+
+func (o *Session) ID() string {
+	return o.id
+}
+
+type SessionIO struct {
+	Stdin  io.ReadCloser
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
+}
+
+func (o *Session) IO() SessionIO {
+	return o.io
 }
 
 func (o *Session) Events() *events.Groups {
@@ -59,7 +74,10 @@ func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
 	ctx, cancelFn = signal.NotifyContext(ctx, syscall.SIGINT)
 	defer cancelFn()
 
-	result, err := cmd.Run(ctx, o.io, o)
+	result, err := cmd.Run(ctx, commands.IO{
+		Stdout: o.io.Stdout,
+		Stderr: o.io.Stderr,
+	}, o)
 	if err != nil {
 		return err
 	}

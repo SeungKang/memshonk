@@ -1,9 +1,14 @@
 package app
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"strings"
 	"sync"
 
-	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
@@ -20,13 +25,13 @@ func NewApp(eventGroups *events.Groups, project *project.Project, progCtl progct
 }
 
 type App struct {
-	events        *events.Groups
-	project       *project.Project
-	procCtl       progctl.Process
-	pluginCtl     plugins.Ctl
-	rwMu          sync.RWMutex
-	nextSessionId uint64
-	sessions      map[uint64]*Session
+	events    *events.Groups
+	project   *project.Project
+	procCtl   progctl.Process
+	pluginCtl plugins.Ctl
+	rwMu      sync.RWMutex
+	randStr   *randomStringer
+	sessions  map[string]*Session
 }
 
 func (o *App) Events() *events.Groups {
@@ -37,21 +42,75 @@ func (o *App) ProcCtl() progctl.Process {
 	return o.procCtl
 }
 
-func (o *App) NewSession(cmdIO commands.IO) *Session {
+type SessionConfig struct {
+	IO    SessionIO
+	OptID string
+}
+
+func (o *App) NewSession(config SessionConfig) (*Session, error) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
 	if o.sessions == nil {
-		o.sessions = make(map[uint64]*Session)
+		o.sessions = make(map[string]*Session)
 	}
 
-	id := o.nextSessionId
-	o.nextSessionId++
+	var id string
 
-	session := newSession(id, o, cmdIO)
+	if config.OptID == "" {
+		if o.randStr == nil {
+			o.randStr = newRandomStringer()
+		}
+
+		for i := 0; i < 100; i++ {
+			possibleId := o.randStr.String()
+
+			_, hasIt := o.sessions[possibleId]
+			if !hasIt {
+				id = possibleId
+
+				break
+			}
+		}
+
+		if id == "" {
+			var buf bytes.Buffer
+
+			b := make([]byte, 4)
+
+			_, err := rand.Read(b)
+			if err != nil {
+				panic(err)
+			}
+
+			_, err = hex.NewEncoder(&buf).Write(b)
+			if err != nil {
+				panic(err)
+			}
+
+			id = buf.String()
+		}
+	} else {
+		_, hasIt := o.sessions[config.OptID]
+		if hasIt {
+			return nil, fmt.Errorf("session id already in use (%q)",
+				config.OptID)
+		}
+
+		id = config.OptID
+	}
+
+	switch {
+	case id == "":
+		return nil, errors.New("session id string is empty")
+	case strings.ContainsAny(id, "/\\"):
+		return nil, errors.New("session id contains path separator charcter(s)")
+	}
+
+	session := newSession(id, o, config.IO)
 	o.sessions[id] = session
 
-	return session
+	return session, nil
 }
 
 func (o *App) Project() *project.Project {

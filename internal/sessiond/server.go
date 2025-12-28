@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/app"
-	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/grsh"
 )
 
@@ -82,6 +81,8 @@ func (o *Server) loopWithError() error {
 
 		err = o.acceptClient(conn)
 		if err != nil {
+			_ = conn.Close()
+
 			log.Printf("failed to accept client - %v", err)
 		}
 	}
@@ -95,10 +96,21 @@ func (o *Server) acceptClient(conn net.Conn) error {
 		o.clients = make(map[net.Conn]*app.Session)
 	}
 
-	session := o.app.NewSession(commands.IO{
-		Stdout: conn,
-		Stderr: conn,
+	var optSessionId string
+
+	session, err := o.app.NewSession(app.SessionConfig{
+		IO: app.SessionIO{
+			Stdin:  conn,
+			Stdout: conn,
+			Stderr: conn,
+		},
+		OptID: optSessionId,
 	})
+	if err != nil {
+		err = fmt.Errorf("failed to create new session - %w", err)
+
+		return err
+	}
 
 	// TODO use actual context
 	sh, err := grsh.NewShell(context.Background(), session)
@@ -108,7 +120,8 @@ func (o *Server) acceptClient(conn net.Conn) error {
 
 	go func() {
 		// TODO maybe log when the shell exits
-		sh.Run(conn, conn, conn)
+		sh.Run()
+
 		o.RemoveSession(conn)
 	}()
 

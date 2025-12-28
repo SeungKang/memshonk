@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/app"
-	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/globalconfig"
 	"github.com/SeungKang/memshonk/internal/grsh"
@@ -23,6 +22,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
+
 	"golang.org/x/term"
 )
 
@@ -149,16 +149,23 @@ func doServer(projectFilePath string) error {
 
 	application := app.NewApp(eventGroups, proj, progCtl, optPluginsCtl)
 
+	session, err := application.NewSession(app.SessionConfig{
+		IO: app.SessionIO{
+			Stdin:  os.Stdin,
+			Stdout: os.Stdout,
+			Stderr: os.Stderr,
+		},
+		OptID: "default",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create default app session - %w", err)
+	}
+
 	server, err := sessiond.NewServer(application)
 	if err != nil {
-		return fmt.Errorf("failed to create new server - %w", err)
+		return fmt.Errorf("failed to create new session server - %w", err)
 	}
 	defer server.Close()
-
-	session := application.NewSession(commands.IO{
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	})
 
 	sh, err := grsh.NewShell(ctx, session)
 	if err != nil {
@@ -177,7 +184,7 @@ func doServer(projectFilePath string) error {
 
 	log.SetFlags(log.LstdFlags)
 
-	return sh.Run(os.Stdin, os.Stdout, os.Stderr)
+	return sh.Run()
 }
 
 func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plugins.Ctl, error) {

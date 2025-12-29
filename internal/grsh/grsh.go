@@ -3,6 +3,7 @@ package grsh
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/desertbit/grumble"
+	"github.com/desertbit/readline"
 	"github.com/fatih/color"
 )
 
@@ -28,6 +30,7 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 		return nil, fmt.Errorf("failed to get user home dir - %w", err)
 	}
 
+	// TODO pass memshonk config directory path from main to this function
 	configDir := filepath.Join(homeDir, ".memshonk")
 	err = os.MkdirAll(configDir, 0o700)
 	if err != nil {
@@ -105,8 +108,15 @@ type Shell struct {
 	ctx context.Context
 }
 
-func (o *Shell) Run() error {
-	return o.ga.Run()
+func (o *Shell) Run(stdin io.ReadCloser, stdout io.WriteCloser, stderr io.WriteCloser) error {
+	config := &readline.Config{Stdin: stdin, Stdout: stdout, Stderr: stderr}
+	rl, err := readline.NewEx(config)
+	if err != nil {
+		return err
+	}
+
+	o.ga.SetReadlineDefaults(config)
+	return o.ga.RunWithReadline(rl)
 }
 
 func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {

@@ -298,7 +298,7 @@ func (a *App) RunCommand(args []string) error {
 func (a *App) Run() (err error) {
 	// Create the readline instance.
 	config := &readline.Config{}
-	a.setReadlineDefaults(config)
+	a.SetReadlineDefaults(config)
 	rl, err := readline.NewEx(config)
 	if err != nil {
 		return err
@@ -309,7 +309,7 @@ func (a *App) Run() (err error) {
 func (a *App) RunWithReadline(rl *readline.Instance) (err error) {
 	defer a.Close()
 
-	a.setReadlineDefaults(rl.Config)
+	a.SetReadlineDefaults(rl.Config)
 
 	// Sort all commands by their name.
 	a.commands.SortRecursive()
@@ -422,7 +422,7 @@ func (a *App) RunWithReadline(rl *readline.Instance) (err error) {
 	return a.runShell()
 }
 
-func (a *App) setReadlineDefaults(config *readline.Config) {
+func (a *App) SetReadlineDefaults(config *readline.Config) {
 	config.Prompt = a.currentPrompt
 	config.HistorySearchFold = true
 	config.DisableAutoSaveHistory = true

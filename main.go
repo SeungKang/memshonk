@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,12 +15,15 @@ import (
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/globalconfig"
 	"github.com/SeungKang/memshonk/internal/grsh"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginscompat"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginsctl"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
+	"github.com/SeungKang/memshonk/internal/sessiond"
+	"golang.org/x/term"
 )
 
 const (
@@ -68,12 +73,63 @@ func mainWithError() error {
 		return nil
 	}
 
-	projectFilePath := flag.Arg(0)
-	if projectFilePath == "" {
+	firstArg := flag.Arg(0)
+	switch firstArg {
+	case "client":
+		return doClient()
+	case "":
 		return errors.New("please specify a project file path as the last argument")
+	default:
+		return doServer(firstArg)
 	}
 
-	proj, err := project.FromFilePath(projectFilePath)
+}
+
+func doClient() error {
+	projectName := flag.Arg(1)
+	if projectName == "" {
+		return errors.New("please specify a project name as the last argument")
+	}
+
+	globalConfig, err := globalconfig.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup global config - %w", err)
+	}
+
+	wsConfig, err := globalConfig.SetupWorkspace(&globalConfig, projectName)
+	if err != nil {
+		return fmt.Errorf("failed to setup workspace - %w", err)
+	}
+
+	conn, err := net.Dial("unix", wsConfig.SocketFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to connect to server - %w", err)
+	}
+	defer conn.Close()
+
+	state, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to make raw - %w", err)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), state)
+
+	go io.Copy(conn, os.Stdin)
+
+	_, err = io.Copy(os.Stdout, conn)
+	if err != nil {
+		return fmt.Errorf("failed to copy data from conn to stdout - %w", err)
+	}
+
+	return nil
+}
+
+func doServer(projectFilePath string) error {
+	globalConfig, err := globalconfig.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup global config - %w", err)
+	}
+
+	proj, err := project.FromFilePath(projectFilePath, globalConfig)
 	if err != nil {
 		return fmt.Errorf("failed to setup project - %w", err)
 	}
@@ -92,6 +148,12 @@ func mainWithError() error {
 	}
 
 	application := app.NewApp(eventGroups, proj, progCtl, optPluginsCtl)
+
+	server, err := sessiond.NewServer(application)
+	if err != nil {
+		return fmt.Errorf("failed to create new server - %w", err)
+	}
+	defer server.Close()
 
 	session := application.NewSession(commands.IO{
 		Stdout: os.Stdout,
@@ -115,7 +177,7 @@ func mainWithError() error {
 
 	log.SetFlags(log.LstdFlags)
 
-	return sh.Run()
+	return sh.Run(os.Stdin, os.Stdout, os.Stderr)
 }
 
 func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plugins.Ctl, error) {

@@ -15,6 +15,8 @@
 ## multi session support
 
 - more than one grumble shell interacting with each other
+- grumble exits process before cleanup code can run (example: socket file not being removed)
+- fix history file creation location
 
 ## plugin
 
@@ -82,6 +84,7 @@
 ## events
 
 - move event and grsh into app or session and implement state for those events
+- consider making log messages available to events to logging logic
 
 ## shell
 

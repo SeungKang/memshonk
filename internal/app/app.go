@@ -54,6 +54,10 @@ func (o *App) NewSession(cmdIO commands.IO) *Session {
 	return session
 }
 
+func (o *App) Project() *project.Project {
+	return o.project
+}
+
 type CommandContext struct {
 	seekAddr uint64
 }

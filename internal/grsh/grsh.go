@@ -54,9 +54,9 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 	grumbleApp := grumble.New(grumbleConfig)
 
 	sh := &Shell{
-		ga:  grumbleApp,
-		ctx: ctx,
-		io:  session.IO(),
+		ga:      grumbleApp,
+		ctx:     ctx,
+		session: session,
 	}
 
 	grumbleApp.OnInit(sh.onInit)
@@ -106,17 +106,17 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 }
 
 type Shell struct {
-	ga  *grumble.App
-	fm  grumble.FlagMap
-	ctx context.Context
-	io  app.SessionIO
+	ga      *grumble.App
+	fm      grumble.FlagMap
+	ctx     context.Context
+	session *app.Session
 }
 
 func (o *Shell) Run() error {
 	config := &readline.Config{
-		Stdin:  o.io.Stdin,
-		Stdout: o.io.Stdout,
-		Stderr: o.io.Stderr,
+		Stdin:  o.session.IO().Stdin,
+		Stdout: o.session.IO().Stdout,
+		Stderr: o.session.IO().Stderr,
 	}
 
 	// This must happen before calling readline.NewEx,
@@ -133,7 +133,13 @@ func (o *Shell) Run() error {
 
 func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
 	o.fm = flags
-	o.setPrompt(0)
+
+	info, procIinfoErr := o.session.Process().ProcessInfo(o.ctx)
+	if procIinfoErr == nil {
+		o.setPrompt(info.PID)
+	} else {
+		o.setPrompt(0)
+	}
 
 	return nil
 }

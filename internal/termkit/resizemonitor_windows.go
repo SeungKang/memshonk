@@ -6,10 +6,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/buger/goterm"
+	"golang.org/x/term"
 )
 
-func monitorResizeEvents(ctx context.Context) <-chan ResizeEvent {
+func monitorResizeEvents(ctx context.Context, fd uintptr) <-chan ResizeEvent {
 	events := make(chan ResizeEvent)
 
 	go func() {
@@ -32,8 +32,10 @@ func monitorResizeEvents(ctx context.Context) <-chan ResizeEvent {
 				// Keep going.
 			}
 
-			width := goterm.Width()
-			height := goterm.Height()
+			width, height, err := term.GetSize(int(fd))
+			if err != nil {
+				return
+			}
 
 			if width == lastWidth && height == lastHeight {
 				continue

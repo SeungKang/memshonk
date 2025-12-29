@@ -3,7 +3,6 @@ module github.com/SeungKang/memshonk
 go 1.24.0
 
 require (
-	github.com/buger/goterm v1.0.4
 	github.com/desertbit/grumble v1.2.0
 	github.com/desertbit/readline v1.5.1
 	github.com/ebitengine/purego v0.8.3

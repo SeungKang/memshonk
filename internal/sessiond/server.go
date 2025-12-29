@@ -11,6 +11,7 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/grsh"
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 func NewServer(app *app.App) (*Server, error) {
@@ -103,6 +104,10 @@ func (o *Server) acceptClient(conn net.Conn) error {
 			Stdin:  conn,
 			Stdout: conn,
 			Stderr: conn,
+			OptTerminal: goterm.NewVirtualTerminal(goterm.VirtualTerminalConfig{
+				Input:  conn,
+				Output: conn,
+			}),
 		},
 		OptID: optSessionId,
 	})

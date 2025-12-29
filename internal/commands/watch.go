@@ -10,8 +10,8 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/hexdump"
 	"github.com/SeungKang/memshonk/internal/memory"
-	"github.com/SeungKang/memshonk/internal/termkit"
-	"github.com/buger/goterm"
+
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 const (
@@ -61,6 +61,13 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	if err != nil {
 		return nil, err
 	}
+
+	terminal, hasTerm := s.Terminal()
+	if !hasTerm {
+		return nil, errCommandNeedsTerminal
+	}
+
+	screen := goterm.NewScreen(terminal)
 
 	rows := make([]watchCommandRow, len(o.AddrStrs))
 
@@ -127,29 +134,35 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	// we will add below.
 	numLinesPerHexdump++
 
-	resized := termkit.NewResizedMonitor(ctx)
+	resized, unsubFn := terminal.OnResize()
+	defer unsubFn()
 
-	width := goterm.Width()
-	height := goterm.Height()
+	size, err := terminal.Size()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get terminal size - %w", err)
+	}
 
-	goterm.Clear()
-	goterm.Flush()
+	width := size.Cols
+	height := size.Rows
+
+	screen.Clear()
+	screen.Flush()
 
 loop:
-	goterm.MoveCursor(1, 1)
+	screen.MoveCursor(1, 1)
 
 	select {
 	case <-ctx.Done():
 		return nil, nil
-	case resize := <-resized.Events():
-		width = resize.Width
-		height = resize.Height
+	case resize := <-resized:
+		width = resize.Cols
+		height = resize.Rows
 
-		goterm.Clear()
-		goterm.Flush()
+		screen.Clear()
+		screen.Flush()
 
 		for _, row := range rows {
-			row.write(numLinesPerHexdump, width, height)
+			row.write(numLinesPerHexdump, width, height, screen)
 		}
 	case read := <-reads:
 		hexdumpConfig.OptStartOffset = uint64(read.row.addr)
@@ -185,7 +198,7 @@ loop:
 			dst.Reset()
 		}
 
-		read.row.write(numLinesPerHexdump, width, height)
+		read.row.write(numLinesPerHexdump, width, height, screen)
 	}
 
 	goto loop
@@ -203,14 +216,14 @@ type watchCommandRow struct {
 	output   string
 }
 
-func (o watchCommandRow) write(numLinesPerHexdump int, width int, height int) {
+func (o watchCommandRow) write(numLinesPerHexdump int, width int, height int, screen *goterm.Screen) {
 	y := o.y(numLinesPerHexdump)
 
 	if y > height {
 		return
 	}
 
-	goterm.MoveCursor(1, y)
+	screen.MoveCursor(1, y)
 
 	// y = 10: 10+3 > 12
 	if y+numLinesPerHexdump > height {
@@ -226,15 +239,16 @@ func (o watchCommandRow) write(numLinesPerHexdump int, width int, height int) {
 			numLines--
 
 			if y+numLines < height {
-				goterm.Print(o.output[0 : i+1])
+				screen.Print(o.output[0 : i+1])
+
 				break
 			}
 		}
 	} else {
-		goterm.Print(o.output)
+		screen.Print(o.output)
 	}
 
-	goterm.Flush()
+	screen.Flush()
 }
 
 func (o watchCommandRow) y(numLinesPerHexdump int) int {

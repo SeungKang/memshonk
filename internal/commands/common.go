@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,6 +11,12 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
+
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
+)
+
+var (
+	errCommandNeedsTerminal = errors.New("this command requires a terminal, but the session does not provide a terminal")
 )
 
 func BuiltinCommands() []CommandSchema {
@@ -82,6 +89,7 @@ type Session interface {
 	Process() progctl.Process
 	Plugins() (plugins.Ctl, bool)
 	Events() *events.Groups
+	Terminal() (goterm.TerminalWithNotifications, bool)
 }
 
 type IO struct {

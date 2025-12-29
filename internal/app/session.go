@@ -13,6 +13,8 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/shvars"
+
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 func newSession(id string, app *App, sessionIO SessionIO) *Session {
@@ -43,6 +45,8 @@ type SessionIO struct {
 	Stdin  io.ReadCloser
 	Stdout io.WriteCloser
 	Stderr io.WriteCloser
+
+	OptTerminal goterm.TerminalWithNotifications
 }
 
 func (o *Session) IO() SessionIO {
@@ -67,6 +71,14 @@ func (o *Session) Plugins() (plugins.Ctl, bool) {
 	}
 
 	return o.app.pluginCtl, true
+}
+
+func (o *Session) Terminal() (goterm.TerminalWithNotifications, bool) {
+	if o.io.OptTerminal != nil {
+		return o.io.OptTerminal, true
+	}
+
+	return nil, false
 }
 
 func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {

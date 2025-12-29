@@ -22,6 +22,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
 	"golang.org/x/term"
 )
@@ -159,11 +160,14 @@ func doServer(projectFilePath string) error {
 
 	application := app.NewApp(eventGroups, proj, progCtl, optPluginsCtl)
 
+	terminal, _ := goterm.NewStdioTerminal()
+
 	session, err := application.NewSession(app.SessionConfig{
 		IO: app.SessionIO{
-			Stdin:  os.Stdin,
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
+			Stdin:       os.Stdin,
+			Stdout:      os.Stdout,
+			Stderr:      os.Stderr,
+			OptTerminal: terminal,
 		},
 		OptID: "default",
 	})

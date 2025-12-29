@@ -5,12 +5,12 @@ import (
 	"sync"
 )
 
-func NewResizedMonitor(ctx context.Context) *Resized {
+func NewResizedMonitor(ctx context.Context, fd uintptr) *Resized {
 	var cancelFn func()
 	ctx, cancelFn = context.WithCancel(ctx)
 
 	return &Resized{
-		events:   monitorResizeEvents(ctx),
+		events:   monitorResizeEvents(ctx, fd),
 		cancelFn: cancelFn,
 		done:     ctx.Done(),
 	}

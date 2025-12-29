@@ -91,7 +91,9 @@ func (o *eventGroup[C]) SendAndWait(ctx context.Context, event C) error {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	ackable, isAckable := any(event).(Ackable)
+	// Note: The "&" is required when type converting
+	// a generic type to an interface.
+	ackable, isAckable := any(&event).(Ackable)
 	if isAckable {
 		ackable.Acker().init(uint64(len(o.subs)))
 	}

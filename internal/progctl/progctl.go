@@ -23,6 +23,8 @@ var (
 type Process interface {
 	Attach(ctx context.Context) (int, error)
 
+	ProcessInfo(ctx context.Context) (ProcessInfo, error)
+
 	ExeInfo(ctx context.Context) (ExeInfo, error)
 
 	Regions(ctx context.Context) (memory.Regions, error)
@@ -131,6 +133,23 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 	})
 
 	return possiblePID, nil
+}
+
+func (o *Ctl) ProcessInfo(context.Context) (ProcessInfo, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if o.current == nil {
+		return ProcessInfo{}, ErrNotAttached
+	}
+
+	return ProcessInfo{
+		PID: o.current.PID(),
+	}, nil
+}
+
+type ProcessInfo struct {
+	PID int
 }
 
 func (o *Ctl) ExeInfo(context.Context) (ExeInfo, error) {

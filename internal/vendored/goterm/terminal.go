@@ -16,11 +16,14 @@ package goterm
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/SeungKang/memshonk/internal/termkit"
 
 	"golang.org/x/term"
 )
@@ -51,26 +54,42 @@ const (
 // Check percent flag: num & PCT
 //
 // Reset percent flag: num & 0xFF
-const shift = uint(^uint(0)>>63) << 4
-const PCT = 0x8000 << shift
+const (
+	shift = uint(^uint(0)>>63) << 4
+	PCT   = 0x8000 << shift
+)
 
-func NewStdioTerminal() (*StdioTerminal, error) {
-	return &StdioTerminal{}, nil
+func NewStdioTerminal() (*FdTerminal, error) {
+	return NewFdTerminal(os.Stdin, os.Stdout)
 }
 
-type StdioTerminal struct {
+func NewFdTerminal(input *os.File, output *os.File) (*FdTerminal, error) {
+	return &FdTerminal{
+		input:          input,
+		output:         output,
+		resizeNotifier: &resizedPubSub{},
+	}, nil
 }
 
-func (o StdioTerminal) Input() io.Reader {
-	return os.Stdin
+type FdTerminal struct {
+	input          *os.File
+	output         *os.File
+	resizeNotifier *resizedPubSub
+	resizerMu      sync.Mutex
+	onResized      *termkit.Resized
+	numSubs        uint64
 }
 
-func (o StdioTerminal) Output() io.Writer {
-	return os.Stdout
+func (o *FdTerminal) Input() io.Reader {
+	return o.input
 }
 
-func (o StdioTerminal) Size() (Size, error) {
-	width, height, err := term.GetSize(int(os.Stdin.Fd()))
+func (o *FdTerminal) Output() io.Writer {
+	return o.output
+}
+
+func (o *FdTerminal) Size() (Size, error) {
+	width, height, err := term.GetSize(int(o.input.Fd()))
 	if err != nil {
 		return Size{}, err
 	}
@@ -79,6 +98,53 @@ func (o StdioTerminal) Size() (Size, error) {
 		Cols: width,
 		Rows: height,
 	}, nil
+}
+
+func (o *FdTerminal) OnResize() (<-chan Size, func()) {
+	o.resizerMu.Lock()
+	defer o.resizerMu.Unlock()
+
+	if o.onResized == nil {
+		onResized := termkit.NewResizedMonitor(context.Background(), o.input.Fd())
+
+		o.onResized = onResized
+
+		go func() {
+			for {
+				select {
+				case <-onResized.Done():
+					return
+				case resizeEvent := <-onResized.Events():
+					o.resizeNotifier.notify(Size{
+						Cols: resizeEvent.Width,
+						Rows: resizeEvent.Height,
+					})
+
+				}
+			}
+		}()
+	}
+
+	o.numSubs++
+
+	c, cancelFn := o.resizeNotifier.Sub()
+
+	wrappedCancelFn := func() {
+		o.resizerMu.Lock()
+		defer o.resizerMu.Unlock()
+
+		o.numSubs--
+
+		cancelFn()
+
+		if o.numSubs == 0 {
+			_ = o.onResized.Close()
+
+			o.onResized = nil
+		}
+	}
+
+	return c, wrappedCancelFn
 }
 
 type VirtualTerminalConfig struct {
@@ -92,12 +158,16 @@ func NewVirtualTerminal(config VirtualTerminalConfig) *VirtualTerminal {
 		config.OptSize = DefaultVirtualTerminalSize()
 	}
 
-	return &VirtualTerminal{config: config}
+	return &VirtualTerminal{
+		config: config,
+		resize: &resizedPubSub{},
+	}
 }
 
 type VirtualTerminal struct {
 	rwMu   sync.RWMutex
 	config VirtualTerminalConfig
+	resize *resizedPubSub
 }
 
 func (o *VirtualTerminal) Input() io.Reader {
@@ -120,6 +190,58 @@ func (o *VirtualTerminal) SetSize(size Size) {
 	defer o.rwMu.Unlock()
 
 	o.config.OptSize = size
+
+	o.resize.notify(size)
+}
+
+func (o *VirtualTerminal) OnResize() (<-chan Size, func()) {
+	return o.resize.Sub()
+}
+
+type resizedPubSub struct {
+	rwMu  sync.RWMutex
+	chans map[chan Size]chan struct{}
+}
+
+func (o *resizedPubSub) notify(size Size) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	for c, done := range o.chans {
+		select {
+		case <-done:
+			o.removeAsync(c)
+		case c <- size:
+			// Keep going.
+		}
+	}
+}
+
+func (o *resizedPubSub) removeAsync(c chan Size) {
+	go func() {
+		o.rwMu.Lock()
+		defer o.rwMu.Unlock()
+
+		delete(o.chans, c)
+	}()
+}
+
+func (o *resizedPubSub) Sub() (<-chan Size, func()) {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	if o.chans == nil {
+		o.chans = make(map[chan Size]chan struct{})
+	}
+
+	c := make(chan Size)
+	done := make(chan struct{})
+
+	o.chans[c] = done
+
+	return c, func() {
+		close(done)
+	}
 }
 
 type Terminal interface {
@@ -128,6 +250,12 @@ type Terminal interface {
 	Output() io.Writer
 
 	Size() (Size, error)
+}
+
+type TerminalWithNotifications interface {
+	Terminal
+
+	OnResize() (<-chan Size, func())
 }
 
 func DefaultVirtualTerminalSize() Size {

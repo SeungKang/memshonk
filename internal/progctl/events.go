@@ -3,8 +3,8 @@ package progctl
 import "github.com/SeungKang/memshonk/internal/events"
 
 type AttachedEvent struct {
-	Pid   int
-	acker *events.EventAcker
+	ProcessInfo ProcessInfo
+	acker       *events.EventAcker
 }
 
 func (o *AttachedEvent) Acker() *events.EventAcker {

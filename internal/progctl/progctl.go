@@ -127,18 +127,24 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 	o.current = proc
 
+	info, _ := o.processInfo(ctx)
+
 	_ = o.attachEvents.SendAndWait(ctx, AttachedEvent{
-		Pid:   possiblePID,
-		acker: events.NewAcker(),
+		ProcessInfo: info,
+		acker:       events.NewAcker(),
 	})
 
 	return possiblePID, nil
 }
 
-func (o *Ctl) ProcessInfo(context.Context) (ProcessInfo, error) {
+func (o *Ctl) ProcessInfo(ctx context.Context) (ProcessInfo, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
+	return o.processInfo(ctx)
+}
+
+func (o *Ctl) processInfo(context.Context) (ProcessInfo, error) {
 	if o.current == nil {
 		return ProcessInfo{}, ErrNotAttached
 	}

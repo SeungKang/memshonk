@@ -84,7 +84,7 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			case <-ctx.Done():
 				return
 			case e := <-attachEvents.RecvCh():
-				sh.setPrompt(e.Pid)
+				sh.setPrompt(e.ProcessInfo.PID)
 
 				e.Acker().Ack()
 			case e := <-detachEvents.RecvCh():

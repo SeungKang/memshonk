@@ -10,9 +10,69 @@ import (
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/connmux"
+	"github.com/SeungKang/memshonk/internal/cstlv"
 	"github.com/SeungKang/memshonk/internal/grsh"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
+
+const (
+	unknowMessageType uint16 = iota
+	signalMessageType
+	terminalResizeMessageType
+)
+
+func NewFromClient(ctx context.Context, conn net.Conn, session *app.Session) *FromClient {
+	var cancelFn func()
+	ctx, cancelFn = context.WithCancel(ctx)
+
+	fromClient := &FromClient{
+		conn:     conn,
+		session:  session,
+		cancelFn: cancelFn,
+	}
+
+	go fromClient.loopWithError(ctx)
+
+	return fromClient
+}
+
+type FromClient struct {
+	conn     net.Conn
+	session  *app.Session
+	cancelFn func()
+}
+
+func (o *FromClient) Close() error {
+	o.cancelFn()
+
+	return o.conn.Close()
+}
+
+func (o *FromClient) loopWithError(ctx context.Context) error {
+	incomingMessages := make(chan cstlv.ReadResult)
+	go cstlv.ReadFromConn(ctx, o.conn, incomingMessages, 0)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case result := <-incomingMessages:
+			if result.Err != nil {
+				return result.Err
+			}
+
+			switch result.Msg.Type {
+			case signalMessageType:
+				// TODO
+			case terminalResizeMessageType:
+				// TODO
+			default:
+				// ignore
+			}
+		}
+	}
+}
 
 func NewServer(app *app.App) (*Server, error) {
 	socketPath := app.Project().WorkspaceConfig().SocketFilePath
@@ -56,7 +116,7 @@ type Server struct {
 	listener   net.Listener
 	socketPath string
 	rwMu       sync.RWMutex
-	clients    map[net.Conn]*app.Session
+	clients    map[net.Conn]*FromClient
 }
 
 func (o *Server) Close() error {
@@ -93,23 +153,53 @@ func (o *Server) acceptClient(conn net.Conn) error {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
-	if o.clients == nil {
-		o.clients = make(map[net.Conn]*app.Session)
+	setupCtx, cancelFn := context.WithTimeout(context.Background(), time.Second)
+	defer cancelFn()
+
+	cm, err := connmux.New(setupCtx, conn)
+	if err != nil {
+		return err
 	}
 
-	var optSessionId string
+	apiConn, err := cm.AcceptContext(setupCtx)
+	if err != nil {
+		_ = cm.Close()
+		return err
+	}
+
+	stdinConn, err := cm.AcceptContext(setupCtx)
+	if err != nil {
+		_ = cm.Close()
+		return err
+	}
+
+	stdoutConn, err := cm.AcceptContext(setupCtx)
+	if err != nil {
+		_ = cm.Close()
+		return err
+	}
+
+	stderrConn, err := cm.AcceptContext(setupCtx)
+	if err != nil {
+		_ = cm.Close()
+		return err
+	}
+
+	if o.clients == nil {
+		o.clients = make(map[net.Conn]*FromClient)
+	}
 
 	session, err := o.app.NewSession(app.SessionConfig{
 		IO: app.SessionIO{
-			Stdin:  conn,
-			Stdout: conn,
-			Stderr: conn,
+			Stdin:  stdinConn,
+			Stdout: stdoutConn,
+			Stderr: stderrConn,
 			OptTerminal: goterm.NewVirtualTerminal(goterm.VirtualTerminalConfig{
-				Input:  conn,
-				Output: conn,
+				Input:  stdinConn,
+				Output: stdoutConn,
 			}),
 		},
-		OptID: optSessionId,
+		OptID: apiConn.RemoteAddr().String(),
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to create new session - %w", err)
@@ -117,8 +207,10 @@ func (o *Server) acceptClient(conn net.Conn) error {
 		return err
 	}
 
-	// TODO use actual context
-	sh, err := grsh.NewShell(context.Background(), session)
+	// TODO create session context
+	ctx := context.Background()
+
+	sh, err := grsh.NewShell(ctx, session)
 	if err != nil {
 		return err
 	}
@@ -130,7 +222,7 @@ func (o *Server) acceptClient(conn net.Conn) error {
 		o.RemoveSession(conn)
 	}()
 
-	o.clients[conn] = session
+	o.clients[conn] = NewFromClient(ctx, apiConn, session)
 
 	return nil
 }
@@ -143,8 +235,9 @@ func (o *Server) RemoveSession(conn net.Conn) {
 		go conn.Close()
 	}()
 
-	_, hasIt := o.clients[conn]
+	fromClient, hasIt := o.clients[conn]
 	if hasIt {
+		_ = fromClient.Close()
 		delete(o.clients, conn)
 	}
 }

@@ -107,6 +107,11 @@ func doClient() error {
 	}
 	defer conn.Close()
 
+	client, err := sessiond.NewClient(context.Background(), conn)
+	if err != nil {
+		return fmt.Errorf("failed to create client - %w", err)
+	}
+
 	state, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return fmt.Errorf("failed to make raw - %w", err)

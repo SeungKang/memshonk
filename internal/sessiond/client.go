@@ -2,9 +2,9 @@ package sessiond
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -12,11 +12,11 @@ import (
 	"github.com/SeungKang/memshonk/internal/cstlv"
 )
 
-func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
+func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
 	setupCtx, cancelFn := context.WithTimeout(ctx, time.Second)
 	defer cancelFn()
 
-	cm, err := connmux.New(setupCtx, conn)
+	cm, err := connmux.New(setupCtx, config.ServerConn)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 	ctx, stopFn = context.WithCancel(ctx)
 
 	client := &Client{
-		conn:     apiConn,
+		apiConn:  apiConn,
 		cancelFn: stopFn,
 		done:     make(chan struct{}),
 	}
@@ -57,7 +57,7 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 	go client.loopWithError(ctx)
 
 	go func() {
-		_, err := io.Copy(os.Stdout, stdoutConn)
+		err := copyAndAddBackslashRLoop(stdoutConn, config.Stdout)
 		client.once.Do(func() {
 			client.err = err
 			close(client.done)
@@ -65,7 +65,7 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 	}()
 
 	go func() {
-		_, err := io.Copy(os.Stderr, stderrConn)
+		err := copyAndAddBackslashRLoop(stderrConn, config.Stderr)
 		client.once.Do(func() {
 			client.err = err
 			close(client.done)
@@ -74,7 +74,7 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 
 	go func() {
 		// TODO should we just ignore the error if stdin is closed
-		_, err := io.Copy(stdinConn, os.Stdin)
+		_, err := io.Copy(stdinConn, config.Stdin)
 		client.once.Do(func() {
 			client.err = err
 			close(client.done)
@@ -84,23 +84,58 @@ func NewClient(ctx context.Context, conn net.Conn) (*Client, error) {
 	return client, nil
 }
 
+func copyAndAddBackslashRLoop(conn net.Conn, out io.Writer) error {
+	b := make([]byte, 1)
+
+	for {
+		_, err := conn.Read(b)
+		if err != nil {
+			return fmt.Errorf("failed to read from server - %w", err)
+		}
+
+		if b[0] == '\n' {
+			out.Write([]byte{'\r'})
+		}
+
+		_, err = out.Write(b)
+		if err != nil {
+			return err
+		}
+	}
+}
+
 type Client struct {
-	conn     net.Conn
+	apiConn  net.Conn
 	cancelFn func()
 	once     sync.Once
 	done     chan struct{}
 	err      error
 }
 
+type ClientConfig struct {
+	ServerConn net.Conn
+	Stdin      io.Reader
+	Stdout     io.Writer
+	Stderr     io.Writer
+}
+
+func (o *Client) Err() error {
+	return o.err
+}
+
+func (o *Client) Done() <-chan struct{} {
+	return o.done
+}
+
 func (o *Client) Close() error {
 	o.cancelFn()
 
-	return o.conn.Close()
+	return o.apiConn.Close()
 }
 
 func (o *Client) loopWithError(ctx context.Context) error {
 	incomingMessages := make(chan cstlv.ReadResult)
-	go cstlv.ReadFromConn(ctx, o.conn, incomingMessages, 0)
+	go cstlv.ReadFromConn(ctx, o.apiConn, incomingMessages, 0)
 
 	for {
 		select {

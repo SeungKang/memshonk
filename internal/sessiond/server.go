@@ -22,58 +22,6 @@ const (
 	terminalResizeMessageType
 )
 
-func NewFromClient(ctx context.Context, conn net.Conn, session *app.Session) *FromClient {
-	var cancelFn func()
-	ctx, cancelFn = context.WithCancel(ctx)
-
-	fromClient := &FromClient{
-		conn:     conn,
-		session:  session,
-		cancelFn: cancelFn,
-	}
-
-	go fromClient.loopWithError(ctx)
-
-	return fromClient
-}
-
-type FromClient struct {
-	conn     net.Conn
-	session  *app.Session
-	cancelFn func()
-}
-
-func (o *FromClient) Close() error {
-	o.cancelFn()
-
-	return o.conn.Close()
-}
-
-func (o *FromClient) loopWithError(ctx context.Context) error {
-	incomingMessages := make(chan cstlv.ReadResult)
-	go cstlv.ReadFromConn(ctx, o.conn, incomingMessages, 0)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case result := <-incomingMessages:
-			if result.Err != nil {
-				return result.Err
-			}
-
-			switch result.Msg.Type {
-			case signalMessageType:
-				// TODO
-			case terminalResizeMessageType:
-				// TODO
-			default:
-				// ignore
-			}
-		}
-	}
-}
-
 func NewServer(app *app.App) (*Server, error) {
 	socketPath := app.Project().WorkspaceConfig().SocketFilePath
 
@@ -239,5 +187,57 @@ func (o *Server) RemoveSession(conn net.Conn) {
 	if hasIt {
 		_ = fromClient.Close()
 		delete(o.clients, conn)
+	}
+}
+
+func NewFromClient(ctx context.Context, conn net.Conn, session *app.Session) *FromClient {
+	var cancelFn func()
+	ctx, cancelFn = context.WithCancel(ctx)
+
+	fromClient := &FromClient{
+		conn:     conn,
+		session:  session,
+		cancelFn: cancelFn,
+	}
+
+	go fromClient.loopWithError(ctx)
+
+	return fromClient
+}
+
+type FromClient struct {
+	conn     net.Conn
+	session  *app.Session
+	cancelFn func()
+}
+
+func (o *FromClient) Close() error {
+	o.cancelFn()
+
+	return o.conn.Close()
+}
+
+func (o *FromClient) loopWithError(ctx context.Context) error {
+	incomingMessages := make(chan cstlv.ReadResult)
+	go cstlv.ReadFromConn(ctx, o.conn, incomingMessages, 0)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case result := <-incomingMessages:
+			if result.Err != nil {
+				return result.Err
+			}
+
+			switch result.Msg.Type {
+			case signalMessageType:
+				// TODO
+			case terminalResizeMessageType:
+				// TODO
+			default:
+				// ignore
+			}
+		}
 	}
 }

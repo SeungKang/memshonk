@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -107,10 +106,16 @@ func doClient() error {
 	}
 	defer conn.Close()
 
-	client, err := sessiond.NewClient(context.Background(), conn)
+	client, err := sessiond.NewClient(context.Background(), sessiond.ClientConfig{
+		ServerConn: conn,
+		Stdin:      os.Stdin,
+		Stdout:     os.Stdout,
+		Stderr:     os.Stderr,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create client - %w", err)
 	}
+	defer client.Close()
 
 	state, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
@@ -118,25 +123,9 @@ func doClient() error {
 	}
 	defer term.Restore(int(os.Stdin.Fd()), state)
 
-	go io.Copy(conn, os.Stdin)
+	<-client.Done()
 
-	b := make([]byte, 1)
-
-	for {
-		_, err := conn.Read(b)
-		if err != nil {
-			return fmt.Errorf("failed to read from server - %w", err)
-		}
-
-		if b[0] == '\n' {
-			os.Stdout.Write([]byte{'\r'})
-		}
-
-		_, err = os.Stdout.Write(b)
-		if err != nil {
-			return err
-		}
-	}
+	return client.Err()
 }
 
 func doServer(projectFilePath string) error {

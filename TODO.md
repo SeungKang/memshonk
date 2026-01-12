@@ -17,6 +17,7 @@
 - more than one grumble shell interacting with each other
 - grumble exits process before cleanup code can run (example: socket file not being removed)
 - fix history file creation location
+- figure out better way of doing copyAndAddBackslashRLoop()
 
 ## plugin
 

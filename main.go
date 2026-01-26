@@ -157,6 +157,7 @@ func doServer(projectFilePath string) error {
 	terminal, _ := goterm.NewStdioTerminal()
 
 	session, err := application.NewSession(app.SessionConfig{
+		IsDefault: true,
 		IO: app.SessionIO{
 			Stdin:       os.Stdin,
 			Stdout:      os.Stdout,
@@ -189,6 +190,15 @@ func doServer(projectFilePath string) error {
 			}
 		}
 	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT)
+	defer signal.Stop(sig)
+	go func() {
+		for range sig {
+			session.OnSignal(app.IntSignalType)
+		}
+	}()
 
 	log.SetFlags(log.LstdFlags)
 

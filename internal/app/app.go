@@ -43,8 +43,9 @@ func (o *App) ProcCtl() progctl.Process {
 }
 
 type SessionConfig struct {
-	IO    SessionIO
-	OptID string
+	IO        SessionIO
+	IsDefault bool
+	OptID     string
 }
 
 func (o *App) NewSession(config SessionConfig) (*Session, error) {
@@ -104,10 +105,10 @@ func (o *App) NewSession(config SessionConfig) (*Session, error) {
 	case id == "":
 		return nil, errors.New("session id string is empty")
 	case strings.ContainsAny(id, "/\\"):
-		return nil, errors.New("session id contains path separator charcter(s)")
+		return nil, errors.New("session id contains path separator character(s)")
 	}
 
-	session := newSession(id, o, config.IO)
+	session := newSession(id, o, config.IO, config.IsDefault)
 	o.sessions[id] = session
 
 	return session, nil

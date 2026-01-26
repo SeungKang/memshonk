@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/signal"
-	"syscall"
+	"sync"
 
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
@@ -17,10 +16,17 @@ import (
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
-func newSession(id string, app *App, sessionIO SessionIO) *Session {
+// various signal message types
+const (
+	unknownSignalType uint8 = iota
+	IntSignalType
+)
+
+func newSession(id string, app *App, sessionIO SessionIO, isDefault bool) *Session {
 	return &Session{
-		id:  id,
-		app: app,
+		id:        id,
+		isDefault: isDefault,
+		app:       app,
 		vars: &SessionVariables{
 			proj: app.project,
 			vars: &shvars.Variables{},
@@ -30,11 +36,15 @@ func newSession(id string, app *App, sessionIO SessionIO) *Session {
 }
 
 type Session struct {
-	id     string
-	app    *App
-	vars   *SessionVariables
-	cmdCtx *CommandContext
-	io     SessionIO
+	id        string
+	isDefault bool
+	app       *App
+	vars      *SessionVariables
+	cmdCtx    *CommandContext
+	io        SessionIO
+
+	cancelCmdMu  sync.Mutex
+	cancelCmdCtx context.CancelFunc
 }
 
 func (o *Session) ID() string {
@@ -51,6 +61,15 @@ type SessionIO struct {
 
 func (o *Session) IO() SessionIO {
 	return o.io
+}
+
+func (o *Session) OnSignal(signalType uint8) {
+	switch signalType {
+	case IntSignalType:
+		o.cancelCurrentCommand()
+	default:
+		// ignore or log unknown signals
+	}
 }
 
 func (o *Session) Events() *events.Groups {
@@ -81,10 +100,17 @@ func (o *Session) Terminal() (goterm.TerminalWithNotifications, bool) {
 	return nil, false
 }
 
-func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
-	var cancelFn func()
-	ctx, cancelFn = signal.NotifyContext(ctx, syscall.SIGINT)
-	defer cancelFn()
+func (o *Session) RunCommand(parent context.Context, cmd commands.Command) error {
+	ctx, cancelFn := context.WithCancel(parent)
+	defer func() {
+		o.clearCancel()
+		cancelFn()
+	}()
+
+	// install the cancel lever for OnSignal
+	o.setCancel(func() {
+		cancelFn()
+	})
 
 	result, err := cmd.Run(ctx, commands.IO{
 		Stdout: o.io.Stdout,
@@ -100,6 +126,28 @@ func (o *Session) RunCommand(ctx context.Context, cmd commands.Command) error {
 	}
 
 	return nil
+}
+
+func (o *Session) setCancel(fn context.CancelFunc) {
+	o.cancelCmdMu.Lock()
+	defer o.cancelCmdMu.Unlock()
+	o.cancelCmdCtx = fn
+}
+
+func (o *Session) clearCancel() {
+	o.cancelCmdMu.Lock()
+	defer o.cancelCmdMu.Unlock()
+	o.cancelCmdCtx = nil
+}
+
+func (o *Session) cancelCurrentCommand() {
+	o.cancelCmdMu.Lock()
+	fn := o.cancelCmdCtx
+	o.cancelCmdMu.Unlock()
+
+	if fn != nil {
+		fn()
+	}
 }
 
 func (o *Session) Process() progctl.Process {

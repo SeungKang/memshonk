@@ -119,6 +119,12 @@ func (o *Shell) Run() error {
 		Stderr: o.session.IO().Stderr,
 	}
 
+	if o.session.IO().Stdin != os.Stdin {
+		// For non-default sessions, don't manipulate os.Stdin's raw mode
+		config.FuncMakeRaw = func() error { return nil }
+		config.FuncExitRaw = func() error { return nil }
+	}
+
 	// This must happen before calling readline.NewEx,
 	// because of course it matters :/
 	o.ga.SetReadlineDefaults(config)

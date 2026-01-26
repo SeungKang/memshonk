@@ -436,7 +436,7 @@ func (o *Mux) acceptDial(message *connMuxMessage) error {
 		return o.writeMessage(&connMuxMessage{
 			Type:    errChildConnMuxMessage,
 			SAddr:   message.SAddr,
-			Payload: []byte(fmt.Sprintf("peer does not permit incomming connections")),
+			Payload: []byte(fmt.Sprintf("peer does not permit incoming connections")),
 		})
 	}
 

@@ -190,12 +190,12 @@ func (o *Server) RemoveSession(conn net.Conn) {
 	}
 }
 
-func NewFromClient(ctx context.Context, conn net.Conn, session *app.Session) *FromClient {
+func NewFromClient(ctx context.Context, apiConn net.Conn, session *app.Session) *FromClient {
 	var cancelFn func()
 	ctx, cancelFn = context.WithCancel(ctx)
 
 	fromClient := &FromClient{
-		conn:     conn,
+		apiConn:  apiConn,
 		session:  session,
 		cancelFn: cancelFn,
 	}
@@ -206,7 +206,7 @@ func NewFromClient(ctx context.Context, conn net.Conn, session *app.Session) *Fr
 }
 
 type FromClient struct {
-	conn     net.Conn
+	apiConn  net.Conn
 	session  *app.Session
 	cancelFn func()
 }
@@ -214,12 +214,12 @@ type FromClient struct {
 func (o *FromClient) Close() error {
 	o.cancelFn()
 
-	return o.conn.Close()
+	return o.apiConn.Close()
 }
 
 func (o *FromClient) loopWithError(ctx context.Context) error {
 	incomingMessages := make(chan cstlv.ReadResult)
-	go cstlv.ReadFromConn(ctx, o.conn, incomingMessages, 0)
+	go cstlv.ReadFromConn(ctx, o.apiConn, incomingMessages, 0)
 
 	for {
 		select {
@@ -232,7 +232,7 @@ func (o *FromClient) loopWithError(ctx context.Context) error {
 
 			switch result.Msg.Type {
 			case signalMessageType:
-				// TODO
+				o.handleSignalMessage(result.Msg)
 			case terminalResizeMessageType:
 				// TODO
 			default:
@@ -240,4 +240,12 @@ func (o *FromClient) loopWithError(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (o *FromClient) handleSignalMessage(msg *cstlv.CSTLV) {
+	if len(msg.Val) == 0 {
+		return
+	}
+
+	o.session.OnSignal(msg.Val[0])
 }

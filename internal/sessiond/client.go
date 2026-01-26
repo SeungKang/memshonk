@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
 )
@@ -73,8 +74,32 @@ func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
 	}()
 
 	go func() {
-		// TODO should we just ignore the error if stdin is closed
-		_, err := io.Copy(stdinConn, config.Stdin)
+		b := make([]byte, 1)
+		var err error
+
+		for {
+			_, err = config.Stdin.Read(b)
+			if err != nil {
+				err = fmt.Errorf("failed to read from stdin - %w", err)
+				break
+			}
+
+			// 0x03 == control + c
+			if b[0] == 0x03 {
+				err = client.sendSignal(app.IntSignalType)
+				if err != nil {
+					err = fmt.Errorf("failed to send signal - %w", err)
+					break
+				}
+			}
+
+			_, err = stdinConn.Write(b)
+			if err != nil {
+				err = fmt.Errorf("failed to write to stdin - %w", err)
+				break
+			}
+		}
+
 		client.once.Do(func() {
 			client.err = err
 			close(client.done)
@@ -146,14 +171,24 @@ func (o *Client) loopWithError(ctx context.Context) error {
 				return result.Err
 			}
 
-			switch result.Msg.Type {
-			case signalMessageType:
-				// TODO
-			case terminalResizeMessageType:
-				// TODO
-			default:
-				// ignore
-			}
+			//switch result.Msg.Type {
+			//case signalMessageType:
+			//	// TODO
+			//case terminalResizeMessageType:
+			//	// TODO
+			//default:
+			//	// ignore
+			//}
 		}
 	}
+}
+
+func (o *Client) sendSignal(signalType uint8) error {
+	msg := cstlv.CSTLV{
+		Type: signalMessageType,
+		Val:  []byte{signalType},
+	}
+
+	_, err := o.apiConn.Write(msg.AutoBytes())
+	return err
 }

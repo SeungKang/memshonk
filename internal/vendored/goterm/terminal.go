@@ -89,7 +89,7 @@ func (o *FdTerminal) Output() io.Writer {
 }
 
 func (o *FdTerminal) Size() (Size, error) {
-	width, height, err := term.GetSize(int(o.input.Fd()))
+	width, height, err := term.GetSize(int(o.output.Fd()))
 	if err != nil {
 		return Size{}, err
 	}

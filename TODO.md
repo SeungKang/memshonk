@@ -2,11 +2,7 @@
 
 ## next stopping point
 
-~~- unix support~~
 - command output support (access the result of previous commands)
-- plugin command for me3
-~~- don't make ctrl + c exit~~
-~~- retain shell command history~~
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
 - instant messaging :)
@@ -18,16 +14,16 @@
 
 ## multi session support
 
-- more than one grumble shell interacting with each other
 - grumble exits process before cleanup code can run (example: socket file not being removed)
-- fix history file creation location
+- fix client shell history
+- fix history for server on windows
 - figure out better way of doing copyAndAddBackslashRLoop()
+- make decision about command line arguments to start client memshonk
+- commands to manage sessions
+- add ability to name a session
 
 ## plugin
 
-- support for custom plugin commands
-  - ex. lineup - makes all enemies lineup in front of player
-  - ex. coords - prints x,y,z coords of all enemies
 - add context as arguments to plugin.load and plugin.unload
 - investigate order of unload and load events being out of order
 - improve plugin user experience when unloading / reloading
@@ -40,27 +36,19 @@
 - helper function for reading a pointer from process
 - helper function for reading data from process using a pointer to a Vec<u8>
 - investigate rust macro to generate ffi functions
-
-## parser
-
-~~- check if we are attached to a process before running a parser~~
-~~- fix assumption of user supplying absolute address in parser~~
+- move mskit directory out of examples directory
 
 ## vmmap
 
-~~- `vmmap object_Name` shows object with that name and regions under it~~
-~~- code needs to be cleaned up~~
-- fix the permissions are not showing up correctly
+- fix the permissions are not showing up correctly on windows
 
 ## progctl
 
-~~- when MappedObjects is called go and actually ask windows~~
 - Support for exitMonitor on Unix-like systems
 - Need to implement Suspend and Resume methods for WindowsProcess
 
 ## memory
 
-~~- fix the MappedObjects to be a slice instead of map, handle duplicate dlls~~
 - Implement a Reader object for a process that knows its bounds based on
   mapped objects
 - BufferedReader: Implement constructor-like functions that either constrain
@@ -73,8 +61,6 @@
   this addr
 - outputs command
 - command performance measuring
-- detach command
-- pid in prompt when attached
 
 ## find
 
@@ -88,7 +74,6 @@
 
 ## events
 
-- move event and grsh into app or session and implement state for those events
 - consider making log messages available to events to logging logic
 
 ## shell

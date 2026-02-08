@@ -20,7 +20,6 @@ const (
 func WriteCommandSchema() CommandSchema {
 	return CommandSchema{
 		Name:      writeCommandName,
-		Aliases:   []string{"w"},
 		ShortHelp: "write value to addr",
 		Flags: []FlagSchema{
 			{

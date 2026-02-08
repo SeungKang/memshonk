@@ -210,7 +210,7 @@ func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plu
 		Events:  eventGroups,
 		Process: pluginscompat.WrapProcess(progCtl),
 	})
-	if err != nil && !errors.Is(err, plugins.ErrPluginsDisabled) {
+	if err != nil {
 		if errors.Is(err, plugins.ErrPluginsDisabled) {
 			return nil, nil
 		}

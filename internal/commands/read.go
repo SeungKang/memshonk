@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/hexdump"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
@@ -41,7 +42,7 @@ func ReadCommandSchema() CommandSchema {
 				DataType: "",
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return NewReadCommand(ReadCommandArgs{
 				EncodingFormat: c.Flags.String("encoding"),
 				SizeBytes:      c.NonFlags.Uint64("size"),
@@ -71,14 +72,14 @@ func (o ReadCommand) Name() string {
 	return readCommandName
 }
 
-func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+func (o ReadCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	var fmtFn func([]byte, uintptr) (string, error)
 
 	// TODO: Document encoding formats
 	encodingFormat := o.args.EncodingFormat
 	switch encodingFormat {
 	case "hexdump":
-		info, err := s.Process().ExeInfo(ctx)
+		info, err := s.SharedState().Progctl.ExeInfo(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (o ReadCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		return nil, err
 	}
 
-	data, actualAddr, err := s.Process().ReadFromAddr(ctx, ptr, o.args.SizeBytes)
+	data, actualAddr, err := s.SharedState().Progctl.ReadFromAddr(ctx, ptr, o.args.SizeBytes)
 	if err != nil {
 		return nil, err
 	}

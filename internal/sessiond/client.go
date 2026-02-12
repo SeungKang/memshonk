@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SeungKang/memshonk/internal/app"
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
 )
@@ -86,7 +85,7 @@ func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
 
 			// 0x03 == control + c
 			if b[0] == 0x03 {
-				err = client.sendSignal(app.IntSignalType)
+				err = client.sendSignal(IntSignalType)
 				if err != nil {
 					err = fmt.Errorf("failed to send signal - %w", err)
 					break
@@ -159,6 +158,14 @@ func (o *Client) Close() error {
 }
 
 func (o *Client) loopWithError(ctx context.Context) error {
+	defer o.once.Do(func() {
+		o.apiConn.SetDeadline(time.Now().Add(time.Second))
+
+		o.apiConn.Write(cstlv.MinimalBytes(0, 0, goodbyeeeMessageType))
+
+		close(o.done)
+	})
+
 	incomingMessages := make(chan cstlv.ReadResult)
 	go cstlv.ReadFromConn(ctx, o.apiConn, incomingMessages, 0)
 
@@ -171,14 +178,12 @@ func (o *Client) loopWithError(ctx context.Context) error {
 				return result.Err
 			}
 
-			//switch result.Msg.Type {
-			//case signalMessageType:
-			//	// TODO
-			//case terminalResizeMessageType:
-			//	// TODO
-			//default:
-			//	// ignore
-			//}
+			switch result.Msg.Type {
+			case sessionExitedClientMessage:
+				return nil
+			default:
+				// ignore
+			}
 		}
 	}
 }

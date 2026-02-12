@@ -1,15 +1,11 @@
-package app
+package sessiond
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 
-	"github.com/SeungKang/memshonk/internal/commands"
-	"github.com/SeungKang/memshonk/internal/events"
-	"github.com/SeungKang/memshonk/internal/plugins"
-	"github.com/SeungKang/memshonk/internal/progctl"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/shvars"
 
@@ -22,44 +18,39 @@ const (
 	IntSignalType
 )
 
-func newSession(id string, app *App, sessionIO SessionIO, isDefault bool) *Session {
-	return &Session{
-		id:        id,
-		isDefault: isDefault,
-		app:       app,
-		vars: &SessionVariables{
-			proj: app.project,
-			vars: &shvars.Variables{},
-		},
-		io: sessionIO,
-	}
-}
-
 type Session struct {
+	shared    apicompat.SharedState
 	id        string
 	isDefault bool
-	app       *App
 	vars      *SessionVariables
-	cmdCtx    *CommandContext
-	io        SessionIO
+	io        apicompat.SessionIO
+	stopper   *sessionStopper
 
 	cancelCmdMu  sync.Mutex
 	cancelCmdCtx context.CancelFunc
+}
+
+func (o *Session) Ctx() context.Context {
+	return o.stopper.ctx
+}
+
+func (o *Session) Done() <-chan struct{} {
+	return o.stopper.ctx.Done()
+}
+
+func (o *Session) Close() error {
+	return o.stopper.Close()
+}
+
+func (o *Session) SharedState() apicompat.SharedState {
+	return o.shared
 }
 
 func (o *Session) ID() string {
 	return o.id
 }
 
-type SessionIO struct {
-	Stdin  io.ReadCloser
-	Stdout io.WriteCloser
-	Stderr io.WriteCloser
-
-	OptTerminal goterm.TerminalWithNotifications
-}
-
-func (o *Session) IO() SessionIO {
+func (o *Session) IO() apicompat.SessionIO {
 	return o.io
 }
 
@@ -72,24 +63,8 @@ func (o *Session) OnSignal(signalType uint8) {
 	}
 }
 
-func (o *Session) Events() *events.Groups {
-	return o.app.events
-}
-
-func (o *Session) Project() *project.Project {
-	return o.app.project
-}
-
 func (o *Session) Variables() *SessionVariables {
 	return o.vars
-}
-
-func (o *Session) Plugins() (plugins.Ctl, bool) {
-	if o.app.pluginCtl == nil {
-		return nil, false
-	}
-
-	return o.app.pluginCtl, true
 }
 
 func (o *Session) Terminal() (goterm.TerminalWithNotifications, bool) {
@@ -100,11 +75,19 @@ func (o *Session) Terminal() (goterm.TerminalWithNotifications, bool) {
 	return nil, false
 }
 
-func (o *Session) RunCommand(parent context.Context, cmd commands.Command) error {
+func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) error {
 	ctx, cancelFn := context.WithCancel(parent)
 	defer func() {
 		o.clearCancel()
 		cancelFn()
+	}()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-o.stopper.ctx.Done():
+			cancelFn()
+		}
 	}()
 
 	// install the cancel lever for OnSignal
@@ -112,10 +95,7 @@ func (o *Session) RunCommand(parent context.Context, cmd commands.Command) error
 		cancelFn()
 	})
 
-	result, err := cmd.Run(ctx, commands.IO{
-		Stdout: o.io.Stdout,
-		Stderr: o.io.Stderr,
-	}, o)
+	result, err := cmd.Run(ctx, o)
 	if err != nil {
 		return err
 	}
@@ -148,10 +128,6 @@ func (o *Session) cancelCurrentCommand() {
 	if fn != nil {
 		fn()
 	}
-}
-
-func (o *Session) Process() progctl.Process {
-	return o.app.ProcCtl()
 }
 
 type SessionVariables struct {

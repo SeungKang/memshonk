@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -44,7 +45,7 @@ func WriteCommandSchema() CommandSchema {
 				DefValue: "",
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return NewWriteCommand(WriteCommandArgs{
 				EncodingFormat: c.Flags.String("encoding"),
 				DataStr:        c.NonFlags.String("data"),
@@ -74,7 +75,7 @@ func (o WriteCommand) Name() string {
 	return writeCommandName
 }
 
-func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) (CommandResult, error) {
+func (o WriteCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	dataStr := o.args.DataStr
 	var data []byte
 
@@ -125,7 +126,7 @@ func (o WriteCommand) Run(ctx context.Context, _ IO, s Session) (CommandResult, 
 		return nil, err
 	}
 
-	_, err = s.Process().WriteToAddr(ctx, data, ptr)
+	_, err = s.SharedState().Progctl.WriteToAddr(ctx, data, ptr)
 	if err != nil {
 		return nil, err
 	}

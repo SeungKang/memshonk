@@ -1,4 +1,4 @@
-package app
+package sessiond
 
 import (
 	"crypto/rand"

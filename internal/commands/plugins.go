@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
@@ -30,7 +31,7 @@ func PluginsCommandSchema() CommandSchema {
 				DefValue: "",
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return NewPluginsCommand(PluginsCommandArgs{
 				Mode:                 c.NonFlags.String("command"),
 				PluginNameOrFilePath: c.NonFlags.String("name"),
@@ -58,8 +59,8 @@ func (o PluginsCommand) Name() string {
 	return pluginsCommandName
 }
 
-func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
-	pluginsCtl, enabled := s.Plugins()
+func (o PluginsCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+	pluginsCtl, enabled := s.SharedState().HasPlugins()
 	if !enabled {
 		return nil, plugins.ErrPluginsDisabled
 	}
@@ -72,14 +73,14 @@ func (o PluginsCommand) Run(ctx context.Context, inOut IO, s Session) (CommandRe
 	case "reload":
 		return nil, o.reload(ctx, pluginsCtl)
 	case "unload":
-		return nil, o.unload(pluginsCtl, inOut)
+		return nil, o.unload(pluginsCtl)
 	default:
 		return nil, fmt.Errorf("unknown plugins command; %q",
 			o.args.Mode)
 	}
 }
 
-func (o PluginsCommand) list(ctl plugins.Ctl) (CommandResult, error) {
+func (o PluginsCommand) list(ctl plugins.Ctl) (apicompat.CommandResult, error) {
 	if o.args.PluginNameOrFilePath != "" {
 		plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
 		if err != nil {
@@ -92,7 +93,7 @@ func (o PluginsCommand) list(ctl plugins.Ctl) (CommandResult, error) {
 	return HumanCommandResult(ctl.PrettyString("")), nil
 }
 
-func (o PluginsCommand) load(ctl plugins.Ctl) (CommandResult, error) {
+func (o PluginsCommand) load(ctl plugins.Ctl) (apicompat.CommandResult, error) {
 	plugin, err := ctl.Load(plugins.PluginConfig{
 		FilePath: o.args.PluginNameOrFilePath,
 	})
@@ -112,7 +113,7 @@ func (o PluginsCommand) reload(ctx context.Context, ctl plugins.Ctl) error {
 	return nil
 }
 
-func (o PluginsCommand) unload(ctl plugins.Ctl, inOut IO) error {
+func (o PluginsCommand) unload(ctl plugins.Ctl) error {
 	err := ctl.Unload(o.args.PluginNameOrFilePath)
 	if err != nil {
 		return err
@@ -141,7 +142,7 @@ func (o CommandFromPlugin) Name() string {
 	return o.cmd.Name() + "::" + o.cmdName
 }
 
-func (o CommandFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandResult, error) {
+func (o CommandFromPlugin) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	output, err := o.cmd.Run(ctx, o.args)
 	if err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ func (o ParserFromPlugin) Name() string {
 	return o.parser.Name() + "::" + o.parserName
 }
 
-func (o ParserFromPlugin) Run(ctx context.Context, i IO, s Session) (CommandResult, error) {
+func (o ParserFromPlugin) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	output, err := o.parser.Run(ctx, o.arg)
 	if err != nil {
 		return nil, err

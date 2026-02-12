@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+
+	"github.com/SeungKang/memshonk/internal/apicompat"
 )
 
 const (
@@ -13,7 +15,7 @@ func DetachCommandSchema() CommandSchema {
 		Name:      detachCommandName,
 		Aliases:   []string{"d"},
 		ShortHelp: "detach from the process",
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return &DetachCommand{args: DetachCommandArgs{}}, nil
 		},
 	}
@@ -29,8 +31,8 @@ func (o DetachCommand) Name() string {
 	return detachCommandName
 }
 
-func (o DetachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
-	err := s.Process().Detach(ctx)
+func (o DetachCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+	err := s.SharedState().Progctl.Detach(ctx)
 	if err != nil {
 		return nil, err
 	}

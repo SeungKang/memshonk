@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
@@ -37,7 +38,7 @@ func FindCommandSchema() CommandSchema {
 				DefValue: nil,
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return FindCommand{
 				EncodingFormat: c.Flags.String("encoding"),
 				Pattern:        c.NonFlags.StringList("pattern"),
@@ -55,7 +56,7 @@ func (o FindCommand) Name() string {
 	return findCommandName
 }
 
-func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+func (o FindCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	var parsedPattern memory.ParsedPattern
 	var err error
 	stringList := strings.Join(o.Pattern, " ")
@@ -78,16 +79,18 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		return nil, err
 	}
 
-	regions, err := s.Process().Regions(ctx)
+	regions, err := s.SharedState().Progctl.Regions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	process := s.Process()
+	process := s.SharedState().Progctl
 
 	var matches FindCommandResult
 
-	fmt.Fprint(inOut.Stderr, "searching")
+	inputOutput := s.IO()
+
+	fmt.Fprint(inputOutput.Stderr, "searching")
 
 	err = regions.Iter(func(i int, region memory.Region) error {
 		if !region.Readable {
@@ -106,7 +109,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		}
 
 		if i%step == 0 {
-			_, err = fmt.Fprint(inOut.Stderr, ".")
+			_, err = fmt.Fprint(inputOutput.Stderr, ".")
 			if err != nil {
 				return err
 			}
@@ -117,7 +120,7 @@ func (o FindCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResul
 		return nil
 	})
 
-	fmt.Fprintln(inOut.Stderr, "")
+	fmt.Fprintln(inputOutput.Stderr, "")
 
 	if err != nil {
 		return nil, err

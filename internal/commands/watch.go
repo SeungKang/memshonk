@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/hexdump"
 	"github.com/SeungKang/memshonk/internal/memory"
-
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
@@ -35,7 +35,7 @@ func WatchCommandSchema() CommandSchema {
 				DataType: []string{},
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return WatchCommand{
 				AddrStrs:  c.NonFlags.StringList("addrs"),
 				SizeBytes: c.NonFlags.Uint64("size"),
@@ -53,12 +53,12 @@ func (o WatchCommand) Name() string {
 	return watchCommandName
 }
 
-func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+func (o WatchCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	var cancelFn func()
 	ctx, cancelFn = context.WithCancel(ctx)
 	defer cancelFn()
 
-	exeInfo, err := s.Process().ExeInfo(ctx)
+	exeInfo, err := s.SharedState().Progctl.ExeInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (o WatchCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 			return nil, err
 		}
 
-		watcher, err := s.Process().Watch(ctx, ptr, o.SizeBytes)
+		watcher, err := s.SharedState().Progctl.Watch(ctx, ptr, o.SizeBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create memory watcher for %s - %w",
 				addrStr, err)

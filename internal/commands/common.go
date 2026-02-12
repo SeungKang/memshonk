@@ -2,17 +2,11 @@ package commands
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"io"
 
-	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/memory"
-	"github.com/SeungKang/memshonk/internal/plugins"
-	"github.com/SeungKang/memshonk/internal/progctl"
-
-	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 var (
@@ -39,7 +33,7 @@ type CommandSchema struct {
 	LongHelp  string
 	NonFlags  []NonFlagSchema
 	Flags     []FlagSchema
-	CreateFn  func(CommandConfig) (Command, error)
+	CreateFn  func(CommandConfig) (apicompat.Command, error)
 }
 
 type FlagSchema struct {
@@ -78,28 +72,6 @@ type FlagFetcher interface {
 	Int64(argID string) int64
 	Uint(argID string) uint
 	Uint64(argID string) uint64
-}
-
-type Command interface {
-	Name() string
-	Run(context.Context, IO, Session) (CommandResult, error)
-}
-
-type Session interface {
-	Process() progctl.Process
-	Plugins() (plugins.Ctl, bool)
-	Events() *events.Groups
-	Terminal() (goterm.TerminalWithNotifications, bool)
-}
-
-type IO struct {
-	Stdout io.Writer
-
-	Stderr io.Writer
-}
-
-type CommandResult interface {
-	Serialize() []byte
 }
 
 type HumanCommandResult string

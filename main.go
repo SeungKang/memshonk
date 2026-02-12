@@ -11,10 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/globalconfig"
-	"github.com/SeungKang/memshonk/internal/grsh"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginscompat"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginsctl"
@@ -152,13 +151,24 @@ func doServer(projectFilePath string) error {
 		return fmt.Errorf("failed to setup plugins - %w", err)
 	}
 
-	application := app.NewApp(eventGroups, proj, progCtl, optPluginsCtl)
+	sharedState := apicompat.SharedState{
+		Events:  eventGroups,
+		Progctl: progCtl,
+		Project: proj,
+		Plugins: optPluginsCtl,
+	}
 
 	terminal, _ := goterm.NewStdioTerminal()
 
-	session, err := application.NewSession(app.SessionConfig{
+	server, err := sessiond.NewServer(ctx, sharedState)
+	if err != nil {
+		return fmt.Errorf("failed to create new session server - %w", err)
+	}
+	defer server.Close()
+
+	session, err := server.NewSession(ctx, sessiond.SessionConfig{
 		IsDefault: true,
-		IO: app.SessionIO{
+		IO: apicompat.SessionIO{
 			Stdin:       os.Stdin,
 			Stdout:      os.Stdout,
 			Stderr:      os.Stderr,
@@ -170,17 +180,7 @@ func doServer(projectFilePath string) error {
 		return fmt.Errorf("failed to create default app session - %w", err)
 	}
 
-	server, err := sessiond.NewServer(application)
-	if err != nil {
-		return fmt.Errorf("failed to create new session server - %w", err)
-	}
-	defer server.Close()
-
-	sh, err := grsh.NewShell(ctx, session)
-	if err != nil {
-		return err
-	}
-
+	// TODO: Should loading plugins happen before setting up the session server?
 	if optPluginsCtl != nil {
 		for _, pluginConfig := range proj.Plugins().Libraries {
 			_, err := optPluginsCtl.Load(pluginConfig)
@@ -191,18 +191,21 @@ func doServer(projectFilePath string) error {
 		}
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT)
-	defer signal.Stop(sig)
+	interrupts := make(chan os.Signal, 1)
+	signal.Notify(interrupts, syscall.SIGINT)
+	defer signal.Stop(interrupts)
+
 	go func() {
-		for range sig {
-			session.OnSignal(app.IntSignalType)
+		for range interrupts {
+			session.OnSignal(sessiond.IntSignalType)
 		}
 	}()
 
 	log.SetFlags(log.LstdFlags)
 
-	return sh.Run()
+	<-session.Done()
+
+	return nil
 }
 
 func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plugins.Ctl, error) {

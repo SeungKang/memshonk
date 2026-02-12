@@ -3,10 +3,11 @@ package grsh
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
-	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/plugins"
@@ -17,7 +18,7 @@ import (
 	"github.com/fatih/color"
 )
 
-func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
+func NewShell(ctx context.Context, session apicompat.Session) (*Shell, error) {
 	// TODO: This is terrible, but grumble makes the assumption
 	// that it should parse process arguments and it always tries
 	// to parse them via os.Args (we want to do that ourselves
@@ -44,7 +45,7 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 		// },
 	}
 
-	wsConfig := session.Project().WorkspaceConfig()
+	wsConfig := session.SharedState().Project.WorkspaceConfig()
 
 	historyFilePath, historyEnabled := wsConfig.HistoryFilePath(session.ID())
 	if historyEnabled {
@@ -66,11 +67,11 @@ func NewShell(ctx context.Context, session *app.Session) (*Shell, error) {
 			cmdSchema, session))
 	}
 
-	attachEvents := events.NewSubscriber[progctl.AttachedEvent](session.Events())
-	detachEvents := events.NewSubscriber[progctl.DetachedEvent](session.Events())
-	exitedEvents := events.NewSubscriber[progctl.ProcessExitedEvent](session.Events())
-	loadedEvents := events.NewSubscriber[plugins.LoadedEvent](session.Events())
-	unloadedEvents := events.NewSubscriber[plugins.UnloadedEvent](session.Events())
+	attachEvents := events.NewSubscriber[progctl.AttachedEvent](session.SharedState().Events)
+	detachEvents := events.NewSubscriber[progctl.DetachedEvent](session.SharedState().Events)
+	exitedEvents := events.NewSubscriber[progctl.ProcessExitedEvent](session.SharedState().Events)
+	loadedEvents := events.NewSubscriber[plugins.LoadedEvent](session.SharedState().Events)
+	unloadedEvents := events.NewSubscriber[plugins.UnloadedEvent](session.SharedState().Events)
 
 	go func() {
 		defer attachEvents.Unsubscribe()
@@ -109,12 +110,12 @@ type Shell struct {
 	ga      *grumble.App
 	fm      grumble.FlagMap
 	ctx     context.Context
-	session *app.Session
+	session apicompat.Session
 }
 
 func (o *Shell) Run() error {
 	config := &readline.Config{
-		Stdin:  o.session.IO().Stdin,
+		Stdin:  io.NopCloser(o.session.IO().Stdin),
 		Stdout: o.session.IO().Stdout,
 		Stderr: o.session.IO().Stderr,
 	}
@@ -140,7 +141,7 @@ func (o *Shell) Run() error {
 func (o *Shell) onInit(_ *grumble.App, flags grumble.FlagMap) error {
 	o.fm = flags
 
-	info, procIinfoErr := o.session.Process().ProcessInfo(o.ctx)
+	info, procIinfoErr := o.session.SharedState().Progctl.ProcessInfo(o.ctx)
 	if procIinfoErr == nil {
 		o.setPrompt(info.PID)
 	} else {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -26,7 +27,7 @@ func VmmapCommandSchema() CommandSchema {
 				DataType: "",
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return VmmapCommand{
 				args: VmmapCommandArgs{
 					searchStr: c.NonFlags.String("search-str"),
@@ -48,8 +49,8 @@ func (o VmmapCommand) Name() string {
 	return vmmapCommandName
 }
 
-func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
-	process := s.Process()
+func (o VmmapCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+	process := s.SharedState().Progctl
 
 	regions, err := process.Regions(ctx)
 	if err != nil {
@@ -63,14 +64,14 @@ func (o VmmapCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResu
 	return o.list(ctx, regions)
 }
 
-func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s Session) (CommandResult, error) {
+func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s apicompat.Session) (apicompat.CommandResult, error) {
 	if strings.HasPrefix(o.args.searchStr, "0x") {
 		ptr, err := memory.CreatePointerFromString(o.args.searchStr)
 		if err != nil {
 			return nil, err
 		}
 
-		resolvedPtr, err := s.Process().ResolvePointer(ctx, ptr)
+		resolvedPtr, err := s.SharedState().Progctl.ResolvePointer(ctx, ptr)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +110,7 @@ func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s Sess
 	return HumanCommandResult(out.String()), nil
 }
 
-func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (CommandResult, error) {
+func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (apicompat.CommandResult, error) {
 	var out bytes.Buffer
 
 	err := regions.IterObjects(func(obj memory.Object) error {

@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SeungKang/memshonk/internal/app"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/plugins"
+
 	"github.com/desertbit/grumble"
 )
 
-func commandSchemaToGrumbleCommand(cmdSchema commands.CommandSchema, session *app.Session) *grumble.Command {
+func commandSchemaToGrumbleCommand(cmdSchema commands.CommandSchema, session apicompat.Session) *grumble.Command {
 	grumbleCmd := &grumble.Command{
 		Name:    cmdSchema.Name,
 		Aliases: cmdSchema.Aliases,
@@ -145,7 +146,7 @@ func flagToGrumble(flag commands.FlagSchema, gflags *grumble.Flags) {
 	}
 }
 
-func newPluginCommand(plugin plugins.Plugin, session *app.Session) *grumble.Command {
+func newPluginCommand(plugin plugins.Plugin, session apicompat.Session) *grumble.Command {
 	description := plugin.Description()
 	if description == "" {
 		description = "a custom plugin"

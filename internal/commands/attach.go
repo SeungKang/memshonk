@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
@@ -32,7 +33,7 @@ func AttachCommandSchema() CommandSchema {
 				DefaultVal: "",
 			},
 		},
-		CreateFn: func(c CommandConfig) (Command, error) {
+		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
 			return NewAttachCommand(AttachCommandArgs{
 				OptPid:  c.Flags.Int("pid"),
 				OptName: c.Flags.String("name"),
@@ -60,14 +61,14 @@ func (o AttachCommand) Name() string {
 	return attachCommandName
 }
 
-func (o AttachCommand) Run(ctx context.Context, inOut IO, s Session) (CommandResult, error) {
+func (o AttachCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
 	// TODO: Support AttachCommandArgs
-	pid, err := s.Process().Attach(ctx)
+	pid, err := s.SharedState().Progctl.Attach(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := s.Process().ExeInfo(ctx)
+	info, err := s.SharedState().Progctl.ExeInfo(ctx)
 	if err != nil {
 		return nil, err
 	}

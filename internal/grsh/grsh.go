@@ -47,7 +47,7 @@ func NewShell(ctx context.Context, session apicompat.Session) (*Shell, error) {
 
 	wsConfig := session.SharedState().Project.WorkspaceConfig()
 
-	historyFilePath, historyEnabled := wsConfig.HistoryFilePath(session.ID())
+	historyFilePath, historyEnabled := wsConfig.HistoryFilePath(session.Info().ID)
 	if historyEnabled {
 		grumbleConfig.HistoryFile = historyFilePath
 	}

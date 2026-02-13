@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +64,8 @@ func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server,
 		listener:    listener,
 		socketPath:  socketPath,
 	}
+
+	server.sharedState.Sessions = server
 
 	go func() {
 		err := server.loopWithError(ctx)
@@ -258,7 +261,10 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 	stopper := newSessionStopper(sessionCtx, cancelSessionFn, config.OptCloseConn)
 
 	session := &Session{
-		id:        id,
+		info: apicompat.SessionInfo{
+			ID:        id,
+			StartedAt: time.Now(),
+		},
 		isDefault: config.IsDefault,
 		shared:    o.sharedState,
 		vars: &SessionVariables{
@@ -326,6 +332,36 @@ func (o *sessionStopper) Close() error {
 	})
 
 	return err
+}
+
+func (o *Server) Sessions() []apicompat.Session {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	sessions := make([]apicompat.Session, 0, len(o.sessions))
+
+	for _, wrapper := range o.sessions {
+		sessions = append(sessions, wrapper.session)
+	}
+
+	sort.SliceStable(sessions, func(i int, j int) bool {
+		return sessions[i].Info().ID < sessions[j].Info().ID
+	})
+
+	return sessions
+}
+
+func (o *Server) GetSession(id string) (apicompat.Session, bool) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	wrapper, hasIt := o.sessions[id]
+
+	if hasIt {
+		return wrapper.session, true
+	}
+
+	return nil, false
 }
 
 func (o *Server) RemoveSession(id string) {

@@ -20,7 +20,7 @@ const (
 
 type Session struct {
 	shared    apicompat.SharedState
-	id        string
+	info      apicompat.SessionInfo
 	isDefault bool
 	vars      *SessionVariables
 	io        apicompat.SessionIO
@@ -46,8 +46,8 @@ func (o *Session) SharedState() apicompat.SharedState {
 	return o.shared
 }
 
-func (o *Session) ID() string {
-	return o.id
+func (o *Session) Info() apicompat.SessionInfo {
+	return o.info
 }
 
 func (o *Session) IO() apicompat.SessionIO {

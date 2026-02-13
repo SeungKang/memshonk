@@ -7,6 +7,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/project"
 )
 
+// SharedState provides access to various application functionality.
 type SharedState struct {
 	Sessions SessionManager
 
@@ -27,10 +28,17 @@ func (o SharedState) HasPlugins() (plugins.Ctl, bool) {
 	return o.Plugins, true
 }
 
+// SessionManager manages sessions.
 type SessionManager interface {
+	// Sessions returns a slice of the current sessions.
 	Sessions() []Session
 
+	// GetSession returns a Session for the specified
+	// session ID. If no such session exists, then
+	// nil and false are returned.
 	GetSession(id string) (Session, bool)
 
+	// RemoveSession removes the specified session b
+	// its ID.
 	RemoveSession(id string)
 }

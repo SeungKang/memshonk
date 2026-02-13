@@ -8,6 +8,8 @@ import (
 )
 
 type SharedState struct {
+	Sessions SessionManager
+
 	Events *events.Groups
 
 	Project *project.Project
@@ -23,4 +25,12 @@ func (o SharedState) HasPlugins() (plugins.Ctl, bool) {
 	}
 
 	return o.Plugins, true
+}
+
+type SessionManager interface {
+	Sessions() []Session
+
+	GetSession(id string) (Session, bool)
+
+	RemoveSession(id string)
 }

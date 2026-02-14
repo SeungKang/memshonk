@@ -10,7 +10,6 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/hexdump"
-	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
@@ -75,12 +74,7 @@ func (o WatchCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.C
 	reads := make(chan watchReadEvent, len(o.AddrStrs))
 
 	for i, addrStr := range o.AddrStrs {
-		ptr, err := memory.CreatePointerFromString(addrStr)
-		if err != nil {
-			return nil, err
-		}
-
-		watcher, err := s.SharedState().Progctl.Watch(ctx, ptr, o.SizeBytes)
+		watcher, err := s.SharedState().Progctl.WatchLookup(ctx, addrStr, o.SizeBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create memory watcher for %s - %w",
 				addrStr, err)

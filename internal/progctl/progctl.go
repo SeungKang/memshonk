@@ -35,13 +35,19 @@ type Process interface {
 
 	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) (uintptr, error)
 
-	Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error)
+	WatchAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) (*Watcher, error)
 
 	Suspend(ctx context.Context) error
 
 	Resume(ctx context.Context) error
 
 	Detach(ctx context.Context) error
+
+	ReadFromLookup(ctx context.Context, addr string, sizeBytes uint64) ([]byte, uintptr, error)
+
+	WriteToLookup(ctx context.Context, p []byte, addr string) (uintptr, error)
+
+	WatchLookup(ctx context.Context, addr string, sizeBytes uint64) (*Watcher, error)
 }
 
 type attachedProcess interface {
@@ -251,6 +257,10 @@ func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
+	return o.readFromAddr(ctx, from, sizeBytes)
+}
+
+func (o *Ctl) readFromAddr(ctx context.Context, from memory.Pointer, sizeBytes uint64) ([]byte, uintptr, error) {
 	if o.current == nil {
 		return nil, 0, ErrNotAttached
 	}
@@ -270,10 +280,26 @@ func (o *Ctl) ReadFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 	return buf, addr, err
 }
 
+func (o *Ctl) ReadFromLookup(ctx context.Context, addr string, sizeBytes uint64) ([]byte, uintptr, error) {
+	ptr, err := memory.CreatePointerFromString(addr)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.readFromAddr(ctx, ptr, sizeBytes)
+}
+
 func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) (uintptr, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
+	return o.writeToAddr(ctx, data, to)
+}
+
+func (o *Ctl) writeToAddr(ctx context.Context, data []byte, to memory.Pointer) (uintptr, error) {
 	if o.current == nil {
 		return 0, ErrNotAttached
 	}
@@ -288,10 +314,26 @@ func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) (
 	})
 }
 
-func (o *Ctl) Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error) {
+func (o *Ctl) WriteToLookup(ctx context.Context, p []byte, addr string) (uintptr, error) {
+	ptr, err := memory.CreatePointerFromString(addr)
+	if err != nil {
+		return 0, err
+	}
+
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
+	return o.writeToAddr(ctx, p, ptr)
+}
+
+func (o *Ctl) WatchAddr(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.watchAddr(ctx, ptr, sizeBytes)
+}
+
+func (o *Ctl) watchAddr(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error) {
 	if o.current == nil {
 		return nil, ErrNotAttached
 	}
@@ -309,6 +351,18 @@ func (o *Ctl) Watch(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (
 	}
 
 	return watcher, nil
+}
+
+func (o *Ctl) WatchLookup(ctx context.Context, addr string, sizeBytes uint64) (*Watcher, error) {
+	ptr, err := memory.CreatePointerFromString(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.watchAddr(ctx, ptr, sizeBytes)
 }
 
 func (o *Ctl) Suspend(ctx context.Context) error {

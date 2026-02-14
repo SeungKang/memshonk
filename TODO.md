@@ -61,6 +61,7 @@
   this addr
 - outputs command
 - command performance measuring
+- remove aliases
 
 ## find
 

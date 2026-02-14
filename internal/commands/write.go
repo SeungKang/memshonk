@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
-	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 const (
@@ -121,12 +120,7 @@ func (o WriteCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.C
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	ptr, err := memory.CreatePointerFromString(o.args.AddrStr)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.SharedState().Progctl.WriteToAddr(ctx, data, ptr)
+	_, err := s.SharedState().Progctl.WriteToLookup(ctx, data, o.args.AddrStr)
 	if err != nil {
 		return nil, err
 	}

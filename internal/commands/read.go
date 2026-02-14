@@ -9,7 +9,6 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/hexdump"
-	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 const (
@@ -112,12 +111,7 @@ func (o ReadCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	ptr, err := memory.CreatePointerFromString(o.args.AddrStr)
-	if err != nil {
-		return nil, err
-	}
-
-	data, actualAddr, err := s.SharedState().Progctl.ReadFromAddr(ctx, ptr, o.args.SizeBytes)
+	data, actualAddr, err := s.SharedState().Progctl.ReadFromLookup(ctx, o.args.AddrStr, o.args.SizeBytes)
 	if err != nil {
 		return nil, err
 	}

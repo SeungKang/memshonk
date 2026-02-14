@@ -33,7 +33,7 @@ type Process interface {
 
 	ReadFromAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) ([]byte, uintptr, error)
 
-	WriteToAddr(ctx context.Context, p []byte, addr memory.Pointer) (uintptr, error)
+	WriteToAddr(ctx context.Context, addr memory.Pointer, p []byte) (uintptr, error)
 
 	WatchAddr(ctx context.Context, addr memory.Pointer, sizeBytes uint64) (*Watcher, error)
 
@@ -45,7 +45,7 @@ type Process interface {
 
 	ReadFromLookup(ctx context.Context, addr string, sizeBytes uint64) ([]byte, uintptr, error)
 
-	WriteToLookup(ctx context.Context, p []byte, addr string) (uintptr, error)
+	WriteToLookup(ctx context.Context, addr string, p []byte) (uintptr, error)
 
 	WatchLookup(ctx context.Context, addr string, sizeBytes uint64) (*Watcher, error)
 }
@@ -292,14 +292,14 @@ func (o *Ctl) ReadFromLookup(ctx context.Context, addr string, sizeBytes uint64)
 	return o.readFromAddr(ctx, ptr, sizeBytes)
 }
 
-func (o *Ctl) WriteToAddr(ctx context.Context, data []byte, to memory.Pointer) (uintptr, error) {
+func (o *Ctl) WriteToAddr(ctx context.Context, to memory.Pointer, data []byte) (uintptr, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	return o.writeToAddr(ctx, data, to)
+	return o.writeToAddr(ctx, to, data)
 }
 
-func (o *Ctl) writeToAddr(ctx context.Context, data []byte, to memory.Pointer) (uintptr, error) {
+func (o *Ctl) writeToAddr(ctx context.Context, to memory.Pointer, data []byte) (uintptr, error) {
 	if o.current == nil {
 		return 0, ErrNotAttached
 	}
@@ -314,7 +314,7 @@ func (o *Ctl) writeToAddr(ctx context.Context, data []byte, to memory.Pointer) (
 	})
 }
 
-func (o *Ctl) WriteToLookup(ctx context.Context, p []byte, addr string) (uintptr, error) {
+func (o *Ctl) WriteToLookup(ctx context.Context, addr string, p []byte) (uintptr, error) {
 	ptr, err := memory.CreatePointerFromString(addr)
 	if err != nil {
 		return 0, err
@@ -323,7 +323,7 @@ func (o *Ctl) WriteToLookup(ctx context.Context, p []byte, addr string) (uintptr
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
-	return o.writeToAddr(ctx, p, ptr)
+	return o.writeToAddr(ctx, ptr, p)
 }
 
 func (o *Ctl) WatchAddr(ctx context.Context, ptr memory.Pointer, sizeBytes uint64) (*Watcher, error) {

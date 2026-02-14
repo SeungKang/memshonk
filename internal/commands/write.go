@@ -120,7 +120,7 @@ func (o WriteCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.C
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	_, err := s.SharedState().Progctl.WriteToLookup(ctx, data, o.args.AddrStr)
+	_, err := s.SharedState().Progctl.WriteToLookup(ctx, o.args.AddrStr, data)
 	if err != nil {
 		return nil, err
 	}

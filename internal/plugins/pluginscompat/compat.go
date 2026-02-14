@@ -26,6 +26,6 @@ func (o ProcessCompatLayer) ReadFromAddr(addr uintptr, size uint64) ([]byte, err
 }
 
 func (o ProcessCompatLayer) WriteToAddr(addr uintptr, data []byte) error {
-	_, err := o.proc.WriteToAddr(context.Background(), data, memory.AbsoluteAddrPointer(addr))
+	_, err := o.proc.WriteToAddr(context.Background(), memory.AbsoluteAddrPointer(addr), data)
 	return err
 }

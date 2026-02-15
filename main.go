@@ -29,13 +29,17 @@ const (
 	appName = "memshonk"
 
 	usage = `SYNOPSIS
+  ` + appName + ` -` + helpArg + `
+  ` + appName + ` [options]` + ` EXECUTABLE-PATH
+  ` + appName + ` [options] -` + projectPathArg + ` PROJECT-FILE-PATH
 
 DESCRIPTION
 
 OPTIONS
 `
 
-	helpArg = "h"
+	helpArg        = "h"
+	projectPathArg = "p"
 )
 
 func main() {
@@ -48,10 +52,18 @@ func main() {
 }
 
 func mainWithError() error {
+	var state mainState
+
 	help := flag.Bool(
 		helpArg,
 		false,
 		"Display this information")
+
+	flag.StringVar(
+		&state.optProjectFilePath,
+		projectPathArg,
+		"",
+		"Use a project file instead of an empty project based on a program path")
 
 	flag.Parse()
 
@@ -72,34 +84,55 @@ func mainWithError() error {
 		return nil
 	}
 
-	firstArg := flag.Arg(0)
-	switch firstArg {
-	case "client":
-		return doClient()
-	case "":
-		return errors.New("please specify a project file path as the last argument")
-	default:
-		return doServer(firstArg)
+	state.optExePath = flag.Arg(0)
+
+	if state.optExePath == "" && state.optProjectFilePath == "" {
+		return fmt.Errorf("please specify either a project path (-%s) or a program file path (as the last non-flag argument)",
+			projectPathArg)
+	}
+
+	if state.optExePath != "" && state.optProjectFilePath != "" {
+		return fmt.Errorf("both a project path (-%s) and a program file path cannot be specified together",
+			projectPathArg)
+	}
+
+	var err error
+
+	state.globalConf, err = globalconfig.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to setup global configuration - %w", err)
+	}
+
+	if state.optExePath != "" {
+		state.project, err = project.Empty(state.optExePath, state.globalConf)
+	} else {
+		state.project, err = project.FromFilePath(state.optProjectFilePath, state.globalConf)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to setup project - %w", err)
+	}
+
+	state.wsConf = state.globalConf.ProjectWorkspaceConfig(state.project.Name())
+
+	if sessiond.IsServerRunning(context.Background(), state.project.WorkspaceConfig().SocketFilePath) {
+		return doClient(state)
+	} else {
+		return doServer(state)
 	}
 }
 
-func doClient() error {
-	projectName := flag.Arg(1)
-	if projectName == "" {
-		return errors.New("please specify a project name as the last argument")
-	}
+type mainState struct {
+	globalConf globalconfig.Config
+	wsConf     globalconfig.WorkspaceConfig
+	project    *project.Project
 
-	globalConfig, err := globalconfig.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup global config - %w", err)
-	}
+	optProjectFilePath string
+	optExePath         string
+}
 
-	wsConfig, err := globalConfig.SetupWorkspace(projectName)
-	if err != nil {
-		return fmt.Errorf("failed to setup workspace - %w", err)
-	}
-
-	conn, err := net.Dial("unix", wsConfig.SocketFilePath)
+func doClient(state mainState) error {
+	conn, err := net.Dial("unix", state.wsConf.SocketFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server - %w", err)
 	}
@@ -116,35 +149,25 @@ func doClient() error {
 	}
 	defer client.Close()
 
-	state, err := term.MakeRaw(int(os.Stdin.Fd()))
+	termState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return fmt.Errorf("failed to make raw - %w", err)
 	}
-	defer term.Restore(int(os.Stdin.Fd()), state)
+	defer term.Restore(int(os.Stdin.Fd()), termState)
 
 	<-client.Done()
 
 	return client.Err()
 }
 
-func doServer(projectFilePath string) error {
-	globalConfig, err := globalconfig.Setup()
-	if err != nil {
-		return fmt.Errorf("failed to setup global config - %w", err)
-	}
-
-	proj, err := project.FromFilePath(projectFilePath, globalConfig)
-	if err != nil {
-		return fmt.Errorf("failed to setup project - %w", err)
-	}
-
+func doServer(state mainState) error {
 	ctx, cancelFn := signal.NotifyContext(context.Background(),
 		syscall.SIGQUIT, syscall.SIGTERM)
 	defer cancelFn()
 
 	eventGroups := events.NewGroups()
 
-	progCtl := progctl.NewCtl(proj.General().ExePath, eventGroups)
+	progCtl := progctl.NewCtl(state.project.General().ExePath, eventGroups)
 
 	optPluginsCtl, err := maybeCreatePluginCtl(progCtl, eventGroups)
 	if err != nil {
@@ -154,7 +177,7 @@ func doServer(projectFilePath string) error {
 	sharedState := apicompat.SharedState{
 		Events:  eventGroups,
 		Progctl: progCtl,
-		Project: proj,
+		Project: state.project,
 		Plugins: optPluginsCtl,
 	}
 
@@ -182,7 +205,7 @@ func doServer(projectFilePath string) error {
 
 	// TODO: Should loading plugins happen before setting up the session server?
 	if optPluginsCtl != nil {
-		for _, pluginConfig := range proj.Plugins().Libraries {
+		for _, pluginConfig := range state.project.Plugins().Libraries {
 			_, err := optPluginsCtl.Load(pluginConfig)
 			if err != nil {
 				return fmt.Errorf("failed to load plugin: %q - %w",

@@ -7,32 +7,53 @@ import (
 )
 
 func (o *Config) SetupWorkspace(projectName string) (WorkspaceConfig, error) {
-	wsConfig := WorkspaceConfig{
-		config: o,
+	wsConfig := o.ProjectWorkspaceConfig(projectName)
+
+	err := os.MkdirAll(wsConfig.DirPath, 0o700)
+	if err != nil {
+		return WorkspaceConfig{}, fmt.Errorf("failed to create workspace directory at %q - %v",
+			wsConfig.DirPath, err)
 	}
 
-	err := wsConfig.socketFilePath(projectName)
+	err = os.MkdirAll(wsConfig.SocketsDirPath, 0o700)
 	if err != nil {
-		return wsConfig, fmt.Errorf("failed to setup socket file path - %v", err)
+		return WorkspaceConfig{}, fmt.Errorf("failed to create sockets directory at %q - %v",
+			wsConfig.SocketsDirPath, err)
 	}
 
-	err = wsConfig.historyDir(projectName)
+	err = os.MkdirAll(wsConfig.HistoryDirPath, 0o700)
 	if err != nil {
-		return wsConfig, fmt.Errorf("failed to setup history dir - %v", err)
+		return WorkspaceConfig{}, fmt.Errorf("failed to create history directory at %q - %v",
+			wsConfig.HistoryDirPath, err)
 	}
 
 	return wsConfig, nil
 }
 
+func (o *Config) ProjectWorkspaceConfig(projectName string) WorkspaceConfig {
+	workspaceDirPath := filepath.Join(o.WorkspacesDirPath, projectName)
+
+	socketsDirPath := filepath.Join(workspaceDirPath, "sockets")
+
+	return WorkspaceConfig{
+		DirPath:        workspaceDirPath,
+		SocketsDirPath: socketsDirPath,
+		SocketFilePath: filepath.Join(socketsDirPath, "socket.sock"),
+		HistoryDirPath: filepath.Join(workspaceDirPath, "history"),
+		globalConfig:   o,
+	}
+}
+
 type WorkspaceConfig struct {
 	DirPath        string
+	SocketsDirPath string
 	SocketFilePath string
 	HistoryDirPath string
-	config         *Config
+	globalConfig   *Config
 }
 
 func (o *WorkspaceConfig) HistoryFilePath(sessionID string) (string, bool) {
-	if !o.config.HistoryFileEnabled {
+	if !o.globalConfig.HistoryFileEnabled {
 		return "", false
 	}
 
@@ -43,50 +64,4 @@ func (o *WorkspaceConfig) HistoryFilePath(sessionID string) (string, bool) {
 	}
 
 	return filepath.Join(o.HistoryDirPath, "history"+suffix), true
-}
-
-func (o *WorkspaceConfig) socketFilePath(projectName string) error {
-	workspaceDir, err := o.createWorkspacesDir(projectName)
-	if err != nil {
-		return err
-	}
-
-	socketDir := filepath.Join(workspaceDir, "sockets")
-	err = os.MkdirAll(socketDir, 0o700)
-	if err != nil {
-		return fmt.Errorf("failed to create sockets directory at %q - %v", socketDir, err)
-	}
-
-	o.SocketFilePath = filepath.Join(socketDir, "socket.sock")
-
-	return nil
-}
-
-func (o *WorkspaceConfig) historyDir(projectName string) error {
-	workspaceDir, err := o.createWorkspacesDir(projectName)
-	if err != nil {
-		return err
-	}
-
-	historyDir := filepath.Join(workspaceDir, "history")
-	err = os.MkdirAll(historyDir, 0o700)
-	if err != nil {
-		return fmt.Errorf("failed to create history directory at %q - %v", workspaceDir, err)
-	}
-
-	o.HistoryDirPath = historyDir
-
-	return nil
-}
-
-func (o *WorkspaceConfig) createWorkspacesDir(projectName string) (string, error) {
-	workspaceDir := filepath.Join(o.config.DirPath, "workspaces", projectName)
-	err := os.MkdirAll(workspaceDir, 0o700)
-	if err != nil {
-		return "", fmt.Errorf("failed to create workspaces directory - %v", err)
-	}
-
-	o.DirPath = workspaceDir
-
-	return workspaceDir, nil
 }

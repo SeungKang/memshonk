@@ -27,7 +27,7 @@ This new command will have the following subcommands:
 To create this command, we can make a copy of `internal/commands/plugins.go`
 (which also uses subcommands) and call the new file `sessions.go` or whatever
 we end up calling the command. After renaming the various references from
-`Attach` in the file, we will need to add the command's `Schema` function
+`Plugins` in the file, we will need to add the command's `Schema` function
 to the `BuiltinCommands` function in `common.go`.
 
 The subcommands can use the following objects from the second argument of the

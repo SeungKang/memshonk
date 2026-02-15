@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 )
 
-func (o *Config) SetupWorkspace(config *Config, projectName string) (WorkspaceConfig, error) {
+func (o *Config) SetupWorkspace(projectName string) (WorkspaceConfig, error) {
 	wsConfig := WorkspaceConfig{
-		config: config,
+		config: o,
 	}
 
 	err := wsConfig.socketFilePath(projectName)

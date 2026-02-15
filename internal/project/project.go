@@ -14,14 +14,14 @@ import (
 	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
-func FromFilePath(filePath string, config globalconfig.Config) (*Project, error) {
+func FromFilePath(filePath string, globalConf globalconfig.Config) (*Project, error) {
 	name := filepath.Base(filePath)
 	dotIndex := strings.LastIndex(name, ".")
 	if dotIndex > 0 {
 		name = name[:dotIndex]
 	}
 
-	wsConfig, err := config.SetupWorkspace(&config, name)
+	wsConfig, err := globalConf.SetupWorkspace(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup workspace - %v", err)
 	}

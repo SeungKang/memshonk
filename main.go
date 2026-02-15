@@ -94,7 +94,7 @@ func doClient() error {
 		return fmt.Errorf("failed to setup global config - %w", err)
 	}
 
-	wsConfig, err := globalConfig.SetupWorkspace(&globalConfig, projectName)
+	wsConfig, err := globalConfig.SetupWorkspace(projectName)
 	if err != nil {
 		return fmt.Errorf("failed to setup workspace - %w", err)
 	}

@@ -1,6 +1,6 @@
 [General]
-ExeName = MassEffect3.exe
+ExePath = MassEffect3.exe
 
 [Plugin]
-Library = ~/src/me3-memshonk/target/debug/me3_memshonk.dll
+Library = examples/plugins/mass-effect-3-memshonk-plugin/target/debug/me3_memshonk.dll
 ExecOnReload = cargo build

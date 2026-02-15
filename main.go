@@ -144,7 +144,7 @@ func doServer(projectFilePath string) error {
 
 	eventGroups := events.NewGroups()
 
-	progCtl := progctl.NewCtl(proj.General().ExeName, eventGroups)
+	progCtl := progctl.NewCtl(proj.General().ExePath, eventGroups)
 
 	optPluginsCtl, err := maybeCreatePluginCtl(progCtl, eventGroups)
 	if err != nil {

@@ -46,6 +46,8 @@
 
 - Support for exitMonitor on Unix-like systems
 - Need to implement Suspend and Resume methods for WindowsProcess
+- Search for process using its path (we are currently limited to
+  searching by its name)
 
 ## memory
 

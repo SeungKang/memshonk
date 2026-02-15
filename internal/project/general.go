@@ -5,11 +5,11 @@ import (
 )
 
 const (
-	exeParam = "ExeName"
+	exePathParam = "ExePath"
 )
 
 type General struct {
-	ExeName string
+	ExePath string
 }
 
 type generalSchema struct {
@@ -18,7 +18,7 @@ type generalSchema struct {
 
 func (o *generalSchema) RequiredParams() []string {
 	return []string{
-		exeParam,
+		exePathParam,
 	}
 }
 
@@ -28,9 +28,9 @@ func (o *generalSchema) OnParam(paramName string) (func(*ini.Param) error, ini.S
 	}
 
 	switch paramName {
-	case exeParam:
+	case exePathParam:
 		return func(p *ini.Param) error {
-			o.general.ExeName = p.Value
+			o.general.ExePath = p.Value
 
 			return nil
 		}, ini.SchemaRule{Limit: 1}

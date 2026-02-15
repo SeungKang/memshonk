@@ -1,2 +1,2 @@
 [General]
-ExeName = vim
+ExePath = /usr/local/bin/vim

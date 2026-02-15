@@ -1,2 +1,2 @@
 [General]
-ExeName = vim.exe
+ExePath = /Program Files/Git/usr/bin/vim.exe

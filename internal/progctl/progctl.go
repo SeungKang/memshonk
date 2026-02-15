@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -72,9 +73,9 @@ type attachedProcess interface {
 	Close() error
 }
 
-func NewCtl(exeName string, eventGroups *events.Groups) *Ctl {
+func NewCtl(exePath string, eventGroups *events.Groups) *Ctl {
 	return &Ctl{
-		exeName:       exeName,
+		exePath:       exePath,
 		attachEvents:  events.NewPublisher[AttachedEvent](eventGroups),
 		detachEvents:  events.NewPublisher[DetachedEvent](eventGroups),
 		processExited: events.NewPublisher[ProcessExitedEvent](eventGroups),
@@ -82,7 +83,7 @@ func NewCtl(exeName string, eventGroups *events.Groups) *Ctl {
 }
 
 type Ctl struct {
-	exeName       string
+	exePath       string
 	attachEvents  *events.Publisher[AttachedEvent]
 	detachEvents  *events.Publisher[DetachedEvent]
 	processExited *events.Publisher[ProcessExitedEvent]
@@ -103,32 +104,35 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 		}
 	}
 
+	targetExeName := filepath.Base(o.exePath)
+	targetExeNameLower := strings.ToLower(targetExeName)
+
 	processes, err := ps.Processes()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get active processes - %w", err)
 	}
 
-	possiblePID := -1
-	var exeName string
+	foundPID := -1
+	var foundExeName string
 	for _, psProc := range processes {
-		if strings.ToLower(psProc.Executable()) == strings.ToLower(o.exeName) {
-			possiblePID = psProc.Pid()
-			exeName = psProc.Executable()
+		if strings.ToLower(psProc.Executable()) == targetExeNameLower {
+			foundPID = psProc.Pid()
+			foundExeName = psProc.Executable()
 			break
 		}
 	}
 
-	if possiblePID == -1 {
+	if foundExeName == "" {
 		return 0, fmt.Errorf("failed to find a matching process for: %q",
-			o.exeName)
+			targetExeName)
 	}
 
 	unexpectedExitMon := newExitMonitor(o.processExited)
 
-	proc, err := newProcessThread(exeName, possiblePID, unexpectedExitMon)
+	proc, err := newProcessThread(foundExeName, foundPID, unexpectedExitMon)
 	if err != nil {
 		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
-			possiblePID, exeName, err)
+			foundPID, foundExeName, err)
 	}
 
 	o.current = proc
@@ -140,7 +144,7 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 		acker:       events.NewAcker(),
 	})
 
-	return possiblePID, nil
+	return foundPID, nil
 }
 
 func (o *Ctl) ProcessInfo(ctx context.Context) (ProcessInfo, error) {

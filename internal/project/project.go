@@ -2,6 +2,7 @@ package project
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,20 +15,44 @@ import (
 	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
-func FromFilePath(filePath string, globalConf globalconfig.Config) (*Project, error) {
-	name := filepath.Base(filePath)
-	dotIndex := strings.LastIndex(name, ".")
-	if dotIndex > 0 {
-		name = name[:dotIndex]
+func Empty(exeFilePath string, globalConf globalconfig.Config) (*Project, error) {
+	absExeFilePath, err := exeAbsPath(exeFilePath)
+	if err != nil {
+		return nil, err
 	}
 
-	wsConfig, err := globalConf.SetupWorkspace(name)
+	projectName := filepath.Base(absExeFilePath)
+
+	wsConfig, err := globalConf.SetupWorkspace(projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup workspace - %v", err)
+	}
+
+	project := &Project{
+		name:     projectName,
+		wsConfig: wsConfig,
+		general: General{
+			ExePath: absExeFilePath,
+		},
+	}
+
+	return project, nil
+}
+
+func FromFilePath(projectFilePath string, globalConf globalconfig.Config) (*Project, error) {
+	projectName := filepath.Base(projectFilePath)
+	dotIndex := strings.LastIndex(projectName, ".")
+	if dotIndex > 0 {
+		projectName = projectName[:dotIndex]
+	}
+
+	wsConfig, err := globalConf.SetupWorkspace(projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup workspace - %v", err)
 	}
 
 	srcFn := func() (io.ReadCloser, error) {
-		return os.Open(filePath)
+		return os.Open(projectFilePath)
 	}
 
 	file, err := srcFn()
@@ -38,7 +63,7 @@ func FromFilePath(filePath string, globalConf globalconfig.Config) (*Project, er
 
 	schemea := &projectSchema{
 		project: &Project{
-			name:     name,
+			name:     projectName,
 			wsConfig: wsConfig,
 			src:      srcFn,
 		},
@@ -49,7 +74,38 @@ func FromFilePath(filePath string, globalConf globalconfig.Config) (*Project, er
 		return nil, fmt.Errorf("failed to parse project - %w", err)
 	}
 
+	exeAbsFilePath, err := exeAbsPath(schemea.project.general.ExePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get exe absolute path - %w", err)
+	}
+
+	schemea.project.general.ExePath = exeAbsFilePath
+
 	return schemea.project, nil
+}
+
+func exeAbsPath(exeFilePath string) (string, error) {
+	absExePath, err := filepath.Abs(exeFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	resolved, readLinkErr := os.Readlink(absExePath)
+	if readLinkErr == nil {
+		resolvedAbs, err := filepath.Abs(resolved)
+		if err != nil {
+			return "", fmt.Errorf("executable file path is a symlink which points to: '%s' - please specify that path instead of the symlink",
+				resolved)
+
+		}
+
+		if resolvedAbs != absExePath {
+			return "", fmt.Errorf("executable file path is a symlink which points to: '%s' - please specify that path instead of the symlink",
+				resolvedAbs)
+		}
+	}
+
+	return absExePath, nil
 }
 
 type Project struct {
@@ -73,6 +129,10 @@ func (o *Project) WorkspaceConfig() globalconfig.WorkspaceConfig {
 func (o *Project) Reload(context.Context) error {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
+
+	if o.src == nil {
+		return errors.New("project does not support reloading")
+	}
 
 	src, err := o.src()
 	if err != nil {

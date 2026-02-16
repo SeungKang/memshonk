@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -112,12 +113,9 @@ type Mux struct {
 // a connection is accepted, an error is returned. Once successfully
 // connected, any expiration of the context will not affect the connection.
 //
-// The resulting net.Conn's LocalAddr and RemoteAddr methods will
-// return a net.Addr that contains the originally-specified network
-// string and address strings. The address string will contain the
-// address and underlying connection ID like so:
-//
-//	<addr-string>:<connection-id>
+// The resulting net.Conn's LocalAddr and RemoteAddr methods return
+// a net.Addr implementation (this package's Addr data type) which
+// contains the originally-specified network string and address strings.
 func (o *Mux) AcceptContext(ctx context.Context) (net.Conn, error) {
 	if o.noAccept {
 		return nil, errors.New("accepting connections is disabled")
@@ -465,9 +463,10 @@ func (o *Mux) acceptDial(message *connMuxMessage) error {
 }
 
 func (o *Mux) newChild(sAddr uint32, network string, addr string) *muxChild {
-	netAddr := &customAddr{
+	netAddr := &Addr{
 		network: network,
-		str:     fmt.Sprintf("%s:%d", addr, sAddr),
+		address: addr,
+		id:      strconv.FormatUint(uint64(sAddr), 10),
 	}
 
 	return &muxChild{
@@ -550,8 +549,8 @@ func (o *Mux) childClosed(child *muxChild) {
 
 type muxChild struct {
 	sAddr  uint32
-	lAddr  *customAddr
-	rAddr  *customAddr
+	lAddr  *Addr
+	rAddr  *Addr
 	reads  chan connMuxReadReady
 	readM  sync.Mutex
 	readB  *list.List
@@ -798,15 +797,20 @@ func readConnMuxMessage(done <-chan struct{}, reader io.Reader, c chan<- *connMu
 	}
 }
 
-type customAddr struct {
+type Addr struct {
 	network string
-	str     string
+	address string
+	id      string
 }
 
-func (o *customAddr) Network() string {
+func (o *Addr) Network() string {
 	return o.network
 }
 
-func (o *customAddr) String() string {
-	return o.str
+func (o *Addr) String() string {
+	return o.address
+}
+
+func (o *Addr) ID() string {
+	return o.id
 }

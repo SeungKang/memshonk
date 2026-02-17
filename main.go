@@ -8,8 +8,11 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/events"
@@ -20,7 +23,6 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
-	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
 	"golang.org/x/term"
 )
@@ -52,6 +54,14 @@ func main() {
 }
 
 func mainWithError() error {
+	isDaemon := false
+	args := os.Args[1:]
+
+	if len(args) > 0 && args[0] == "daemon" {
+		isDaemon = true
+		args = args[2:]
+	}
+
 	var state mainState
 
 	help := flag.Bool(
@@ -65,7 +75,7 @@ func mainWithError() error {
 		"",
 		"Use a project file instead of an empty project based on a program path")
 
-	flag.Parse()
+	flag.CommandLine.Parse(args)
 
 	if *help {
 		out := os.Stderr
@@ -115,11 +125,11 @@ func mainWithError() error {
 
 	state.wsConf = state.globalConf.ProjectWorkspaceConfig(state.project.Name())
 
-	if sessiond.IsServerRunning(context.Background(), state.project.WorkspaceConfig().SocketFilePath) {
-		return doClient(state)
-	} else {
-		return doServer(state)
+	if isDaemon {
+		return beDaemon(state)
 	}
+
+	return beClient(state)
 }
 
 type mainState struct {
@@ -131,21 +141,36 @@ type mainState struct {
 	optExePath         string
 }
 
-func doClient(state mainState) error {
-	conn, err := net.Dial("unix", state.wsConf.SocketFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to connect to server - %w", err)
-	}
-	defer conn.Close()
-
-	client, err := sessiond.NewClient(context.Background(), sessiond.ClientConfig{
-		ServerConn: conn,
+func beClient(state mainState) error {
+	clientConfig := sessiond.ClientConfig{
+		SocketPath: state.wsConf.SocketFilePath,
 		Stdin:      os.Stdin,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
-	})
+	}
+
+	setupCtx, cancelFn := context.WithTimeout(context.Background(), time.Second)
+	defer cancelFn()
+
+	// Try to connect to an existing daemon process. If that
+	// fails, try starting a new daemon process and connect
+	// to the new  process.
+	client, err := sessiond.SetupClient(setupCtx, clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create client - %w", err)
+		cancelFn()
+
+		setupCtx, cancelFn = context.WithTimeout(context.Background(), 2*time.Second)
+
+		err = execDaemon(setupCtx)
+		if err != nil {
+			return fmt.Errorf("failed to start daemon - %w", err)
+		}
+
+		client, err = sessiond.SetupClient(setupCtx, clientConfig)
+		cancelFn()
+		if err != nil {
+			return fmt.Errorf("failed to setup client after successfully starting daemon - %w", err)
+		}
 	}
 	defer client.Close()
 
@@ -160,7 +185,122 @@ func doClient(state mainState) error {
 	return client.Err()
 }
 
-func doServer(state mainState) error {
+func execDaemon(setupCtx context.Context) error {
+	exePath, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	tmpDirPath, err := os.MkdirTemp("", "memshonk-")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary directory for daemon setup - %w", err)
+	}
+	defer os.RemoveAll(tmpDirPath)
+
+	initSocketPath := filepath.Join(tmpDirPath, "init.sock")
+
+	initSocket, err := net.Listen("unix", initSocketPath)
+	if err != nil {
+		return fmt.Errorf("failed to create init daemon socket - %w", err)
+	}
+	defer initSocket.Close()
+
+	args := make([]string, len(os.Args)+1)
+	args[0] = "daemon"
+	args[1] = "--"
+	copy(args[2:], os.Args[1:])
+
+	daemon := exec.Command(exePath, args...)
+
+	daemon.SysProcAttr = sessiond.DaemonSysProcAttr()
+
+	// TODO: grumble needs these to be set to fds connected to a terminal.
+	// Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
+	daemon.Stdin = os.Stdin
+	daemon.Stdout = os.Stdout
+	daemon.Stderr = os.Stderr
+
+	// TODO: Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
+	daemon.Env = os.Environ()
+	daemon.Env = append(daemon.Env, "MEMSHONK_INIT_SOCKET_HACK="+initSocketPath)
+
+	// TODO: Uncomment once MEMSHONK_INIT_SOCKET_HACK is removed.
+	//stdout, err := daemon.StdoutPipe()
+	//if err != nil {
+	//	return fmt.Errorf("failed to create pipe for daemon's stdout - %w",
+	//		err)
+	//}
+	//defer stdout.Close()
+
+	err = daemon.Start()
+	if err != nil {
+		return fmt.Errorf("exec start failed (argv: %q) - %w",
+			daemon.String(), err)
+	}
+
+	ready := make(chan struct{})
+	waitErr := make(chan error, 1)
+
+	go func() {
+		conn, err := initSocket.Accept()
+		if err != nil {
+			waitErr <- err
+		} else {
+			conn.Close()
+			close(ready)
+		}
+	}()
+
+	// TODO: Uncomment once MEMSHONK_INIT_SOCKET_HACK is removed.
+	// go func() {
+	// 	scanner := bufio.NewScanner(stdout)
+
+	// 	readFromStdout := scanner.Scan()
+
+	// 	if !readFromStdout {
+	// 		var err error
+	// 		if scanner.Err() != nil {
+	// 			err = scanner.Err()
+	// 		} else {
+	// 			err = errors.New("stdout scanner failed without error")
+	// 		}
+
+	// 		waitErr <- fmt.Errorf("failed to read from daemon's stdout - %w", err)
+
+	// 		return
+	// 	}
+
+	// 	if scanner.Text() != "ready" {
+	// 		waitErr <- fmt.Errorf("got unexpected ready string: %q",
+	// 			scanner.Text())
+
+	// 		return
+	// 	}
+
+	// 	close(ready)
+	// }()
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+	defer signal.Stop(sigs)
+
+	select {
+	case s := <-sigs:
+		err = fmt.Errorf("received signal while waiting for daemon to become ready: %q", s.String())
+	case <-setupCtx.Done():
+		err = fmt.Errorf("timed-out waiting for daemon process to become ready - %w", setupCtx.Err())
+	case err := <-waitErr:
+		err = fmt.Errorf("daemon process communication failed - %w", err)
+	case <-ready:
+		return nil
+	}
+
+	_ = daemon.Process.Kill()
+
+	return err
+}
+
+func beDaemon(state mainState) error {
 	ctx, cancelFn := signal.NotifyContext(context.Background(),
 		syscall.SIGQUIT, syscall.SIGTERM)
 	defer cancelFn()
@@ -181,27 +321,11 @@ func doServer(state mainState) error {
 		Plugins: optPluginsCtl,
 	}
 
-	terminal, _ := goterm.NewStdioTerminal()
-
 	server, err := sessiond.NewServer(ctx, sharedState)
 	if err != nil {
 		return fmt.Errorf("failed to create new session server - %w", err)
 	}
 	defer server.Close()
-
-	session, err := server.NewSession(ctx, sessiond.SessionConfig{
-		IsDefault: true,
-		IO: apicompat.SessionIO{
-			Stdin:       os.Stdin,
-			Stdout:      os.Stdout,
-			Stderr:      os.Stderr,
-			OptTerminal: terminal,
-		},
-		OptID: "default",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create default app session - %w", err)
-	}
 
 	// TODO: Should loading plugins happen before setting up the session server?
 	if optPluginsCtl != nil {
@@ -214,19 +338,26 @@ func doServer(state mainState) error {
 		}
 	}
 
-	interrupts := make(chan os.Signal, 1)
-	signal.Notify(interrupts, syscall.SIGINT)
-	defer signal.Stop(interrupts)
-
-	go func() {
-		for range interrupts {
-			session.OnSignal(sessiond.IntSignalType)
-		}
-	}()
-
 	log.SetFlags(log.LstdFlags)
 
-	<-session.Done()
+	// _, err = os.Stdout.WriteString("ready\n")
+	// if err != nil {
+	// 	return err
+	// }
+
+	// TODO: Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
+	initSocketPath := os.Getenv("MEMSHONK_INIT_SOCKET_HACK")
+	if initSocketPath == "" {
+		return errors.New("MEMSHONK_INIT_SOCKET_HACK is not set")
+	}
+
+	tmp, err := net.Dial("unix", initSocketPath)
+	if err != nil {
+		return fmt.Errorf("failed to connect to init socket - %w", err)
+	}
+	tmp.Close()
+
+	<-ctx.Done()
 
 	return nil
 }

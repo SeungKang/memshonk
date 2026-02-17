@@ -17,7 +17,6 @@
 - fix client shell history
 - fix history for server on windows
 - figure out better way of doing copyAndAddBackslashRLoop()
-- make decision about command line arguments to start client memshonk
 - commands to manage sessions
 - add ability to name a session
 

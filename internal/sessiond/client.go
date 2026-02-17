@@ -12,12 +12,24 @@ import (
 	"github.com/SeungKang/memshonk/internal/cstlv"
 )
 
-func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
-	setupCtx, cancelFn := context.WithTimeout(ctx, time.Second)
-	defer cancelFn()
+type ClientConfig struct {
+	SocketPath string
+	Stdin      io.Reader
+	Stdout     io.Writer
+	Stderr     io.Writer
+}
 
-	cm, err := connmux.New(setupCtx, config.ServerConn)
+func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error) {
+	dialer := net.Dialer{}
+
+	conn, err := dialer.DialContext(setupCtx, "unix", config.SocketPath)
 	if err != nil {
+		return nil, fmt.Errorf("failed to dial unix socket - %w", err)
+	}
+
+	cm, err := connmux.New(setupCtx, conn)
+	if err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 
@@ -45,8 +57,7 @@ func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
 		return nil, err
 	}
 
-	var stopFn func()
-	ctx, stopFn = context.WithCancel(ctx)
+	clientCtx, stopFn := context.WithCancel(context.Background())
 
 	client := &Client{
 		apiConn:  apiConn,
@@ -54,7 +65,7 @@ func NewClient(ctx context.Context, config ClientConfig) (*Client, error) {
 		done:     make(chan struct{}),
 	}
 
-	go client.loopWithError(ctx)
+	go client.loopWithError(clientCtx)
 
 	go func() {
 		err := copyAndAddBackslashRLoop(stdoutConn, config.Stdout)
@@ -134,13 +145,6 @@ type Client struct {
 	once     sync.Once
 	done     chan struct{}
 	err      error
-}
-
-type ClientConfig struct {
-	ServerConn net.Conn
-	Stdin      io.Reader
-	Stdout     io.Writer
-	Stderr     io.Writer
 }
 
 func (o *Client) Err() error {

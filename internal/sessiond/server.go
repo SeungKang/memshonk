@@ -41,10 +41,6 @@ const (
 func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server, error) {
 	socketPath := sharedState.Project.WorkspaceConfig().SocketFilePath
 
-	if IsServerRunning(ctx, socketPath) {
-		return nil, fmt.Errorf("a memshonk server is already listening for this project (%q)", socketPath)
-	}
-
 	_ = os.Remove(socketPath)
 
 	listener, err := net.Listen("unix", socketPath)
@@ -68,21 +64,6 @@ func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server,
 	}()
 
 	return server, nil
-}
-
-func IsServerRunning(ctx context.Context, socketPath string) bool {
-	dialCtx, cancelFn := context.WithTimeout(ctx, time.Second)
-	defer cancelFn()
-
-	dialer := net.Dialer{}
-
-	tempConn, _ := dialer.DialContext(dialCtx, "unix", socketPath)
-	if tempConn != nil {
-		_ = tempConn.Close()
-		return true
-	}
-
-	return false
 }
 
 type Server struct {

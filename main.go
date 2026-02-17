@@ -351,7 +351,9 @@ func beDaemon(state mainState) error {
 		return errors.New("MEMSHONK_INIT_SOCKET_HACK is not set")
 	}
 
-	tmp, err := net.Dial("unix", initSocketPath)
+	dialer := net.Dialer{}
+
+	tmp, err := dialer.DialContext(ctx, "unix", initSocketPath)
 	if err != nil {
 		return fmt.Errorf("failed to connect to init socket - %w", err)
 	}

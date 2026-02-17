@@ -80,3 +80,8 @@
 
 - reverse search (ctrl+r) and selecting an entry does not save to history
 - disable color (needs to be a Session-level setting)
+
+## projects
+
+- Create project file based on current settings (i.e., serialize current
+  project.Project object to ini)

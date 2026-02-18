@@ -138,13 +138,17 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
-	stdoutConn, err := cm.AcceptContext(setupCtx)
-	if err != nil {
-		_ = cm.Close()
-		return err
-	}
-
-	stderrConn, err := cm.AcceptContext(setupCtx)
+	// We use a single net.Conn to transport both stderr and
+	// stdout data in order to preserve the order in which
+	// it was generated in.
+	//
+	// We originally used two net.Conns (one for stderr and
+	// one for stdout), but that resulted in the data being
+	// parsed out of order since it required two go routines
+	// to read from both net.Conns. It may have been possible
+	// to continue using that design, but I think using a single
+	// net.Conn ends up being simpler.
+	stdErrAndOutConn, err := cm.AcceptContext(setupCtx)
 	if err != nil {
 		_ = cm.Close()
 		return err
@@ -153,11 +157,11 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 	_, err = o.newSession(ctx, SessionConfig{
 		IO: apicompat.SessionIO{
 			Stdin:  stdinConn,
-			Stdout: stdoutConn,
-			Stderr: stderrConn,
+			Stdout: stdSplitterWriter{conn: stdErrAndOutConn},
+			Stderr: stdSplitterWriter{conn: stdErrAndOutConn, isStderr: true},
 			OptTerminal: goterm.NewVirtualTerminal(goterm.VirtualTerminalConfig{
 				Input:  stdinConn,
-				Output: stdoutConn,
+				Output: stdSplitterWriter{conn: stdErrAndOutConn},
 			}),
 		},
 		OptID:            apiConn.RemoteAddr().String(),

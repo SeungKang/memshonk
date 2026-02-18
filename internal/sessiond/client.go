@@ -45,13 +45,7 @@ func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error)
 		return nil, err
 	}
 
-	stdoutConn, err := cm.DialContext(setupCtx, "", "")
-	if err != nil {
-		_ = cm.Close()
-		return nil, err
-	}
-
-	stderrConn, err := cm.DialContext(setupCtx, "", "")
+	stdErrOutConn, err := cm.DialContext(setupCtx, "", "")
 	if err != nil {
 		_ = cm.Close()
 		return nil, err
@@ -68,15 +62,7 @@ func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error)
 	go client.loopWithError(clientCtx)
 
 	go func() {
-		err := copyAndAddBackslashRLoop(stdoutConn, config.Stdout)
-		client.once.Do(func() {
-			client.err = err
-			close(client.done)
-		})
-	}()
-
-	go func() {
-		err := copyAndAddBackslashRLoop(stderrConn, config.Stderr)
+		err := copyAndAddBackslashRLoop(stdErrOutConn, config.Stderr, config.Stdout)
 		client.once.Do(func() {
 			client.err = err
 			close(client.done)
@@ -119,24 +105,35 @@ func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error)
 	return client, nil
 }
 
-func copyAndAddBackslashRLoop(conn net.Conn, out io.Writer) error {
-	b := make([]byte, 1)
+func copyAndAddBackslashRLoop(conn net.Conn, stdErr io.Writer, stdOut io.Writer) error {
+	splitter := newStdSplitterReader(conn)
 
-	for {
-		_, err := conn.Read(b)
-		if err != nil {
-			return fmt.Errorf("failed to read from server - %w", err)
+next:
+	kind, data, err := splitter.next()
+	if err != nil {
+		return err
+	}
+
+	out := stdOut
+	if kind == 0x01 {
+		out = stdErr
+	}
+
+	for _, b := range data {
+		if b == '\n' {
+			_, err = out.Write([]byte{'\r'})
+			if err != nil {
+				return err
+			}
 		}
 
-		if b[0] == '\n' {
-			out.Write([]byte{'\r'})
-		}
-
-		_, err = out.Write(b)
+		_, err = out.Write([]byte{b})
 		if err != nil {
 			return err
 		}
 	}
+
+	goto next
 }
 
 type Client struct {

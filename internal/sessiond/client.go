@@ -9,6 +9,7 @@ import (
 
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 type ClientConfig struct {
@@ -16,6 +17,8 @@ type ClientConfig struct {
 	Stdin      io.Reader
 	Stdout     io.Writer
 	Stderr     io.Writer
+
+	OptTerminalResizes <-chan goterm.ResizeEvent
 }
 
 func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error) {
@@ -71,7 +74,33 @@ func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error)
 		client.onIoError(err)
 	}()
 
+	if config.OptTerminalResizes != nil {
+		go func() {
+			err := sendTerminalResizeEvents(client, config.OptTerminalResizes)
+			client.onIoError(err)
+		}()
+	}
+
 	return client, nil
+}
+
+func sendTerminalResizeEvents(client *Client, events <-chan goterm.ResizeEvent) error {
+loop:
+	select {
+	case <-client.Done():
+		return nil
+	case event, isOpen := <-events:
+		if !isOpen {
+			return fmt.Errorf("terminal resize events listener exited unexpectedly")
+		}
+
+		err := client.sendTerminalResized(event)
+		if err != nil {
+			return fmt.Errorf("failed to send terminal resize event - %w", err)
+		}
+	}
+
+	goto loop
 }
 
 func copyAndAddBackslashRLoop(conn net.Conn, stdErr io.Writer, stdOut io.Writer) error {
@@ -207,4 +236,23 @@ func (o *Client) sendSignal(signalType uint8) error {
 
 	_, err := o.apiConn.Write(msg.AutoBytes())
 	return err
+}
+
+func (o *Client) sendTerminalResized(event goterm.ResizeEvent) error {
+	b, err := terminalSizeToBytes(event.NewSize)
+	if err != nil {
+		return fmt.Errorf("failed to convert terminal resize event to bytes - %w", err)
+	}
+
+	msg := cstlv.CSTLV{
+		Type: terminalResizeMessageType,
+		Val:  b,
+	}
+
+	_, err = o.apiConn.Write(msg.AutoBytes())
+	if err != nil {
+		return fmt.Errorf("failed to write terminal resize event to api conn - %w", err)
+	}
+
+	return nil
 }

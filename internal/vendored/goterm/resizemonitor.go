@@ -38,6 +38,5 @@ func (o *Resized) Events() <-chan ResizeEvent {
 }
 
 type ResizeEvent struct {
-	Width  int
-	Height int
+	NewSize Size
 }

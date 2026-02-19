@@ -24,7 +24,7 @@ type Session interface {
 	// Terminal returns a non-nil terminal object and true
 	// if the client supports a terminal, otherwise it
 	// returns nil and false.
-	Terminal() (goterm.TerminalWithNotifications, bool)
+	Terminal() (*goterm.VirtualTerminal, bool)
 
 	// RunCommand runs a command.
 	RunCommand(context.Context, Command) error
@@ -53,5 +53,5 @@ type SessionIO struct {
 	// OptTerminal is the client's terminal if
 	// it allocated one. This field is nil if
 	// no terminal has been allocated.
-	OptTerminal goterm.TerminalWithNotifications
+	OptTerminal *goterm.VirtualTerminal
 }

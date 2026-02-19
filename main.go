@@ -23,6 +23,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
+	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
 	"golang.org/x/term"
 )
@@ -142,11 +143,21 @@ type mainState struct {
 }
 
 func beClient(state mainState) error {
+	terminal, err := goterm.NewFdTerminal(os.Stdin, os.Stdout)
+	if err != nil {
+		return fmt.Errorf("failed to create new fd terminal - %w", err)
+	}
+
+	resizeEvents, stopResizeEventsFn := terminal.OnResize()
+	defer stopResizeEventsFn()
+
 	clientConfig := sessiond.ClientConfig{
 		SocketPath: state.wsConf.SocketFilePath,
 		Stdin:      os.Stdin,
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
+
+		OptTerminalResizes: resizeEvents,
 	}
 
 	setupCtx, cancelFn := context.WithTimeout(context.Background(), time.Second)
@@ -173,6 +184,9 @@ func beClient(state mainState) error {
 		}
 	}
 	defer client.Close()
+
+	termResizeMon := goterm.NewResizedMonitor(context.Background(), os.Stderr.Fd())
+	defer termResizeMon.Close()
 
 	termState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {

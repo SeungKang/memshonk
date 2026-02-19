@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -430,7 +431,9 @@ func (o *fromClient) loopWithError(ctx context.Context) error {
 			case signalMessageType:
 				o.handleSignalMessage(result.Msg)
 			case terminalResizeMessageType:
-				// TODO
+				if o.session.io.OptTerminal != nil {
+					o.handTerminalResizeMessage(result.Msg, o.session.io.OptTerminal)
+				}
 			case goodbyeeeMessageType:
 				o.session.stopper.Close()
 
@@ -448,4 +451,50 @@ func (o *fromClient) handleSignalMessage(msg *cstlv.CSTLV) {
 	}
 
 	o.session.OnSignal(msg.Val[0])
+}
+
+func (o *fromClient) handTerminalResizeMessage(msg *cstlv.CSTLV, terminal *goterm.VirtualTerminal) {
+	newSize, err := terminalSizeFromBytes(msg.Val)
+	if err != nil {
+		return
+	}
+
+	terminal.SetSize(newSize)
+}
+
+func terminalSizeToBytes(size goterm.Size) ([]byte, error) {
+	var buf bytes.Buffer
+
+	err := binary.Write(&buf, binary.BigEndian, tmpTermSize{
+		Cols: int64(size.Cols),
+		Rows: int64(size.Rows),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func terminalSizeFromBytes(msg []byte) (goterm.Size, error) {
+	var event tmpTermSize
+
+	err := binary.Read(bytes.NewReader(msg), binary.BigEndian, &event)
+	if err != nil {
+		return goterm.Size{}, err
+	}
+
+	return goterm.Size{
+		Cols: int(event.Cols),
+		Rows: int(event.Rows),
+	}, nil
+}
+
+// tmpTermSize is needed because goterm.Size does uses non-fixed sized
+// integers in its fields.
+//
+// TODO: Remove once we replace those fields with fixed-size types.
+type tmpTermSize struct {
+	Cols int64
+	Rows int64
 }

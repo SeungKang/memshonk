@@ -98,7 +98,7 @@ func (o *FdTerminal) Size() (Size, error) {
 	}, nil
 }
 
-func (o *FdTerminal) OnResize() (<-chan Size, func()) {
+func (o *FdTerminal) OnResize() (<-chan ResizeEvent, func()) {
 	o.resizerMu.Lock()
 	defer o.resizerMu.Unlock()
 
@@ -113,11 +113,7 @@ func (o *FdTerminal) OnResize() (<-chan Size, func()) {
 				case <-onResized.Done():
 					return
 				case resizeEvent := <-onResized.Events():
-					o.resizeNotifier.notify(Size{
-						Cols: resizeEvent.Width,
-						Rows: resizeEvent.Height,
-					})
-
+					o.resizeNotifier.notify(resizeEvent)
 				}
 			}
 		}()
@@ -189,19 +185,21 @@ func (o *VirtualTerminal) SetSize(size Size) {
 
 	o.config.OptSize = size
 
-	o.resize.notify(size)
+	o.resize.notify(ResizeEvent{
+		NewSize: size,
+	})
 }
 
-func (o *VirtualTerminal) OnResize() (<-chan Size, func()) {
+func (o *VirtualTerminal) OnResize() (<-chan ResizeEvent, func()) {
 	return o.resize.Sub()
 }
 
 type resizedPubSub struct {
 	rwMu  sync.RWMutex
-	chans map[chan Size]chan struct{}
+	chans map[chan ResizeEvent]chan struct{}
 }
 
-func (o *resizedPubSub) notify(size Size) {
+func (o *resizedPubSub) notify(size ResizeEvent) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -215,7 +213,7 @@ func (o *resizedPubSub) notify(size Size) {
 	}
 }
 
-func (o *resizedPubSub) removeAsync(c chan Size) {
+func (o *resizedPubSub) removeAsync(c chan ResizeEvent) {
 	go func() {
 		o.rwMu.Lock()
 		defer o.rwMu.Unlock()
@@ -224,15 +222,15 @@ func (o *resizedPubSub) removeAsync(c chan Size) {
 	}()
 }
 
-func (o *resizedPubSub) Sub() (<-chan Size, func()) {
+func (o *resizedPubSub) Sub() (<-chan ResizeEvent, func()) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
 	if o.chans == nil {
-		o.chans = make(map[chan Size]chan struct{})
+		o.chans = make(map[chan ResizeEvent]chan struct{})
 	}
 
-	c := make(chan Size)
+	c := make(chan ResizeEvent)
 	done := make(chan struct{})
 
 	o.chans[c] = done
@@ -253,7 +251,7 @@ type Terminal interface {
 type TerminalWithNotifications interface {
 	Terminal
 
-	OnResize() (<-chan Size, func())
+	OnResize() (<-chan ResizeEvent, func())
 }
 
 func DefaultVirtualTerminalSize() Size {

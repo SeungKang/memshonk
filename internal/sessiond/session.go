@@ -67,7 +67,7 @@ func (o *Session) Variables() *SessionVariables {
 	return o.vars
 }
 
-func (o *Session) Terminal() (goterm.TerminalWithNotifications, bool) {
+func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
 	if o.io.OptTerminal != nil {
 		return o.io.OptTerminal, true
 	}

@@ -150,8 +150,8 @@ loop:
 	case <-ctx.Done():
 		return nil, nil
 	case resize := <-resized:
-		width = resize.Cols
-		height = resize.Rows
+		width = resize.NewSize.Cols
+		height = resize.NewSize.Rows
 
 		screen.Clear()
 		screen.Flush()

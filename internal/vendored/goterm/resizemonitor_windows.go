@@ -48,8 +48,10 @@ func monitorResizeEvents(ctx context.Context, fd uintptr) <-chan ResizeEvent {
 			case <-ctx.Done():
 				return
 			case events <- ResizeEvent{
-				Width:  width,
-				Height: height,
+				NewSize: Size{
+					Cols: width,
+					Rows: height,
+				},
 			}:
 			}
 		}

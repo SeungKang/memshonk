@@ -1,6 +1,6 @@
 //go:build windows
 
-package termkit
+package goterm
 
 import (
 	"context"

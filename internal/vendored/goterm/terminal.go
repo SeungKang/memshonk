@@ -23,8 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SeungKang/memshonk/internal/termkit"
-
 	"golang.org/x/term"
 )
 
@@ -76,7 +74,7 @@ type FdTerminal struct {
 	output         *os.File
 	resizeNotifier *resizedPubSub
 	resizerMu      sync.Mutex
-	onResized      *termkit.Resized
+	onResized      *Resized
 	numSubs        uint64
 }
 
@@ -105,7 +103,7 @@ func (o *FdTerminal) OnResize() (<-chan Size, func()) {
 	defer o.resizerMu.Unlock()
 
 	if o.onResized == nil {
-		onResized := termkit.NewResizedMonitor(context.Background(), o.input.Fd())
+		onResized := NewResizedMonitor(context.Background(), o.input.Fd())
 
 		o.onResized = onResized
 

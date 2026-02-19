@@ -1,6 +1,6 @@
 //go:build unix
 
-package termkit
+package goterm
 
 import (
 	"context"

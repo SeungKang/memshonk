@@ -19,7 +19,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
-	"github.com/SeungKang/memshonk/internal/grsh"
+	"github.com/SeungKang/memshonk/internal/shell"
 	"github.com/SeungKang/memshonk/internal/shvars"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
@@ -268,7 +268,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 		stopper: stopper,
 	}
 
-	sh, err := grsh.NewShell(sessionCtx, session)
+	sh, err := shell.NewShell(session)
 	if err != nil {
 		_ = stopper.Close()
 		return nil, err
@@ -276,7 +276,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 
 	go func() {
 		// TODO maybe log when the shell exits
-		sh.Run()
+		sh.Run(sessionCtx)
 
 		o.RemoveSession(id)
 	}()

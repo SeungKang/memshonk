@@ -16,12 +16,33 @@ import (
 )
 
 // NewInterpreter creates a new shell interpreter.
-func NewInterpreter(session apicompat.Session, registry *CommandRegistry) *Interpreter {
-	return &Interpreter{
+func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Interpreter, error) {
+	i := &Interpreter{
 		session:  session,
 		registry: registry,
 		parser:   syntax.NewParser(),
 	}
+
+	sio := session.IO()
+
+	// Use an empty reader for stdin to avoid competing with readline for input.
+	// Built-in commands don't read from stdin, and external commands that need
+	// stdin piping would require a different approach (e.g., temporarily giving
+	// them exclusive access to the terminal).
+	emptyStdin := bytes.NewReader(nil)
+
+	runner, err := interp.New(
+		interp.StdIO(emptyStdin, sio.Stdout, sio.Stderr),
+		interp.Env(expand.ListEnviron()),
+		interp.ExecHandlers(i.execHandler),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create interpreter - %w", err)
+	}
+
+	i.runner = runner
+
+	return i, nil
 }
 
 // Interpreter wraps mvdan/sh to provide shell interpretation with built-in command routing.
@@ -29,6 +50,7 @@ type Interpreter struct {
 	session  apicompat.Session
 	registry *CommandRegistry
 	parser   *syntax.Parser
+	runner   *interp.Runner
 }
 
 // Execute parses and executes a shell command line.
@@ -39,25 +61,7 @@ func (o *Interpreter) Execute(ctx context.Context, line string) error {
 		return fmt.Errorf("parse error - %w", err)
 	}
 
-	sio := o.session.IO()
-
-	// Use an empty reader for stdin to avoid competing with readline for input.
-	// Built-in commands don't read from stdin, and external commands that need
-	// stdin piping would require a different approach (e.g., temporarily giving
-	// them exclusive access to the terminal).
-	emptyStdin := bytes.NewReader(nil)
-
-	// Create a new runner for this execution
-	runner, err := interp.New(
-		interp.StdIO(emptyStdin, sio.Stdout, sio.Stderr),
-		interp.Env(expand.ListEnviron()),
-		interp.ExecHandlers(o.execHandler),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create interpreter - %w", err)
-	}
-
-	return runner.Run(ctx, file)
+	return o.runner.Run(ctx, file)
 }
 
 // execHandler routes command execution to built-in commands or external commands.

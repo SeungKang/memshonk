@@ -38,15 +38,20 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 	}
 
 	// Create readline instance
-	rl, err := readline.NewEx(readlineConfig)
+	readLine, err := readline.NewEx(readlineConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create readline - %w", err)
 	}
 
+	interpreter, err := NewInterpreter(session, registry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create interpreter - %w", err)
+	}
+
 	return &Shell{
 		session:  session,
-		rl:       rl,
-		interp:   NewInterpreter(session, registry),
+		rl:       readLine,
+		interp:   interpreter,
 		registry: registry,
 		colorFn:  color.New(color.FgCyan).SprintFunc(),
 		prompt:   "$ ",

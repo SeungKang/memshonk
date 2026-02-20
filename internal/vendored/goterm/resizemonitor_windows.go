@@ -9,9 +9,7 @@ import (
 	"golang.org/x/term"
 )
 
-func monitorResizeEvents(ctx context.Context, fd uintptr) <-chan ResizeEvent {
-	events := make(chan ResizeEvent)
-
+func monitorResizeEventsOS(ctx context.Context, fd uintptr, events chan ResizeEvent) {
 	go func() {
 		// Stackoverflow user ChrisV suggested
 		// using a combination of SetConsoleMode
@@ -33,9 +31,6 @@ func monitorResizeEvents(ctx context.Context, fd uintptr) <-chan ResizeEvent {
 			}
 
 			width, height, err := term.GetSize(int(fd))
-			if err != nil {
-				return
-			}
 
 			if width == lastWidth && height == lastHeight {
 				continue
@@ -52,10 +47,9 @@ func monitorResizeEvents(ctx context.Context, fd uintptr) <-chan ResizeEvent {
 					Cols: width,
 					Rows: height,
 				},
+				Err: err,
 			}:
 			}
 		}
 	}()
-
-	return events
 }

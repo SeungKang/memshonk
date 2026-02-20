@@ -84,7 +84,6 @@
 - allow execution of external programs to be disabled
 - implement "-h" auto-generation
 - fix piping of built-in commands to external programs
-- fix terminal sizing
 - replace shlex code in `internal/shell/completer.go` (`splitWords`)
 
 ## projects

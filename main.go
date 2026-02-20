@@ -185,9 +185,6 @@ func beClient(state mainState) error {
 	}
 	defer client.Close()
 
-	termResizeMon := goterm.NewResizedMonitor(context.Background(), os.Stderr.Fd())
-	defer termResizeMon.Close()
-
 	termState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return fmt.Errorf("failed to make raw - %w", err)

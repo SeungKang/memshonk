@@ -94,9 +94,14 @@ loop:
 			return fmt.Errorf("terminal resize events listener exited unexpectedly")
 		}
 
+		if event.Err != nil {
+			return fmt.Errorf("terminal resize listener returned an error - %w",
+				event.Err)
+		}
+
 		err := client.sendTerminalResized(event)
 		if err != nil {
-			return fmt.Errorf("failed to send terminal resize event - %w", err)
+			return fmt.Errorf("failed to send terminal resize to server - %w", err)
 		}
 	}
 

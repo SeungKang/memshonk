@@ -2,12 +2,9 @@ package sessiond
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
-	"github.com/SeungKang/memshonk/internal/project"
-	"github.com/SeungKang/memshonk/internal/shvars"
 
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
@@ -22,7 +19,6 @@ type Session struct {
 	shared    apicompat.SharedState
 	info      apicompat.SessionInfo
 	isDefault bool
-	vars      *SessionVariables
 	io        apicompat.SessionIO
 	stopper   *sessionStopper
 
@@ -61,10 +57,6 @@ func (o *Session) OnSignal(signalType uint8) {
 	default:
 		// ignore or log unknown signals
 	}
-}
-
-func (o *Session) Variables() *SessionVariables {
-	return o.vars
 }
 
 func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
@@ -128,43 +120,4 @@ func (o *Session) cancelCurrentCommand() {
 	if fn != nil {
 		fn()
 	}
-}
-
-type SessionVariables struct {
-	proj *project.Project
-	vars *shvars.Variables
-}
-
-func (o *SessionVariables) Len() int {
-	numProjVars := o.proj.Variables().Len()
-
-	numSessionVars := o.vars.Len()
-
-	return numProjVars + numSessionVars
-}
-
-func (o *SessionVariables) Set(name string, value string) error {
-	projVars := o.proj.Variables()
-
-	_, alreadyProjectVar := projVars.Get(name)
-	if alreadyProjectVar {
-		return fmt.Errorf("variable is already set as a project variable (%q)",
-			name)
-	}
-
-	return o.vars.Set(name, value)
-}
-
-func (o *SessionVariables) Get(name string) (string, bool) {
-	value, hasProjectVar := o.proj.Variables().Get(name)
-	if hasProjectVar {
-		return value, true
-	}
-
-	value, hasSessionVar := o.vars.Get(name)
-	if hasSessionVar {
-		return value, true
-	}
-
-	return "", false
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
 	"github.com/SeungKang/memshonk/internal/shell"
-	"github.com/SeungKang/memshonk/internal/shvars"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
@@ -261,12 +260,8 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 		},
 		isDefault: config.IsDefault,
 		shared:    o.sharedState,
-		vars: &SessionVariables{
-			proj: o.sharedState.Project,
-			vars: &shvars.Variables{},
-		},
-		io:      config.IO,
-		stopper: stopper,
+		io:        config.IO,
+		stopper:   stopper,
 	}
 
 	sh, err := shell.NewShell(session)

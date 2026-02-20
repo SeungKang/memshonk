@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
+	"github.com/SeungKang/memshonk/internal/shvars"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
 	"golang.org/x/term"
@@ -107,6 +109,8 @@ func mainWithError() error {
 			projectPathArg)
 	}
 
+	state.globalVars = &shvars.Variables{}
+
 	var err error
 
 	state.globalConf, err = globalconfig.Setup()
@@ -114,10 +118,32 @@ func mainWithError() error {
 		return fmt.Errorf("failed to setup global configuration - %w", err)
 	}
 
+	projConfig := project.ProjectConfig{
+		GlobalVars: state.globalVars,
+		GlobalConf: state.globalConf,
+	}
+
+	for _, keyValuePair := range os.Environ() {
+		name, value, _ := strings.Cut(keyValuePair, "=")
+
+		if varMayBeSecret(name) {
+			os.Unsetenv(name)
+
+			continue
+		}
+
+		projConfig.GlobalVars.Set(shvars.Variable{
+			Name:      name,
+			Value:     value,
+			Source:    shvars.ProcEnvVarsSrc,
+			Immutable: true,
+		})
+	}
+
 	if state.optExePath != "" {
-		state.project, err = project.Empty(state.optExePath, state.globalConf)
+		state.project, err = project.EmptyForExePath(state.optExePath, projConfig)
 	} else {
-		state.project, err = project.FromFilePath(state.optProjectFilePath, state.globalConf)
+		state.project, err = project.FromFilePath(state.optProjectFilePath, projConfig)
 	}
 
 	if err != nil {
@@ -133,8 +159,21 @@ func mainWithError() error {
 	return beClient(state)
 }
 
+func varMayBeSecret(name string) bool {
+	lower := strings.ToLower(name)
+
+	for _, secretLookingStr := range []string{"secret", "token", "password", "pass"} {
+		if strings.Contains(lower, secretLookingStr) {
+			return true
+		}
+	}
+
+	return false
+}
+
 type mainState struct {
 	globalConf globalconfig.Config
+	globalVars *shvars.Variables
 	wsConf     globalconfig.WorkspaceConfig
 	project    *project.Project
 
@@ -327,6 +366,7 @@ func beDaemon(state mainState) error {
 
 	sharedState := apicompat.SharedState{
 		Events:  eventGroups,
+		Vars:    state.globalVars,
 		Progctl: progCtl,
 		Project: state.project,
 		Plugins: optPluginsCtl,

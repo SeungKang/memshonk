@@ -33,7 +33,7 @@ func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Inte
 
 	runner, err := interp.New(
 		interp.StdIO(emptyStdin, sio.Stdout, sio.Stderr),
-		interp.Env(expand.ListEnviron()),
+		interp.Env(expand.ListEnviron(session.SharedState().Vars.KeyValues(nil)...)),
 		interp.ExecHandlers(i.execHandler),
 	)
 	if err != nil {

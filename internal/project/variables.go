@@ -29,7 +29,12 @@ func (o *variablesSchema) OnParam(paramName string) (func(*ini.Param) error, ini
 	}
 
 	return func(p *ini.Param) error {
-		err := o.variables.vars.Set(p.Name, p.Value)
+		err := o.variables.vars.Set(shvars.Variable{
+			Name:      p.Name,
+			Value:     p.Value,
+			Source:    shvars.ProjectVarsSrc,
+			Immutable: true,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to set project variable for %q - %w",
 				p.Name, err)

@@ -15,7 +15,12 @@ import (
 	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
-func Empty(exeFilePath string, globalConf globalconfig.Config) (*Project, error) {
+type ProjectConfig struct {
+	GlobalConf globalconfig.Config
+	GlobalVars *shvars.Variables
+}
+
+func EmptyForExePath(exeFilePath string, projConfig ProjectConfig) (*Project, error) {
 	absExeFilePath, err := exeAbsPath(exeFilePath)
 	if err != nil {
 		return nil, err
@@ -23,7 +28,7 @@ func Empty(exeFilePath string, globalConf globalconfig.Config) (*Project, error)
 
 	projectName := filepath.Base(absExeFilePath)
 
-	wsConfig, err := globalConf.SetupWorkspace(projectName)
+	wsConfig, err := projConfig.GlobalConf.SetupWorkspace(projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup workspace - %v", err)
 	}
@@ -34,19 +39,22 @@ func Empty(exeFilePath string, globalConf globalconfig.Config) (*Project, error)
 		general: General{
 			ExePath: absExeFilePath,
 		},
+		variables: Variables{
+			vars: projConfig.GlobalVars,
+		},
 	}
 
 	return project, nil
 }
 
-func FromFilePath(projectFilePath string, globalConf globalconfig.Config) (*Project, error) {
+func FromFilePath(projectFilePath string, projConfig ProjectConfig) (*Project, error) {
 	projectName := filepath.Base(projectFilePath)
 	dotIndex := strings.LastIndex(projectName, ".")
 	if dotIndex > 0 {
 		projectName = projectName[:dotIndex]
 	}
 
-	wsConfig, err := globalConf.SetupWorkspace(projectName)
+	wsConfig, err := projConfig.GlobalConf.SetupWorkspace(projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup workspace - %v", err)
 	}
@@ -66,6 +74,9 @@ func FromFilePath(projectFilePath string, globalConf globalconfig.Config) (*Proj
 			name:     projectName,
 			wsConfig: wsConfig,
 			src:      srcFn,
+			variables: Variables{
+				vars: projConfig.GlobalVars,
+			},
 		},
 	}
 

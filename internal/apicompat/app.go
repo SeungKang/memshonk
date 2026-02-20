@@ -5,6 +5,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
+	"github.com/SeungKang/memshonk/internal/shvars"
 )
 
 // SharedState provides access to various application functionality.
@@ -12,6 +13,8 @@ type SharedState struct {
 	Sessions SessionManager
 
 	Events *events.Groups
+
+	Vars *shvars.Variables
 
 	Project *project.Project
 

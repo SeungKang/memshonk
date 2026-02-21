@@ -118,11 +118,6 @@ func mainWithError() error {
 		return fmt.Errorf("failed to setup global configuration - %w", err)
 	}
 
-	projConfig := project.ProjectConfig{
-		GlobalVars: state.globalVars,
-		GlobalConf: state.globalConf,
-	}
-
 	for _, keyValuePair := range os.Environ() {
 		name, value, _ := strings.Cut(keyValuePair, "=")
 
@@ -138,6 +133,11 @@ func mainWithError() error {
 			Source:    shvars.ProcEnvVarsSrc,
 			Immutable: true,
 		})
+	}
+
+	projConfig := project.ProjectConfig{
+		GlobalVars: state.globalVars,
+		GlobalConf: state.globalConf,
 	}
 
 	if state.optExePath != "" {

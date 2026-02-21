@@ -132,7 +132,7 @@ func mainWithError() error {
 			continue
 		}
 
-		projConfig.GlobalVars.Set(shvars.Variable{
+		state.globalVars.Set(shvars.Variable{
 			Name:      name,
 			Value:     value,
 			Source:    shvars.ProcEnvVarsSrc,

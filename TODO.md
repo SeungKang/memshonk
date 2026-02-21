@@ -80,7 +80,6 @@
 
 - reverse search (ctrl+r) and selecting an entry does not save to history
 - disable color (needs to be a Session-level setting)
-- fix PATH lookup for external programs
 - allow execution of external programs to be disabled
 - implement "-h" auto-generation
 - fix piping of built-in commands to external programs

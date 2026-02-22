@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/globalconfig"
 	"github.com/SeungKang/memshonk/internal/plugins"
@@ -375,11 +376,12 @@ func beDaemon(state mainState) error {
 	}
 
 	sharedState := apicompat.SharedState{
-		Events:  eventGroups,
-		Vars:    state.globalVars,
-		Progctl: progCtl,
-		Project: state.project,
-		Plugins: optPluginsCtl,
+		Events:   eventGroups,
+		Vars:     state.globalVars,
+		Progctl:  progCtl,
+		Project:  state.project,
+		Commands: setupCommands(),
+		Plugins:  optPluginsCtl,
 	}
 
 	server, err := sessiond.NewServer(ctx, sessiond.ServerConfig{
@@ -428,6 +430,14 @@ func beDaemon(state mainState) error {
 	<-ctx.Done()
 
 	return nil
+}
+
+func setupCommands() *apicompat.CommandRegistry {
+	reg := apicompat.NewEmptyCommandRegistry()
+
+	reg.Register("plugins", commands.NewPluginsCommandX)
+
+	return reg
 }
 
 func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plugins.Ctl, error) {

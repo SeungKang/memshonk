@@ -20,6 +20,8 @@ type SharedState struct {
 
 	Progctl *progctl.Ctl
 
+	Commands *CommandRegistry
+
 	Plugins plugins.Ctl
 }
 

@@ -164,11 +164,14 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
+	stdout := stdSplitterWriter{conn: stdErrAndOutConn}
+
 	_, err = o.newSession(ctx, SessionConfig{
 		IO: apicompat.SessionIO{
-			Stdin:  stdinConn,
-			Stdout: stdSplitterWriter{conn: stdErrAndOutConn},
-			Stderr: stdSplitterWriter{conn: stdErrAndOutConn, isStderr: true},
+			Stdin:        stdinConn,
+			Stdout:       stdout,
+			Stderr:       stdSplitterWriter{conn: stdErrAndOutConn, isStderr: true},
+			BuiltinUsage: stdout,
 			OptTerminal: goterm.NewVirtualTerminal(goterm.VirtualTerminalConfig{
 				Input:  stdinConn,
 				Output: stdSplitterWriter{conn: stdErrAndOutConn},
@@ -262,6 +265,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 		isDefault: config.IsDefault,
 		shared:    o.config.SharedState,
 		io:        config.IO,
+		cmdExec:   &apicompat.CommandExecutor{},
 		ctx:       sessionCtx,
 		cancelFn:  cancelSessionFn,
 		apiConn:   config.clientApiConn,

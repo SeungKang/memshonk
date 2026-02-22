@@ -21,6 +21,7 @@ type Session struct {
 	info      apicompat.SessionInfo
 	isDefault bool
 	io        apicompat.SessionIO
+	cmdExec   *apicompat.CommandExecutor
 	shell     Shell
 	ctx       context.Context
 	ocne      sync.Once
@@ -82,6 +83,10 @@ func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
 	}
 
 	return nil, false
+}
+
+func (o *Session) CommandExecutor() *apicompat.CommandExecutor {
+	return o.cmdExec
 }
 
 func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) error {

@@ -74,9 +74,10 @@ func (o *Interpreter) execHandler(next interp.ExecHandlerFunc) interp.ExecHandle
 		cmdName := args[0]
 
 		// Check if it's a built-in command
-		schema, found := o.registry.Lookup(cmdName)
+		schema, found := o.session.SharedState().Commands.Lookup(cmdName)
 		if found {
-			return o.runBuiltin(ctx, schema, args[1:])
+			return o.session.CommandExecutor().Run(
+				ctx, o.session, schema(o.session), args[1:])
 		}
 
 		// Fall back to external command execution

@@ -27,6 +27,8 @@ type Session interface {
 	// returns nil and false.
 	Terminal() (*goterm.VirtualTerminal, bool)
 
+	CommandExecutor() *CommandExecutor
+
 	// RunCommand runs a command.
 	RunCommand(context.Context, Command) error
 }
@@ -54,6 +56,11 @@ type SessionIO struct {
 
 	// Stderr is the client's standard error.
 	Stderr io.Writer
+
+	// BuiltinUsage is the writer that builtin commands
+	// should write their usage and help messages to
+	// (e.g., the output of "-h").
+	BuiltinUsage io.Writer
 
 	// OptTerminal is the client's terminal if
 	// it allocated one. This field is nil if

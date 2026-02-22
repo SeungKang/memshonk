@@ -2,6 +2,7 @@ package sessiond
 
 import (
 	"context"
+	"io"
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
@@ -20,22 +21,38 @@ type Session struct {
 	info      apicompat.SessionInfo
 	isDefault bool
 	io        apicompat.SessionIO
-	stopper   *sessionStopper
+	shell     Shell
+	ctx       context.Context
+	ocne      sync.Once
+	cancelFn  func()
+	apiConn   io.Closer
 
 	cancelCmdMu  sync.Mutex
 	cancelCmdCtx context.CancelFunc
 }
 
 func (o *Session) Ctx() context.Context {
-	return o.stopper.ctx
+	return o.ctx
 }
 
 func (o *Session) Done() <-chan struct{} {
-	return o.stopper.ctx.Done()
+	return o.ctx.Done()
 }
 
 func (o *Session) Close() error {
-	return o.stopper.Close()
+	var err error
+
+	o.ocne.Do(func() {
+		o.cancelFn()
+
+		if o.shell != nil {
+			_ = o.shell.Close()
+		}
+
+		err = o.apiConn.Close()
+	})
+
+	return err
 }
 
 func (o *Session) SharedState() apicompat.SharedState {
@@ -77,7 +94,7 @@ func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) erro
 	go func() {
 		select {
 		case <-ctx.Done():
-		case <-o.stopper.ctx.Done():
+		case <-o.ctx.Done():
 			cancelFn()
 		}
 	}()

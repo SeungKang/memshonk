@@ -20,7 +20,6 @@ import (
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
-	"github.com/SeungKang/memshonk/internal/shell"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
@@ -38,8 +37,19 @@ const (
 	sessionExitedClientMessage
 )
 
-func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server, error) {
-	socketPath := sharedState.Project.WorkspaceConfig().SocketFilePath
+type ServerConfig struct {
+	SharedState apicompat.SharedState
+	NewShellFn  func(apicompat.Session) (Shell, error)
+}
+
+type Shell interface {
+	Run(context.Context) error
+
+	Close() error
+}
+
+func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
+	socketPath := config.SharedState.Project.WorkspaceConfig().SocketFilePath
 
 	_ = os.Remove(socketPath)
 
@@ -49,12 +59,12 @@ func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server,
 	}
 
 	server := &Server{
-		sharedState: sharedState,
-		listener:    listener,
-		socketPath:  socketPath,
+		config:     config,
+		listener:   listener,
+		socketPath: socketPath,
 	}
 
-	server.sharedState.Sessions = server
+	server.config.SharedState.Sessions = server
 
 	go func() {
 		err := server.loopWithError(ctx)
@@ -67,17 +77,17 @@ func NewServer(ctx context.Context, sharedState apicompat.SharedState) (*Server,
 }
 
 type Server struct {
-	sharedState apicompat.SharedState
-	listener    net.Listener
-	socketPath  string
-	rwMu        sync.RWMutex
-	randStr     *randomStringer
-	sessions    map[string]sessionWrapper
+	config     ServerConfig
+	listener   net.Listener
+	socketPath string
+	rwMu       sync.RWMutex
+	randStr    *randomStringer
+	sessions   map[string]sessionWrapper
 }
 
 type sessionWrapper struct {
-	session         *Session
-	optRemoteClient *fromClient
+	session    *Session
+	clientConn *fromClient
 }
 
 func (o *Server) Close() error {
@@ -164,9 +174,9 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 				Output: stdSplitterWriter{conn: stdErrAndOutConn},
 			}),
 		},
-		OptID:            apiConn.RemoteAddr().String(),
-		OptCloseConn:     cm,
-		optClientApiConn: apiConn,
+		OptID:         apiConn.RemoteAddr().String(),
+		ClientConn:    cm,
+		clientApiConn: apiConn,
 	})
 	if err != nil {
 		_ = cm.Close()
@@ -177,19 +187,12 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 }
 
 type SessionConfig struct {
-	IO           apicompat.SessionIO
-	IsDefault    bool
-	OptCloseConn io.Closer
-	OptID        string
+	IO         apicompat.SessionIO
+	IsDefault  bool
+	ClientConn io.Closer
+	OptID      string
 
-	optClientApiConn net.Conn
-}
-
-func (o *Server) NewSession(ctx context.Context, config SessionConfig) (*Session, error) {
-	o.rwMu.Lock()
-	defer o.rwMu.Unlock()
-
-	return o.newSession(ctx, config)
+	clientApiConn net.Conn
 }
 
 func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session, error) {
@@ -251,24 +254,27 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 
 	sessionCtx, cancelSessionFn := context.WithCancel(ctx)
 
-	stopper := newSessionStopper(sessionCtx, cancelSessionFn, config.OptCloseConn)
-
 	session := &Session{
 		info: apicompat.SessionInfo{
 			ID:        id,
 			StartedAt: time.Now(),
 		},
 		isDefault: config.IsDefault,
-		shared:    o.sharedState,
+		shared:    o.config.SharedState,
 		io:        config.IO,
-		stopper:   stopper,
+		ctx:       sessionCtx,
+		cancelFn:  cancelSessionFn,
+		apiConn:   config.clientApiConn,
 	}
 
-	sh, err := shell.NewShell(session)
+	sh, err := o.config.NewShellFn(session)
 	if err != nil {
-		_ = stopper.Close()
+		_ = session.Close()
+
 		return nil, err
 	}
+
+	session.shell = sh
 
 	go func() {
 		// TODO maybe log when the shell exits
@@ -281,46 +287,12 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 		o.sessions = make(map[string]sessionWrapper)
 	}
 
-	var optClientApiConn *fromClient
-	if config.optClientApiConn != nil {
-		optClientApiConn = newFromClient(sessionCtx, config.optClientApiConn, session)
-	}
-
 	o.sessions[id] = sessionWrapper{
-		session:         session,
-		optRemoteClient: optClientApiConn,
+		session:    session,
+		clientConn: newFromClient(sessionCtx, config.clientApiConn, session),
 	}
 
 	return session, nil
-}
-
-func newSessionStopper(ctx context.Context, cancelFn func(), optConn io.Closer) *sessionStopper {
-	return &sessionStopper{
-		ctx:       ctx,
-		cancelFn:  cancelFn,
-		optCloser: optConn,
-	}
-}
-
-type sessionStopper struct {
-	ctx       context.Context
-	ocne      sync.Once
-	cancelFn  func()
-	optCloser io.Closer
-}
-
-func (o *sessionStopper) Close() error {
-	var err error
-
-	o.ocne.Do(func() {
-		o.cancelFn()
-
-		if o.optCloser != nil {
-			err = o.optCloser.Close()
-		}
-	})
-
-	return err
 }
 
 func (o *Server) Sessions() []apicompat.Session {
@@ -359,18 +331,18 @@ func (o *Server) RemoveSession(id string) {
 
 	wrapper, hasIt := o.sessions[id]
 	if hasIt {
-		if wrapper.optRemoteClient != nil {
+		if wrapper.clientConn != nil {
 			timeout := time.After(time.Second)
 
-			wrapper.optRemoteClient.apiConn.SetDeadline(
+			wrapper.clientConn.apiConn.SetDeadline(
 				time.Now().Add(time.Second))
 
-			wrapper.optRemoteClient.apiConn.Write(
+			wrapper.clientConn.apiConn.Write(
 				cstlv.MinimalBytes(0, 0, sessionExitedClientMessage))
 
 			select {
 			case <-timeout:
-			case <-wrapper.optRemoteClient.session.Done():
+			case <-wrapper.clientConn.session.Done():
 			}
 		}
 
@@ -430,7 +402,7 @@ func (o *fromClient) loopWithError(ctx context.Context) error {
 					o.handTerminalResizeMessage(result.Msg, o.session.io.OptTerminal)
 				}
 			case goodbyeeeMessageType:
-				o.session.stopper.Close()
+				_ = o.session.Close()
 
 				return nil
 			default:

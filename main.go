@@ -24,6 +24,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
 	"github.com/SeungKang/memshonk/internal/sessiond"
+	"github.com/SeungKang/memshonk/internal/shell"
 	"github.com/SeungKang/memshonk/internal/shvars"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
@@ -381,7 +382,12 @@ func beDaemon(state mainState) error {
 		Plugins: optPluginsCtl,
 	}
 
-	server, err := sessiond.NewServer(ctx, sharedState)
+	server, err := sessiond.NewServer(ctx, sessiond.ServerConfig{
+		SharedState: sharedState,
+		NewShellFn: func(s apicompat.Session) (sessiond.Shell, error) {
+			return shell.NewShell(s)
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create new session server - %w", err)
 	}

@@ -105,6 +105,8 @@ func (o *Interpreter) runBuiltin(ctx context.Context, schema commands.CommandSch
 
 // ExecuteSimple executes a simple command without full shell parsing.
 // This is useful for built-in commands that don't need shell features.
+//
+// TODO: Unused.
 func (o *Interpreter) ExecuteSimple(ctx context.Context, args []string) error {
 	if len(args) == 0 {
 		return nil

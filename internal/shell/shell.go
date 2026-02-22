@@ -68,6 +68,8 @@ type Shell struct {
 	colorFn  func(a ...interface{}) string
 	promptMu sync.RWMutex
 	prompt   string
+	ctx      context.Context
+	cancelFn func()
 
 	attachEvents   *events.Sub[progctl.AttachedEvent]
 	detachEvents   *events.Sub[progctl.DetachedEvent]
@@ -76,9 +78,17 @@ type Shell struct {
 	unloadedEvents *events.Sub[plugins.UnloadedEvent]
 }
 
+func (o *Shell) Close() error {
+	o.cancelFn()
+
+	return nil
+}
+
 // Run starts the shell's REPL loop.
 func (o *Shell) Run(ctx context.Context) error {
 	defer o.rl.Close()
+
+	ctx, o.cancelFn = context.WithCancel(ctx)
 
 	// Initialize prompt based on current state
 	o.initPrompt(ctx)

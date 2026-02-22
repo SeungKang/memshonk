@@ -23,6 +23,7 @@ func BuiltinCommands() []CommandSchema {
 		VmmapCommandSchema(),
 		PluginsCommandSchema(),
 		WatchCommandSchema(),
+		SessionsCommandSchema(),
 	}
 }
 

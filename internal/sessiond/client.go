@@ -13,10 +13,11 @@ import (
 )
 
 type ClientConfig struct {
-	SocketPath string
-	Stdin      io.Reader
-	Stdout     io.Writer
-	Stderr     io.Writer
+	SocketPath   string
+	Stdin        io.Reader
+	Stdout       io.Writer
+	Stderr       io.Writer
+	OptSessionID string
 
 	OptTerminalResizes <-chan goterm.ResizeEvent
 }
@@ -35,7 +36,7 @@ func SetupClient(setupCtx context.Context, config ClientConfig) (*Client, error)
 		return nil, err
 	}
 
-	apiConn, err := cm.DialContext(setupCtx, "", "")
+	apiConn, err := cm.DialContext(setupCtx, "", config.OptSessionID)
 	if err != nil {
 		_ = cm.Close()
 		return nil, err

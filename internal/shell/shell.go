@@ -199,9 +199,9 @@ func (o *Shell) setPrompt(pid int) {
 	defer o.promptMu.Unlock()
 
 	if pid == 0 {
-		o.prompt = o.colorFn("$ ")
+		o.prompt = o.colorFn(fmt.Sprintf("(%s) $ ", o.session.Info().ID))
 	} else {
-		o.prompt = o.colorFn(fmt.Sprintf("[%d] $ ", pid))
+		o.prompt = o.colorFn(fmt.Sprintf("(%s) [%d] $ ", o.session.Info().ID, pid))
 	}
 }
 

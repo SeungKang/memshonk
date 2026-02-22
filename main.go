@@ -45,6 +45,7 @@ OPTIONS
 
 	helpArg        = "h"
 	projectPathArg = "p"
+	sessionIDArg   = "S"
 )
 
 func main() {
@@ -77,6 +78,12 @@ func mainWithError() error {
 		projectPathArg,
 		"",
 		"Use a project file instead of an empty project based on a program path")
+
+	flag.StringVar(
+		&state.optSessionID,
+		sessionIDArg,
+		"",
+		"Use a custom session ID")
 
 	flag.CommandLine.Parse(args)
 
@@ -179,10 +186,11 @@ type mainState struct {
 
 	optProjectFilePath string
 	optExePath         string
+	optSessionID       string
 }
 
 func beClient(state mainState) error {
-	terminal, err := goterm.NewFdTerminal(os.Stdin, os.Stdout)
+	terminal, err := goterm.NewStdioTerminal()
 	if err != nil {
 		return fmt.Errorf("failed to create new fd terminal - %w", err)
 	}
@@ -191,10 +199,11 @@ func beClient(state mainState) error {
 	defer stopResizeEventsFn()
 
 	clientConfig := sessiond.ClientConfig{
-		SocketPath: state.wsConf.SocketFilePath,
-		Stdin:      os.Stdin,
-		Stdout:     os.Stdout,
-		Stderr:     os.Stderr,
+		SocketPath:   state.wsConf.SocketFilePath,
+		Stdin:        os.Stdin,
+		Stdout:       os.Stdout,
+		Stderr:       os.Stderr,
+		OptSessionID: state.optSessionID,
 
 		OptTerminalResizes: resizeEvents,
 	}

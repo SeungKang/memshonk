@@ -2,6 +2,7 @@ package apicompat
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -37,6 +38,10 @@ type SessionInfo struct {
 
 	// StartedAt is the time that the session was started at.
 	StartedAt time.Time
+}
+
+func (o SessionInfo) String() string {
+	return fmt.Sprintf("Session ID: %s Started at: %s", o.ID, o.StartedAt.Format(time.DateTime))
 }
 
 // SessionIO is the session's input-output.

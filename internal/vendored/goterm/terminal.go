@@ -103,7 +103,7 @@ func (o *FdTerminal) OnResize() (<-chan ResizeEvent, func()) {
 	defer o.resizerMu.Unlock()
 
 	if o.onResized == nil {
-		onResized := NewResizedMonitor(context.Background(), o.input.Fd())
+		onResized := NewResizedMonitor(context.Background(), o.output.Fd())
 
 		o.onResized = onResized
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SeungKang/memshonk/internal/clifkit"
+	"github.com/SeungKang/memshonk/internal/fx"
 )
 
 // Command represents a command that can be run by a client.
@@ -25,7 +25,7 @@ type CommandResult interface {
 // NewEmptyCommandRegistry creates a new empty command registry.
 func NewEmptyCommandRegistry() *CommandRegistry {
 	return &CommandRegistry{
-		byName:  make(map[string]func(Session) clifkit.Command),
+		byName:  make(map[string]func(Session) fx.Command),
 		aliases: make(map[string]string),
 	}
 }
@@ -34,13 +34,13 @@ func NewEmptyCommandRegistry() *CommandRegistry {
 // It is safe for concurrent read access after initialization.
 type CommandRegistry struct {
 	rwMu    sync.RWMutex
-	byName  map[string]func(Session) clifkit.Command
+	byName  map[string]func(Session) fx.Command
 	names   []string
 	aliases map[string]string // alias -> canonical name
 }
 
 // Register adds a command schema to the registry.
-func (o *CommandRegistry) Register(name string, newCommandFn func(Session) clifkit.Command) {
+func (o *CommandRegistry) Register(name string, newCommandFn func(Session) fx.Command) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -77,7 +77,7 @@ func (o *CommandRegistry) Unregister(name string) {
 // Lookup finds a command schema by name or alias.
 //
 // Returns the schema and true if found, or nil and false if not.
-func (o *CommandRegistry) Lookup(nameOrAlias string) (func(Session) clifkit.Command, bool) {
+func (o *CommandRegistry) Lookup(nameOrAlias string) (func(Session) fx.Command, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -125,7 +125,7 @@ type CommandExecutor struct {
 	namesToOutputs map[string]*list.List
 }
 
-func (o *CommandExecutor) Run(ctx context.Context, s Session, cmd clifkit.Command, args []string) error {
+func (o *CommandExecutor) Run(ctx context.Context, s Session, cmd fx.Command, args []string) error {
 	result, err := cmd.Run(ctx, args)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (o *CommandExecutor) Run(ctx context.Context, s Session, cmd clifkit.Comman
 	return nil
 }
 
-func (o *CommandExecutor) AddOutput(output clifkit.CommandResultWrapper) {
+func (o *CommandExecutor) AddOutput(output fx.CommandResultWrapper) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -160,7 +160,7 @@ func (o *CommandExecutor) AddOutput(output clifkit.CommandResultWrapper) {
 	outputs.PushFront(output)
 }
 
-func (o *CommandExecutor) PreviousOutput(commandID []string) (clifkit.CommandResultWrapper, bool) {
+func (o *CommandExecutor) PreviousOutput(commandID []string) (fx.CommandResultWrapper, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -168,10 +168,10 @@ func (o *CommandExecutor) PreviousOutput(commandID []string) (clifkit.CommandRes
 
 	outputs, hasAny := o.namesToOutputs[id]
 	if !hasAny {
-		return clifkit.CommandResultWrapper{}, false
+		return fx.CommandResultWrapper{}, false
 	}
 
-	output := outputs.Front().Value.(clifkit.CommandResultWrapper)
+	output := outputs.Front().Value.(fx.CommandResultWrapper)
 
 	return output, true
 }

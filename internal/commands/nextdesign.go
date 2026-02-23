@@ -4,18 +4,18 @@ import (
 	"context"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
-	"github.com/SeungKang/memshonk/internal/clifkit"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-func NewPluginsCommandX(s apicompat.Session) clifkit.Command {
+func NewPluginsCommandX(s apicompat.Session) fx.Command {
 	pluginsCtl, pluginsEnabled := s.SharedState().HasPlugins()
 
 	pluginsCmd := PluginsCommandX{
 		Ctl: pluginsCtl,
 	}
 
-	root := clifkit.NewCommand(pluginsCommandName, "manage plugins", s.IO().BuiltinUsage, pluginsCmd.list)
+	root := fx.NewCommand(pluginsCommandName, "manage plugins", s.IO().BuiltinUsage, pluginsCmd.list)
 
 	root.OptPreRunFn = func(context.Context) error {
 		if pluginsEnabled {
@@ -33,14 +33,14 @@ func NewPluginsCommandX(s apicompat.Session) clifkit.Command {
 
 	root.AddSubcommand("unload", "unload a plugin", pluginsCmd.unload)
 
-	root.VisitAll(func(c *clifkit.Command) {
+	root.VisitAll(func(c *fx.Command) {
 		required := true
 
 		if c.Name() == root.Name() || c.Name() == ls.Name() {
 			required = false
 		}
 
-		c.FlagSet.StringFlag(&pluginsCmd.PluginNameOrFilePath, "", clifkit.FlagConfig{
+		c.FlagSet.StringFlag(&pluginsCmd.PluginNameOrFilePath, "", fx.FlagConfig{
 			Name:        "plugin-name-or-path",
 			Description: "name of a plugin or its file path",
 			Required:    required,
@@ -55,20 +55,20 @@ type PluginsCommandX struct {
 	Ctl                  plugins.Ctl
 }
 
-func (o PluginsCommandX) list(_ context.Context) (clifkit.CommandResult, error) {
+func (o PluginsCommandX) list(_ context.Context) (fx.CommandResult, error) {
 	if o.PluginNameOrFilePath != "" {
 		plugin, err := o.Ctl.Plugin(o.PluginNameOrFilePath)
 		if err != nil {
 			return nil, err
 		}
 
-		return clifkit.NewHumanCommandResult(plugin.PrettyString("")), nil
+		return fx.NewHumanCommandResult(plugin.PrettyString("")), nil
 	}
 
-	return clifkit.NewHumanCommandResult(o.Ctl.PrettyString("")), nil
+	return fx.NewHumanCommandResult(o.Ctl.PrettyString("")), nil
 }
 
-func (o PluginsCommandX) load(_ context.Context) (clifkit.CommandResult, error) {
+func (o PluginsCommandX) load(_ context.Context) (fx.CommandResult, error) {
 	plugin, err := o.Ctl.Load(plugins.PluginConfig{
 		FilePath: o.PluginNameOrFilePath,
 	})
@@ -76,10 +76,10 @@ func (o PluginsCommandX) load(_ context.Context) (clifkit.CommandResult, error) 
 		return nil, err
 	}
 
-	return clifkit.NewHumanCommandResult(plugin.PrettyString("")), nil
+	return fx.NewHumanCommandResult(plugin.PrettyString("")), nil
 }
 
-func (o PluginsCommandX) reload(ctx context.Context) (clifkit.CommandResult, error) {
+func (o PluginsCommandX) reload(ctx context.Context) (fx.CommandResult, error) {
 	err := o.Ctl.Reload(ctx, o.PluginNameOrFilePath)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (o PluginsCommandX) reload(ctx context.Context) (clifkit.CommandResult, err
 	return nil, nil
 }
 
-func (o PluginsCommandX) unload(_ context.Context) (clifkit.CommandResult, error) {
+func (o PluginsCommandX) unload(_ context.Context) (fx.CommandResult, error) {
 	err := o.Ctl.Unload(o.PluginNameOrFilePath)
 	if err != nil {
 		return nil, err

@@ -40,7 +40,7 @@ func NewPluginsCommandX(s apicompat.Session) fx.Command {
 			required = false
 		}
 
-		c.FlagSet.StringNf(&pluginsCmd.PluginNameOrFilePath, fx.FlagConfig{
+		c.FlagSet.StringNf(&pluginsCmd.PluginNameOrFilePath, fx.ArgConfig{
 			Name:        "plugin-name-or-path",
 			Description: "name of a plugin or its file path",
 			Required:    required,

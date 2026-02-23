@@ -105,7 +105,7 @@ func (o *FlagSet) addShort(name string, adder func(short string)) {
 }
 
 // trackRequired adds the flag name to the required list if cfg.Required is true.
-func (o *FlagSet) trackRequired(cfg FlagConfig) {
+func (o *FlagSet) trackRequired(cfg ArgConfig) {
 	if cfg.Required {
 		o.required = append(o.required, cfg.Name)
 	}

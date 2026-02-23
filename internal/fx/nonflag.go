@@ -14,7 +14,7 @@ type nonflagDef struct {
 }
 
 // IntNf defines a positional int argument with the specified config.
-func (o *FlagSet) IntNf(p *int, cfg FlagConfig) {
+func (o *FlagSet) IntNf(p *int, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -31,7 +31,7 @@ func (o *FlagSet) IntNf(p *int, cfg FlagConfig) {
 }
 
 // Int64Nf defines a positional int64 argument with the specified config.
-func (o *FlagSet) Int64Nf(p *int64, cfg FlagConfig) {
+func (o *FlagSet) Int64Nf(p *int64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -48,7 +48,7 @@ func (o *FlagSet) Int64Nf(p *int64, cfg FlagConfig) {
 }
 
 // UintNf defines a positional uint argument with the specified config.
-func (o *FlagSet) UintNf(p *uint, cfg FlagConfig) {
+func (o *FlagSet) UintNf(p *uint, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -65,7 +65,7 @@ func (o *FlagSet) UintNf(p *uint, cfg FlagConfig) {
 }
 
 // Uint64Nf defines a positional uint64 argument with the specified config.
-func (o *FlagSet) Uint64Nf(p *uint64, cfg FlagConfig) {
+func (o *FlagSet) Uint64Nf(p *uint64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -82,7 +82,7 @@ func (o *FlagSet) Uint64Nf(p *uint64, cfg FlagConfig) {
 }
 
 // StringNf defines a positional string argument with the specified config.
-func (o *FlagSet) StringNf(p *string, cfg FlagConfig) {
+func (o *FlagSet) StringNf(p *string, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -95,7 +95,7 @@ func (o *FlagSet) StringNf(p *string, cfg FlagConfig) {
 }
 
 // Float64Nf defines a positional float64 argument with the specified config.
-func (o *FlagSet) Float64Nf(p *float64, cfg FlagConfig) {
+func (o *FlagSet) Float64Nf(p *float64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -113,7 +113,7 @@ func (o *FlagSet) Float64Nf(p *float64, cfg FlagConfig) {
 
 // DurationNf defines a positional time.Duration argument with the
 // specified config.
-func (o *FlagSet) DurationNf(p *time.Duration, cfg FlagConfig) {
+func (o *FlagSet) DurationNf(p *time.Duration, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -131,7 +131,7 @@ func (o *FlagSet) DurationNf(p *time.Duration, cfg FlagConfig) {
 
 // IntSliceNf defines a positional int slice argument that consumes all
 // remaining positional arguments.
-func (o *FlagSet) IntSliceNf(p *[]int, cfg FlagConfig) {
+func (o *FlagSet) IntSliceNf(p *[]int, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -149,7 +149,7 @@ func (o *FlagSet) IntSliceNf(p *[]int, cfg FlagConfig) {
 
 // Int64SliceNf defines a positional int64 slice argument that consumes all
 // remaining positional arguments.
-func (o *FlagSet) Int64SliceNf(p *[]int64, cfg FlagConfig) {
+func (o *FlagSet) Int64SliceNf(p *[]int64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -167,7 +167,7 @@ func (o *FlagSet) Int64SliceNf(p *[]int64, cfg FlagConfig) {
 
 // UintSliceNf defines a positional uint slice argument that consumes all
 // remaining positional arguments.
-func (o *FlagSet) UintSliceNf(p *[]uint, cfg FlagConfig) {
+func (o *FlagSet) UintSliceNf(p *[]uint, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -185,7 +185,7 @@ func (o *FlagSet) UintSliceNf(p *[]uint, cfg FlagConfig) {
 
 // Uint64SliceNf defines a positional uint64 slice argument that consumes
 // all remaining positional arguments.
-func (o *FlagSet) Uint64SliceNf(p *[]uint64, cfg FlagConfig) {
+func (o *FlagSet) Uint64SliceNf(p *[]uint64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -203,7 +203,7 @@ func (o *FlagSet) Uint64SliceNf(p *[]uint64, cfg FlagConfig) {
 
 // StringSliceNf defines a positional string slice argument that consumes
 // all remaining positional arguments.
-func (o *FlagSet) StringSliceNf(p *[]string, cfg FlagConfig) {
+func (o *FlagSet) StringSliceNf(p *[]string, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -217,7 +217,7 @@ func (o *FlagSet) StringSliceNf(p *[]string, cfg FlagConfig) {
 
 // Float64SliceNf defines a positional float64 slice argument that consumes
 // all remaining positional arguments.
-func (o *FlagSet) Float64SliceNf(p *[]float64, cfg FlagConfig) {
+func (o *FlagSet) Float64SliceNf(p *[]float64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,
@@ -235,7 +235,7 @@ func (o *FlagSet) Float64SliceNf(p *[]float64, cfg FlagConfig) {
 
 // DurationSliceNf defines a positional time.Duration slice argument that
 // consumes all remaining positional arguments.
-func (o *FlagSet) DurationSliceNf(p *[]time.Duration, cfg FlagConfig) {
+func (o *FlagSet) DurationSliceNf(p *[]time.Duration, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
 		name:     cfg.Name,
 		required: cfg.Required,

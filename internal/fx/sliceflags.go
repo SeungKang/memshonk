@@ -177,7 +177,7 @@ func (o *durationSliceValue) Set(s string) error {
 // Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) IntSliceFlag(p *[]int, cfg FlagConfig) {
+func (o *FlagSet) IntSliceFlag(p *[]int, cfg ArgConfig) {
 	v := &intSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -190,7 +190,7 @@ func (o *FlagSet) IntSliceFlag(p *[]int, cfg FlagConfig) {
 // config. Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) Int64SliceFlag(p *[]int64, cfg FlagConfig) {
+func (o *FlagSet) Int64SliceFlag(p *[]int64, cfg ArgConfig) {
 	v := &int64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -203,7 +203,7 @@ func (o *FlagSet) Int64SliceFlag(p *[]int64, cfg FlagConfig) {
 // Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) UintSliceFlag(p *[]uint, cfg FlagConfig) {
+func (o *FlagSet) UintSliceFlag(p *[]uint, cfg ArgConfig) {
 	v := &uintSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -216,7 +216,7 @@ func (o *FlagSet) UintSliceFlag(p *[]uint, cfg FlagConfig) {
 // config. Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) Uint64SliceFlag(p *[]uint64, cfg FlagConfig) {
+func (o *FlagSet) Uint64SliceFlag(p *[]uint64, cfg ArgConfig) {
 	v := &uint64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -229,7 +229,7 @@ func (o *FlagSet) Uint64SliceFlag(p *[]uint64, cfg FlagConfig) {
 // config. Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) StringSliceFlag(p *[]string, cfg FlagConfig) {
+func (o *FlagSet) StringSliceFlag(p *[]string, cfg ArgConfig) {
 	v := &stringSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -242,7 +242,7 @@ func (o *FlagSet) StringSliceFlag(p *[]string, cfg FlagConfig) {
 // config. Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) Float64SliceFlag(p *[]float64, cfg FlagConfig) {
+func (o *FlagSet) Float64SliceFlag(p *[]float64, cfg ArgConfig) {
 	v := &float64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {
@@ -255,7 +255,7 @@ func (o *FlagSet) Float64SliceFlag(p *[]float64, cfg FlagConfig) {
 // specified config. Each occurrence of the flag appends to the slice.
 //
 // A short alias using the first character is added if available.
-func (o *FlagSet) DurationSliceFlag(p *[]time.Duration, cfg FlagConfig) {
+func (o *FlagSet) DurationSliceFlag(p *[]time.Duration, cfg ArgConfig) {
 	v := &durationSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
 	o.addShort(cfg.Name, func(short string) {

@@ -120,23 +120,14 @@ func (o *CommandRegistry) AllNamesAndAliases() []string {
 	return result
 }
 
-type CommandExecutor struct {
+// CommandStorage stores information about the session's previously-run
+// commands.
+type CommandStorage struct {
 	rwMu           sync.RWMutex
 	namesToOutputs map[string]*list.List
 }
 
-func (o *CommandExecutor) Run(ctx context.Context, s Session, cmd fx.Command, args []string) error {
-	result, err := cmd.Run(ctx, args)
-	if err != nil {
-		return err
-	}
-
-	o.AddOutput(result)
-
-	return nil
-}
-
-func (o *CommandExecutor) AddOutput(output fx.CommandResultWrapper) {
+func (o *CommandStorage) AddOutput(output fx.CommandResultWrapper) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -160,7 +151,7 @@ func (o *CommandExecutor) AddOutput(output fx.CommandResultWrapper) {
 	outputs.PushFront(output)
 }
 
-func (o *CommandExecutor) PreviousOutput(commandID []string) (fx.CommandResultWrapper, bool) {
+func (o *CommandStorage) PreviousOutput(commandID []string) (fx.CommandResultWrapper, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 

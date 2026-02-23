@@ -2,6 +2,7 @@ package sessiond
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -21,7 +22,7 @@ type Session struct {
 	info      apicompat.SessionInfo
 	isDefault bool
 	io        apicompat.SessionIO
-	cmdExec   *apicompat.CommandExecutor
+	cmdStore  *apicompat.CommandStorage
 	shell     Shell
 	ctx       context.Context
 	ocne      sync.Once
@@ -85,8 +86,54 @@ func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
 	return nil, false
 }
 
-func (o *Session) CommandExecutor() *apicompat.CommandExecutor {
-	return o.cmdExec
+func (o *Session) CommandStorage() *apicompat.CommandStorage {
+	return o.cmdStore
+}
+
+func (o *Session) RunCommandNext(parent context.Context, argv []string) (bool, error) {
+	if len(argv) == 0 {
+		return false, nil
+	}
+
+	newCmdFn, hasIt := o.shared.Commands.Lookup(argv[0])
+	if !hasIt {
+		return false, nil
+	}
+
+	ctx, cancelFn := context.WithCancel(parent)
+	defer func() {
+		o.clearCancel()
+		cancelFn()
+	}()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-o.ctx.Done():
+			cancelFn()
+		}
+	}()
+
+	// install the cancel lever for OnSignal
+	o.setCancel(func() {
+		cancelFn()
+	})
+
+	cmd := newCmdFn(o)
+
+	result, err := cmd.Run(ctx, argv[1:])
+	if err != nil {
+		return true, fmt.Errorf("%s failed: %w", cmd.Name(), err)
+	}
+
+	o.cmdStore.AddOutput(result)
+
+	if result.Result != nil {
+		o.io.Stdout.Write([]byte(result.Result.Human()))
+		o.io.Stdout.Write([]byte{'\n'})
+	}
+
+	return true, nil
 }
 
 func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) error {

@@ -66,22 +66,23 @@ func (o *Interpreter) Execute(ctx context.Context, line string) error {
 
 // execHandler routes command execution to built-in commands or external commands.
 func (o *Interpreter) execHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
-	return func(ctx context.Context, args []string) error {
-		if len(args) == 0 {
+	return func(ctx context.Context, argv []string) error {
+		if len(argv) == 0 {
 			return nil
 		}
 
-		cmdName := args[0]
-
 		// Check if it's a built-in command
-		schema, found := o.session.SharedState().Commands.Lookup(cmdName)
-		if found {
-			return o.session.CommandExecutor().Run(
-				ctx, o.session, schema(o.session), args[1:])
+		wasHandled, err := o.session.RunCommandNext(ctx, argv)
+		if err != nil {
+			return err
+		}
+
+		if wasHandled {
+			return nil
 		}
 
 		// Fall back to external command execution
-		return next(ctx, args)
+		return next(ctx, argv)
 	}
 }
 

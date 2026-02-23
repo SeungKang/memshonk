@@ -265,7 +265,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 		isDefault: config.IsDefault,
 		shared:    o.config.SharedState,
 		io:        config.IO,
-		cmdExec:   &apicompat.CommandExecutor{},
+		cmdStore:  &apicompat.CommandStorage{},
 		ctx:       sessionCtx,
 		cancelFn:  cancelSessionFn,
 		apiConn:   config.clientApiConn,

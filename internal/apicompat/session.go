@@ -27,10 +27,15 @@ type Session interface {
 	// returns nil and false.
 	Terminal() (*goterm.VirtualTerminal, bool)
 
-	CommandExecutor() *CommandExecutor
-
 	// RunCommand runs a command.
 	RunCommand(context.Context, Command) error
+
+	// RunCommand runs a command.
+	RunCommandNext(ctx context.Context, argv []string) (bool, error)
+
+	// CommandStorage returns information about the session's
+	// previously-run commands.
+	CommandStorage() *CommandStorage
 }
 
 // SessionInfo contains information about the session.

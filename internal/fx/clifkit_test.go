@@ -19,7 +19,7 @@ func TestNewFlagSet(t *testing.T) {
 func TestBoolFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var b bool
-	fs.BoolFlag(&b, false, FlagConfig{Name: "verbose", Description: "verbose"})
+	fs.BoolFlag(&b, false, ArgConfig{Name: "verbose", Description: "verbose"})
 
 	err := fs.Parse([]string{"-verbose"})
 	if err != nil {
@@ -33,7 +33,7 @@ func TestBoolFlag(t *testing.T) {
 func TestBoolFlagShortAlias(t *testing.T) {
 	fs := NewFlagSet("test")
 	var b bool
-	fs.BoolFlag(&b, false, FlagConfig{Name: "verbose", Description: "verbose"})
+	fs.BoolFlag(&b, false, ArgConfig{Name: "verbose", Description: "verbose"})
 
 	err := fs.Parse([]string{"-v"})
 	if err != nil {
@@ -47,7 +47,7 @@ func TestBoolFlagShortAlias(t *testing.T) {
 func TestIntFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var n int
-	fs.IntFlag(&n, 0, FlagConfig{Name: "count", Description: "count"})
+	fs.IntFlag(&n, 0, ArgConfig{Name: "count", Description: "count"})
 
 	err := fs.Parse([]string{"-count", "42"})
 	if err != nil {
@@ -61,7 +61,7 @@ func TestIntFlag(t *testing.T) {
 func TestInt64Flag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var n int64
-	fs.Int64Flag(&n, 0, FlagConfig{Name: "size", Description: "size"})
+	fs.Int64Flag(&n, 0, ArgConfig{Name: "size", Description: "size"})
 
 	err := fs.Parse([]string{"-size", "9223372036854775807"})
 	if err != nil {
@@ -75,7 +75,7 @@ func TestInt64Flag(t *testing.T) {
 func TestUintFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var n uint
-	fs.UintFlag(&n, 0, FlagConfig{Name: "port", Description: "port"})
+	fs.UintFlag(&n, 0, ArgConfig{Name: "port", Description: "port"})
 
 	err := fs.Parse([]string{"-port", "8080"})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestUintFlag(t *testing.T) {
 func TestUint64Flag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var n uint64
-	fs.Uint64Flag(&n, 0, FlagConfig{Name: "bytes", Description: "bytes"})
+	fs.Uint64Flag(&n, 0, ArgConfig{Name: "bytes", Description: "bytes"})
 
 	err := fs.Parse([]string{"-bytes", "18446744073709551615"})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestUint64Flag(t *testing.T) {
 func TestStringFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var s string
-	fs.StringFlag(&s, "", FlagConfig{Name: "name", Description: "name"})
+	fs.StringFlag(&s, "", ArgConfig{Name: "name", Description: "name"})
 
 	err := fs.Parse([]string{"-name", "test-value"})
 	if err != nil {
@@ -117,7 +117,7 @@ func TestStringFlag(t *testing.T) {
 func TestFloat64Flag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var f float64
-	fs.Float64Flag(&f, 0, FlagConfig{Name: "rate", Description: "rate"})
+	fs.Float64Flag(&f, 0, ArgConfig{Name: "rate", Description: "rate"})
 
 	err := fs.Parse([]string{"-rate", "3.14159"})
 	if err != nil {
@@ -131,7 +131,7 @@ func TestFloat64Flag(t *testing.T) {
 func TestDurationFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var d time.Duration
-	fs.DurationFlag(&d, 0, FlagConfig{Name: "timeout", Description: "timeout"})
+	fs.DurationFlag(&d, 0, ArgConfig{Name: "timeout", Description: "timeout"})
 
 	err := fs.Parse([]string{"-timeout", "5s"})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestDurationFlag(t *testing.T) {
 func TestTextFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var ip net.IP
-	fs.TextFlag(&ip, net.IPv4(127, 0, 0, 1), FlagConfig{
+	fs.TextFlag(&ip, net.IPv4(127, 0, 0, 1), ArgConfig{
 		Name:        "addr",
 		Description: "address",
 	})
@@ -168,7 +168,7 @@ func TestFuncFlag(t *testing.T) {
 		called = true
 		value = s
 		return nil
-	}, FlagConfig{Name: "callback", Description: "callback"})
+	}, ArgConfig{Name: "callback", Description: "callback"})
 
 	err := fs.Parse([]string{"-callback", "hello"})
 	if err != nil {
@@ -188,7 +188,7 @@ func TestBoolFuncFlag(t *testing.T) {
 	fs.BoolFuncFlag(func(s string) error {
 		called = true
 		return nil
-	}, FlagConfig{Name: "help", Description: "help"})
+	}, ArgConfig{Name: "help", Description: "help"})
 
 	err := fs.Parse([]string{"-help"})
 	if err != nil {
@@ -202,7 +202,7 @@ func TestBoolFuncFlag(t *testing.T) {
 func TestRequiredFlagMissing(t *testing.T) {
 	fs := NewFlagSet("test")
 	var s string
-	fs.StringFlag(&s, "", FlagConfig{
+	fs.StringFlag(&s, "", ArgConfig{
 		Name:        "required",
 		Description: "required flag",
 		Required:    true,
@@ -217,7 +217,7 @@ func TestRequiredFlagMissing(t *testing.T) {
 func TestRequiredFlagProvided(t *testing.T) {
 	fs := NewFlagSet("test")
 	var s string
-	fs.StringFlag(&s, "", FlagConfig{
+	fs.StringFlag(&s, "", ArgConfig{
 		Name:        "required",
 		Description: "required flag",
 		Required:    true,
@@ -235,8 +235,8 @@ func TestRequiredFlagProvided(t *testing.T) {
 func TestShortAliasConflict(t *testing.T) {
 	fs := NewFlagSet("test")
 	var a, b bool
-	fs.BoolFlag(&a, false, FlagConfig{Name: "verbose", Description: "verbose"})
-	fs.BoolFlag(&b, false, FlagConfig{Name: "version", Description: "version"})
+	fs.BoolFlag(&a, false, ArgConfig{Name: "verbose", Description: "verbose"})
+	fs.BoolFlag(&b, false, ArgConfig{Name: "version", Description: "version"})
 
 	// -v should match "verbose" since it was registered first
 	err := fs.Parse([]string{"-v"})
@@ -254,7 +254,7 @@ func TestShortAliasConflict(t *testing.T) {
 func TestSingleCharFlagNoShortAlias(t *testing.T) {
 	fs := NewFlagSet("test")
 	var b bool
-	fs.BoolFlag(&b, false, FlagConfig{Name: "v", Description: "verbose"})
+	fs.BoolFlag(&b, false, ArgConfig{Name: "v", Description: "verbose"})
 
 	// Single char flag should not create another alias
 	err := fs.Parse([]string{"-v"})
@@ -269,7 +269,7 @@ func TestSingleCharFlagNoShortAlias(t *testing.T) {
 func TestDefaultValue(t *testing.T) {
 	fs := NewFlagSet("test")
 	var n int
-	fs.IntFlag(&n, 100, FlagConfig{Name: "count", Description: "count"})
+	fs.IntFlag(&n, 100, ArgConfig{Name: "count", Description: "count"})
 
 	err := fs.Parse([]string{})
 	if err != nil {

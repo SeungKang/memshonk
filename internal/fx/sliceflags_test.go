@@ -9,7 +9,7 @@ import (
 func TestIntSliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []int
-	fs.IntSliceFlag(&vals, FlagConfig{Name: "num", Description: "numbers"})
+	fs.IntSliceFlag(&vals, ArgConfig{Name: "num", Description: "numbers"})
 
 	err := fs.Parse([]string{"-num", "1", "-num", "2", "-num", "3"})
 	if err != nil {
@@ -24,7 +24,7 @@ func TestIntSliceFlag(t *testing.T) {
 func TestIntSliceFlagShortAlias(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []int
-	fs.IntSliceFlag(&vals, FlagConfig{Name: "num", Description: "numbers"})
+	fs.IntSliceFlag(&vals, ArgConfig{Name: "num", Description: "numbers"})
 
 	err := fs.Parse([]string{"-n", "10", "-n", "20"})
 	if err != nil {
@@ -39,7 +39,7 @@ func TestIntSliceFlagShortAlias(t *testing.T) {
 func TestInt64SliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []int64
-	fs.Int64SliceFlag(&vals, FlagConfig{Name: "size", Description: "sizes"})
+	fs.Int64SliceFlag(&vals, ArgConfig{Name: "size", Description: "sizes"})
 
 	err := fs.Parse([]string{"-size", "1000000000000", "-size", "2000000000000"})
 	if err != nil {
@@ -54,7 +54,7 @@ func TestInt64SliceFlag(t *testing.T) {
 func TestUintSliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []uint
-	fs.UintSliceFlag(&vals, FlagConfig{Name: "port", Description: "ports"})
+	fs.UintSliceFlag(&vals, ArgConfig{Name: "port", Description: "ports"})
 
 	err := fs.Parse([]string{"-port", "80", "-port", "443", "-port", "8080"})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestUintSliceFlag(t *testing.T) {
 func TestUint64SliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []uint64
-	fs.Uint64SliceFlag(&vals, FlagConfig{Name: "bytes", Description: "bytes"})
+	fs.Uint64SliceFlag(&vals, ArgConfig{Name: "bytes", Description: "bytes"})
 
 	err := fs.Parse([]string{"-bytes", "18446744073709551615"})
 	if err != nil {
@@ -84,7 +84,7 @@ func TestUint64SliceFlag(t *testing.T) {
 func TestStringSliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []string
-	fs.StringSliceFlag(&vals, FlagConfig{Name: "tag", Description: "tags"})
+	fs.StringSliceFlag(&vals, ArgConfig{Name: "tag", Description: "tags"})
 
 	err := fs.Parse([]string{"-tag", "foo", "-tag", "bar", "-tag", "baz"})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestStringSliceFlag(t *testing.T) {
 func TestFloat64SliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []float64
-	fs.Float64SliceFlag(&vals, FlagConfig{Name: "rate", Description: "rates"})
+	fs.Float64SliceFlag(&vals, ArgConfig{Name: "rate", Description: "rates"})
 
 	err := fs.Parse([]string{"-rate", "1.5", "-rate", "2.5", "-rate", "3.5"})
 	if err != nil {
@@ -114,7 +114,7 @@ func TestFloat64SliceFlag(t *testing.T) {
 func TestDurationSliceFlag(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []time.Duration
-	fs.DurationSliceFlag(&vals, FlagConfig{
+	fs.DurationSliceFlag(&vals, ArgConfig{
 		Name:        "timeout",
 		Description: "timeouts",
 	})
@@ -136,7 +136,7 @@ func TestDurationSliceFlag(t *testing.T) {
 func TestSliceFlagEmpty(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []string
-	fs.StringSliceFlag(&vals, FlagConfig{Name: "tag", Description: "tags"})
+	fs.StringSliceFlag(&vals, ArgConfig{Name: "tag", Description: "tags"})
 
 	err := fs.Parse([]string{})
 	if err != nil {
@@ -216,7 +216,7 @@ func TestSliceValueString(t *testing.T) {
 func TestSliceFlagRequired(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []string
-	fs.StringSliceFlag(&vals, FlagConfig{
+	fs.StringSliceFlag(&vals, ArgConfig{
 		Name:        "tag",
 		Description: "tags",
 		Required:    true,
@@ -231,7 +231,7 @@ func TestSliceFlagRequired(t *testing.T) {
 func TestSliceFlagRequiredProvided(t *testing.T) {
 	fs := NewFlagSet("test")
 	var vals []string
-	fs.StringSliceFlag(&vals, FlagConfig{
+	fs.StringSliceFlag(&vals, ArgConfig{
 		Name:        "tag",
 		Description: "tags",
 		Required:    true,

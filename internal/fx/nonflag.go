@@ -7,18 +7,16 @@ import (
 
 // nonflagDef describes a positional (non-flag) argument.
 type nonflagDef struct {
-	name     string
-	required bool
-	isSlice  bool
-	setter   func(string) error
+	config  ArgConfig
+	isSlice bool
+	setter  func(string) error
 }
 
 // IntNf defines a positional int argument with the specified config.
 func (o *FlagSet) IntNf(p *int, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := strconv.Atoi(s)
 			if err != nil {
@@ -33,9 +31,8 @@ func (o *FlagSet) IntNf(p *int, cfg ArgConfig) {
 // Int64Nf defines a positional int64 argument with the specified config.
 func (o *FlagSet) Int64Nf(p *int64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
@@ -50,9 +47,8 @@ func (o *FlagSet) Int64Nf(p *int64, cfg ArgConfig) {
 // UintNf defines a positional uint argument with the specified config.
 func (o *FlagSet) UintNf(p *uint, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -67,9 +63,8 @@ func (o *FlagSet) UintNf(p *uint, cfg ArgConfig) {
 // Uint64Nf defines a positional uint64 argument with the specified config.
 func (o *FlagSet) Uint64Nf(p *uint64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -84,9 +79,8 @@ func (o *FlagSet) Uint64Nf(p *uint64, cfg ArgConfig) {
 // StringNf defines a positional string argument with the specified config.
 func (o *FlagSet) StringNf(p *string, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			*p = s
 			return nil
@@ -97,9 +91,8 @@ func (o *FlagSet) StringNf(p *string, cfg ArgConfig) {
 // Float64Nf defines a positional float64 argument with the specified config.
 func (o *FlagSet) Float64Nf(p *float64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := strconv.ParseFloat(s, 64)
 			if err != nil {
@@ -115,9 +108,8 @@ func (o *FlagSet) Float64Nf(p *float64, cfg ArgConfig) {
 // specified config.
 func (o *FlagSet) DurationNf(p *time.Duration, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  false,
+		config:  cfg,
+		isSlice: false,
 		setter: func(s string) error {
 			val, err := time.ParseDuration(s)
 			if err != nil {
@@ -133,9 +125,8 @@ func (o *FlagSet) DurationNf(p *time.Duration, cfg ArgConfig) {
 // remaining positional arguments.
 func (o *FlagSet) IntSliceNf(p *[]int, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := strconv.Atoi(s)
 			if err != nil {
@@ -151,9 +142,8 @@ func (o *FlagSet) IntSliceNf(p *[]int, cfg ArgConfig) {
 // remaining positional arguments.
 func (o *FlagSet) Int64SliceNf(p *[]int64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {
@@ -169,9 +159,8 @@ func (o *FlagSet) Int64SliceNf(p *[]int64, cfg ArgConfig) {
 // remaining positional arguments.
 func (o *FlagSet) UintSliceNf(p *[]uint, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -187,9 +176,8 @@ func (o *FlagSet) UintSliceNf(p *[]uint, cfg ArgConfig) {
 // all remaining positional arguments.
 func (o *FlagSet) Uint64SliceNf(p *[]uint64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := strconv.ParseUint(s, 10, 64)
 			if err != nil {
@@ -205,9 +193,8 @@ func (o *FlagSet) Uint64SliceNf(p *[]uint64, cfg ArgConfig) {
 // all remaining positional arguments.
 func (o *FlagSet) StringSliceNf(p *[]string, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			*p = append(*p, s)
 			return nil
@@ -219,9 +206,8 @@ func (o *FlagSet) StringSliceNf(p *[]string, cfg ArgConfig) {
 // all remaining positional arguments.
 func (o *FlagSet) Float64SliceNf(p *[]float64, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := strconv.ParseFloat(s, 64)
 			if err != nil {
@@ -237,9 +223,8 @@ func (o *FlagSet) Float64SliceNf(p *[]float64, cfg ArgConfig) {
 // consumes all remaining positional arguments.
 func (o *FlagSet) DurationSliceNf(p *[]time.Duration, cfg ArgConfig) {
 	o.nonflags = append(o.nonflags, nonflagDef{
-		name:     cfg.Name,
-		required: cfg.Required,
-		isSlice:  true,
+		config:  cfg,
+		isSlice: true,
 		setter: func(s string) error {
 			val, err := time.ParseDuration(s)
 			if err != nil {

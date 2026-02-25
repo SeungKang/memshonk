@@ -2,20 +2,28 @@ package fx
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 )
+
+var DoUsageErr = errors.New("usage requested")
 
 func NewCommand(name string, description string, usageOut io.Writer, fn func(context.Context) (CommandResult, error)) Command {
 	set := NewFlagSet(name)
 
 	set.Actual().SetOutput(usageOut)
 
-	return Command{
+	set.internal.Usage = func() {}
+
+	cmd := Command{
 		FlagSet:     set,
 		Description: description,
 		Fn:          fn,
 	}
+
+	return cmd
 }
 
 type Command struct {
@@ -23,6 +31,7 @@ type Command struct {
 	Description string
 	Subcommands []Command
 	Fn          func(context.Context) (CommandResult, error)
+	OptParent   *Command
 	OptPreRunFn func(context.Context) error
 }
 
@@ -30,11 +39,97 @@ func (o *Command) Name() string {
 	return o.FlagSet.Actual().Name()
 }
 
+func (o *Command) PrintUsage() {
+	o.FlagSet.internal.Output().Write([]byte(`SYNOPSIS
+` + o.synopsis("  ") + `
+
+DESCRIPTION
+  ` + o.Description + `
+
+OPTIONS
+`))
+
+	_ = LongArgsUsage(o.FlagSet, 80)
+}
+
+func (o *Command) synopsis(indent string) string {
+	var names string
+	current := o
+
+	for current != nil {
+		if names == "" {
+			names = current.Name()
+		} else {
+			names = current.Name() + " " + names
+		}
+
+		current = current.OptParent
+	}
+
+	names = indent + names
+
+	str := names + " -h|--help"
+
+	var hasOptions bool
+
+	var flags string
+
+	var nonFlags string
+
+	o.FlagSet.VisitAll(func(info ArgInfo) {
+		if info.IsFlag {
+			hasOptions = true
+
+			if info.Config.Required && len(info.Config.Name) == 1 {
+				if flags != "" {
+					flags += " "
+				}
+
+				flags += "-" + info.Config.Name + " " + flagDataType(info.OptFlag)
+			}
+		} else {
+			if nonFlags != "" {
+				nonFlags += " "
+			}
+
+			if info.Config.Required {
+				nonFlags += info.Config.Name
+			} else {
+				nonFlags += "[" + info.Config.Name + "]"
+			}
+		}
+	})
+
+	if hasOptions || flags != "" || nonFlags != "" {
+		str += "\n" + names
+	}
+
+	if hasOptions {
+		str += " [options]"
+	}
+
+	if flags != "" {
+		str += " " + flags
+	}
+
+	if nonFlags != "" {
+		str += " " + nonFlags
+	}
+
+	for _, sub := range o.Subcommands {
+		str += "\n\n" + sub.synopsis(indent)
+	}
+
+	return str
+}
+
 func (o *Command) AddSubcommand(name string, description string, fn func(context.Context) (CommandResult, error)) Command {
 	return o.AddSubcommandCustom(NewCommand(name, description, o.FlagSet.Actual().Output(), fn))
 }
 
 func (o *Command) AddSubcommandCustom(cmd Command) Command {
+	cmd.OptParent = o
+
 	if cmd.FlagSet.Actual().Output() != o.FlagSet.Actual().Output() {
 		cmd.FlagSet.Actual().SetOutput(o.FlagSet.Actual().Output())
 	}
@@ -66,6 +161,10 @@ func (o *Command) Run(ctx context.Context, args []string) (CommandResultWrapper,
 func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrapper) error {
 	err := o.FlagSet.Parse(args)
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			o.PrintUsage()
+		}
+
 		return err
 	}
 

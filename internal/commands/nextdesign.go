@@ -8,7 +8,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-func NewPluginsCommandX(s apicompat.Session) fx.Command {
+func NewPluginsCommandX(s apicompat.Session) *fx.Command {
 	pluginsCtl, pluginsEnabled := s.SharedState().HasPlugins()
 
 	pluginsCmd := PluginsCommandX{

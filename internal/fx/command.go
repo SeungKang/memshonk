@@ -2,26 +2,32 @@ package fx
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 )
 
-var DoUsageErr = errors.New("usage requested")
-
-func NewCommand(name string, description string, usageOut io.Writer, fn func(context.Context) (CommandResult, error)) Command {
+func NewCommand(name string, description string, usageOut io.Writer, fn func(context.Context) (CommandResult, error)) *Command {
 	set := NewFlagSet(name)
 
 	set.Actual().SetOutput(usageOut)
 
 	set.internal.Usage = func() {}
 
-	cmd := Command{
+	cmd := &Command{
 		FlagSet:     set,
 		Description: description,
 		Fn:          fn,
 	}
+
+	// I tried using BoolFuncFlag and propogating flag.ErrHelp,
+	// but that creates a new error object using FlagSet.failf
+	// which makes it impossible to check if flag.ErrHelp is
+	// present using errors.Is.
+	set.BoolFlag(&cmd.help, false, ArgConfig{
+		Name:        "help",
+		Description: "Display this information",
+	})
 
 	return cmd
 }
@@ -29,10 +35,12 @@ func NewCommand(name string, description string, usageOut io.Writer, fn func(con
 type Command struct {
 	FlagSet     *FlagSet
 	Description string
-	Subcommands []Command
+	Subcommands []*Command
 	Fn          func(context.Context) (CommandResult, error)
 	OptParent   *Command
 	OptPreRunFn func(context.Context) error
+
+	help bool
 }
 
 func (o *Command) Name() string {
@@ -68,7 +76,7 @@ func (o *Command) synopsis(indent string) string {
 
 	names = indent + names
 
-	str := names + " -h|--help"
+	str := names + " -h"
 
 	var hasOptions bool
 
@@ -123,11 +131,11 @@ func (o *Command) synopsis(indent string) string {
 	return str
 }
 
-func (o *Command) AddSubcommand(name string, description string, fn func(context.Context) (CommandResult, error)) Command {
+func (o *Command) AddSubcommand(name string, description string, fn func(context.Context) (CommandResult, error)) *Command {
 	return o.AddSubcommandCustom(NewCommand(name, description, o.FlagSet.Actual().Output(), fn))
 }
 
-func (o *Command) AddSubcommandCustom(cmd Command) Command {
+func (o *Command) AddSubcommandCustom(cmd *Command) *Command {
 	cmd.OptParent = o
 
 	if cmd.FlagSet.Actual().Output() != o.FlagSet.Actual().Output() {
@@ -161,11 +169,13 @@ func (o *Command) Run(ctx context.Context, args []string) (CommandResultWrapper,
 func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrapper) error {
 	err := o.FlagSet.Parse(args)
 	if err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			o.PrintUsage()
-		}
-
 		return err
+	}
+
+	if o.help {
+		o.PrintUsage()
+
+		return flag.ErrHelp
 	}
 
 	if o.OptPreRunFn != nil {

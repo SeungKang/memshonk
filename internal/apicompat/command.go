@@ -25,7 +25,7 @@ type CommandResult interface {
 // NewEmptyCommandRegistry creates a new empty command registry.
 func NewEmptyCommandRegistry() *CommandRegistry {
 	return &CommandRegistry{
-		byName:  make(map[string]func(Session) fx.Command),
+		byName:  make(map[string]func(Session) *fx.Command),
 		aliases: make(map[string]string),
 	}
 }
@@ -34,13 +34,13 @@ func NewEmptyCommandRegistry() *CommandRegistry {
 // It is safe for concurrent read access after initialization.
 type CommandRegistry struct {
 	rwMu    sync.RWMutex
-	byName  map[string]func(Session) fx.Command
+	byName  map[string]func(Session) *fx.Command
 	names   []string
 	aliases map[string]string // alias -> canonical name
 }
 
 // Register adds a command schema to the registry.
-func (o *CommandRegistry) Register(name string, newCommandFn func(Session) fx.Command) {
+func (o *CommandRegistry) Register(name string, newCommandFn func(Session) *fx.Command) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -77,7 +77,7 @@ func (o *CommandRegistry) Unregister(name string) {
 // Lookup finds a command schema by name or alias.
 //
 // Returns the schema and true if found, or nil and false if not.
-func (o *CommandRegistry) Lookup(nameOrAlias string) (func(Session) fx.Command, bool) {
+func (o *CommandRegistry) Lookup(nameOrAlias string) (func(Session) *fx.Command, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 

@@ -168,14 +168,13 @@ func (o *Command) Run(ctx context.Context, args []string) (CommandResultWrapper,
 
 func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrapper) error {
 	err := o.FlagSet.Parse(args)
-	if err != nil {
-		return err
-	}
-
 	if o.help {
 		o.PrintUsage()
 
 		return flag.ErrHelp
+	}
+	if err != nil {
+		return err
 	}
 
 	if o.OptPreRunFn != nil {

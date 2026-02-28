@@ -20,6 +20,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/connmux"
 	"github.com/SeungKang/memshonk/internal/cstlv"
+	"github.com/SeungKang/memshonk/internal/jobsctl"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
@@ -265,6 +266,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 			StartedAt: time.Now(),
 		},
 		isDefault: config.IsDefault,
+		jobs:      jobsctl.New(),
 		shared:    o.config.SharedState,
 		io:        config.IO,
 		cmdStore:  &apicompat.CommandStorage{},

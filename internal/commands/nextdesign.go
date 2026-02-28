@@ -8,14 +8,14 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-func NewPluginsCommandX(s apicompat.Session) *fx.Command {
-	pluginsCtl, pluginsEnabled := s.SharedState().HasPlugins()
+func NewPluginsCommandX(config apicompat.NewCommandConfig) *fx.Command {
+	pluginsCtl, pluginsEnabled := config.Session.SharedState().HasPlugins()
 
 	pluginsCmd := PluginsCommandX{
 		Ctl: pluginsCtl,
 	}
 
-	root := fx.NewCommand(pluginsCommandName, "manage plugins", s.IO().BuiltinUsage, pluginsCmd.list)
+	root := fx.NewCommand(pluginsCommandName, "manage plugins", pluginsCmd.list)
 
 	root.OptPreRunFn = func(context.Context) error {
 		if pluginsEnabled {

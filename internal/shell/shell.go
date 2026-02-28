@@ -53,7 +53,7 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 		return nil, fmt.Errorf("failed to create readline - %w", err)
 	}
 
-	interpreter, err := NewInterpreter(session, registry)
+	interpreter, err := NewInterpreter(session, apicompat.NewCommandHandler(session), registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create interpreter - %w", err)
 	}
@@ -187,10 +187,7 @@ func (o *Shell) Run(ctx context.Context) error {
 		o.cancelCmdCtxFnMu.Unlock()
 
 		// Execute through interpreter
-		err = o.interp.Execute(cmdCtx, line)
-		if err != nil {
-			fmt.Fprintf(o.session.IO().Stderr, "error - %v\n", err)
-		}
+		_ = o.interp.Execute(cmdCtx, line)
 	}
 }
 

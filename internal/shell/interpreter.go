@@ -3,13 +3,9 @@ package shell
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
 	"strings"
-	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/commands"
@@ -20,9 +16,10 @@ import (
 )
 
 // NewInterpreter creates a new shell interpreter.
-func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Interpreter, error) {
+func NewInterpreter(session apicompat.Session, cmdHandler *apicompat.CommandHandler, registry *CommandRegistry) (*Interpreter, error) {
 	i := &Interpreter{
 		session:  session,
+		cmdHand:  cmdHandler,
 		registry: registry,
 		parser:   syntax.NewParser(),
 	}
@@ -55,6 +52,7 @@ func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Inte
 // command routing.
 type Interpreter struct {
 	session  apicompat.Session
+	cmdHand  *apicompat.CommandHandler
 	registry *CommandRegistry
 	parser   *syntax.Parser
 	runner   *interp.Runner
@@ -75,89 +73,55 @@ func (o *Interpreter) Execute(ctx context.Context, line string) error {
 // or external programs.
 func (o *Interpreter) execHandler(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	return func(ctx context.Context, argv []string) error {
-		if len(argv) == 0 {
-			return nil
-		}
-
+		// interp.HandlerCtx is the prescribed mechanism
+		// for accesing the stdin/out pipes managed by
+		// the sh library.
 		handlerCtx := interp.HandlerCtx(ctx)
 
-		// Check if it's a built-in command
-		wasHandled, err := o.session.RunCommandNext(ctx, apicompat.RunCommandConfig{
+		err := o.cmdHand.Run(ctx, apicompat.RunCommandConfig{
 			Argv:   argv,
+			Env:    execEnv(handlerCtx.Env),
+			Cwd:    "",
 			Stdin:  handlerCtx.Stdin,
 			Stdout: handlerCtx.Stdout,
 			Stderr: handlerCtx.Stderr,
 		})
 		if err != nil {
-			return err
-		}
-
-		if wasHandled {
-			return nil
-		}
-
-		// Fall back to external command execution
-		return execProgram(ctx, execProgramConfig{
-			Argv:   argv,
-			Env:    os.Environ(),
-			Stdin:  handlerCtx.Stdin,
-			Stdout: handlerCtx.Stdout,
-			Stderr: handlerCtx.Stderr,
-		})
-	}
-}
-
-type execProgramConfig struct {
-	Argv   []string
-	Env    []string
-	Cwd    string
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-func execProgram(ctx context.Context, config execProgramConfig) error {
-	program := exec.CommandContext(ctx, config.Argv[0], config.Argv[1:]...)
-
-	program.Dir = config.Cwd
-	program.Env = config.Env
-
-	program.Stdin = config.Stdin
-	program.Stdout = config.Stdout
-	program.Stderr = config.Stderr
-
-	err := program.Start()
-	if err != nil {
-		return fmt.Errorf("failed to exec %q - %w",
-			program.String(), err)
-	}
-
-	var exitErr *exec.ExitError
-
-	err = program.Wait()
-	switch {
-	case err == nil:
-		return nil
-	case errors.As(err, &exitErr):
-		// Based on code from the DefaultExecHandler
-		// function in:
-		// mvdan.cc/sh/v3/interp/handler.go
-		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-			if status.Signaled() {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-
-				return interp.NewExitStatus(uint8(128 + status.Signal()))
+			exitStatus, hasIt := err.HasExitStatus()
+			if !hasIt {
+				exitStatus = 1
 			}
 
-			return interp.NewExitStatus(uint8(status.ExitStatus()))
+			return interp.NewExitStatus(exitStatus)
 		}
 
-		return interp.NewExitStatus(1)
-	default:
-		return err
+		return nil
 	}
+}
+
+// execEnv is a copy of the private function of the same name from
+// mvdan.cc/sh/v3, interp/vars.go
+func execEnv(env expand.Environ) []string {
+	list := make([]string, 0, 64)
+	env.Each(func(name string, vr expand.Variable) bool {
+		if !vr.IsSet() {
+			// If a variable is set globally but unset in the
+			// runner, we need to ensure it's not part of the final
+			// list. Seems like zeroing the element is enough.
+			// This is a linear search, but this scenario should be
+			// rare, and the number of variables shouldn't be large.
+			for i, kv := range list {
+				if strings.HasPrefix(kv, name+"=") {
+					list[i] = ""
+				}
+			}
+		}
+		if vr.Exported && vr.Kind == expand.String {
+			list = append(list, name+"="+vr.String())
+		}
+		return true
+	})
+	return list
 }
 
 // runBuiltin executes a built-in command.

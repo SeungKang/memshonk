@@ -4,13 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 )
 
-func NewCommand(name string, description string, usageOut io.Writer, fn func(context.Context) (CommandResult, error)) *Command {
+func NewCommand(name string, description string, fn func(context.Context) (CommandResult, error)) *Command {
 	set := NewFlagSet(name)
-
-	set.Actual().SetOutput(usageOut)
 
 	set.internal.Usage = func() {}
 
@@ -20,10 +17,10 @@ func NewCommand(name string, description string, usageOut io.Writer, fn func(con
 		Fn:          fn,
 	}
 
-	// I tried using BoolFuncFlag and propogating flag.ErrHelp,
-	// but that creates a new error object using FlagSet.failf
-	// which makes it impossible to check if flag.ErrHelp is
-	// present using errors.Is.
+	// I tried using BoolFuncFlag to return flag.ErrHelp,
+	// but that calls FlagSet.failf which uses errors.New,
+	// which makes it impossible to check if flag.ErrHelp
+	// is present using errors.Is.
 	set.BoolFlag(&cmd.help, false, ArgConfig{
 		Name:        "help",
 		Description: "Display this information",
@@ -132,7 +129,7 @@ func (o *Command) synopsis(indent string) string {
 }
 
 func (o *Command) AddSubcommand(name string, description string, fn func(context.Context) (CommandResult, error)) *Command {
-	return o.AddSubcommandCustom(NewCommand(name, description, o.FlagSet.Actual().Output(), fn))
+	return o.AddSubcommandCustom(NewCommand(name, description, fn))
 }
 
 func (o *Command) AddSubcommandCustom(cmd *Command) *Command {

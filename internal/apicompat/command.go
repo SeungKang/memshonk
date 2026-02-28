@@ -3,10 +3,18 @@ package apicompat
 import (
 	"container/list"
 	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/fx"
+	"github.com/SeungKang/memshonk/internal/jobsctl"
 )
 
 // Command represents a command that can be run by a client.
@@ -25,7 +33,7 @@ type CommandResult interface {
 // NewEmptyCommandRegistry creates a new empty command registry.
 func NewEmptyCommandRegistry() *CommandRegistry {
 	return &CommandRegistry{
-		byName:  make(map[string]func(Session) *fx.Command),
+		byName:  make(map[string]func(NewCommandConfig) *fx.Command),
 		aliases: make(map[string]string),
 	}
 }
@@ -34,13 +42,20 @@ func NewEmptyCommandRegistry() *CommandRegistry {
 // It is safe for concurrent read access after initialization.
 type CommandRegistry struct {
 	rwMu    sync.RWMutex
-	byName  map[string]func(Session) *fx.Command
+	byName  map[string]func(NewCommandConfig) *fx.Command
 	names   []string
 	aliases map[string]string // alias -> canonical name
 }
 
+type NewCommandConfig struct {
+	Session Session
+	Stdin   io.Reader
+	Stdout  io.Writer
+	Stderr  io.Writer
+}
+
 // Register adds a command schema to the registry.
-func (o *CommandRegistry) Register(name string, newCommandFn func(Session) *fx.Command) {
+func (o *CommandRegistry) Register(name string, newCommandFn func(NewCommandConfig) *fx.Command) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -77,7 +92,7 @@ func (o *CommandRegistry) Unregister(name string) {
 // Lookup finds a command schema by name or alias.
 //
 // Returns the schema and true if found, or nil and false if not.
-func (o *CommandRegistry) Lookup(nameOrAlias string) (func(Session) *fx.Command, bool) {
+func (o *CommandRegistry) Lookup(nameOrAlias string) (func(NewCommandConfig) *fx.Command, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
 
@@ -169,4 +184,176 @@ func (o *CommandStorage) PreviousOutput(commandID []string) (fx.CommandResultWra
 
 func serializeCommandID(eachCmd []string) string {
 	return strings.Join(eachCmd, "-")
+}
+
+func NewCommandHandler(session Session) *CommandHandler {
+	return &CommandHandler{
+		session: session,
+	}
+}
+
+type CommandHandler struct {
+	session Session
+}
+
+type RunCommandConfig struct {
+	Argv   []string
+	Env    []string
+	Cwd    string
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+func (o *CommandHandler) Run(ctx context.Context, config RunCommandConfig) *CommandHandlerError {
+	if len(config.Argv) == 0 {
+		return nil
+	}
+
+	wasHandled, err := o.runInternalCommand(ctx, config)
+	if err != nil {
+		if !errors.Is(err, flag.ErrHelp) {
+			fmt.Fprintf(config.Stderr, "%s failed - %s\n", config.Argv[0], err)
+		}
+
+		return err
+	}
+
+	if wasHandled {
+		return nil
+	}
+
+	err = o.execProgram(ctx, config)
+	if err != nil {
+		_, hasExitStatus := err.HasExitStatus()
+		if !hasExitStatus {
+			fmt.Fprintf(config.Stderr, "%s failed - %s\n", config.Argv[0], err)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (o *CommandHandler) runInternalCommand(ctx context.Context, config RunCommandConfig) (bool, *CommandHandlerError) {
+	newCmdFn, hasIt := o.session.SharedState().Commands.Lookup(config.Argv[0])
+	if !hasIt {
+		return false, nil
+	}
+
+	cmd := newCmdFn(NewCommandConfig{
+		Session: o.session,
+		Stdin:   config.Stdin,
+		Stdout:  config.Stdout,
+		Stderr:  config.Stderr,
+	})
+
+	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{})
+	if err != nil {
+		return false, NewCommandHandlerError(0, fmt.Errorf("failed to register internal command job - %w", err))
+	}
+	defer job.Finished()
+
+	usageWriter := config.Stderr
+
+	stdoutFd, stdoutIsFd := config.Stdout.(*os.File)
+	if stdoutIsFd {
+		info, _ := stdoutFd.Stat()
+		if info != nil && info.Mode()&os.ModeNamedPipe > 0 {
+			usageWriter = config.Stdout
+		}
+	}
+
+	cmd.VisitAll(func(c *fx.Command) {
+		c.FlagSet.Actual().SetOutput(usageWriter)
+	})
+
+	result, err := cmd.Run(ctx, config.Argv[1:])
+	if err != nil {
+		return true, NewCommandHandlerError(1, fmt.Errorf("%s failed: %w", cmd.Name(), err))
+	}
+
+	o.session.CommandStorage().AddOutput(result)
+
+	if result.Result != nil {
+		config.Stdout.Write([]byte(result.Result.Human()))
+		config.Stdout.Write([]byte{'\n'})
+	}
+
+	return true, nil
+}
+
+func (o *CommandHandler) execProgram(ctx context.Context, config RunCommandConfig) *CommandHandlerError {
+	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{})
+	if err != nil {
+		return NewCommandHandlerError(0, fmt.Errorf("failed to register external program job - %w", err))
+	}
+	defer job.Finished()
+
+	program := exec.CommandContext(ctx, config.Argv[0], config.Argv[1:]...)
+
+	program.Dir = config.Cwd
+	program.Env = config.Env
+
+	program.Stdin = config.Stdin
+	program.Stdout = config.Stdout
+	program.Stderr = config.Stderr
+
+	err = program.Start()
+	if err != nil {
+		return NewCommandHandlerError(0, fmt.Errorf("failed to exec new process - %w",
+			err))
+	}
+
+	var exitErr *exec.ExitError
+
+	err = program.Wait()
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &exitErr):
+		// Based on code from the DefaultExecHandler
+		// function in:
+		// mvdan.cc/sh/v3/interp/handler.go
+		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+			if status.Signaled() {
+				if ctx.Err() != nil {
+					return NewCommandHandlerError(1, err)
+				}
+
+				return NewCommandHandlerError(uint8(128+status.Signal()), err)
+			}
+
+			return NewCommandHandlerError(uint8(status.ExitStatus()), err)
+		}
+
+		fallthrough
+	default:
+		return NewCommandHandlerError(1, err)
+	}
+}
+
+func NewCommandHandlerError(exitStatus uint8, err error) *CommandHandlerError {
+	return &CommandHandlerError{
+		err:    err,
+		status: exitStatus,
+	}
+}
+
+type CommandHandlerError struct {
+	err    error
+	status uint8
+}
+
+func (o CommandHandlerError) Unwrap() error {
+	return o.err
+}
+
+func (o CommandHandlerError) Error() string {
+	return o.err.Error()
+}
+
+func (o CommandHandlerError) HasExitStatus() (uint8, bool) {
+	return o.status, o.status != 0
 }

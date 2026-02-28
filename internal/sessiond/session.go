@@ -2,11 +2,12 @@ package sessiond
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/jobsctl"
 
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
@@ -21,6 +22,7 @@ type Session struct {
 	shared    apicompat.SharedState
 	info      apicompat.SessionInfo
 	isDefault bool
+	jobs      *jobsctl.Ctl
 	io        apicompat.SessionIO
 	cmdStore  *apicompat.CommandStorage
 	shell     Shell
@@ -47,6 +49,12 @@ func (o *Session) Close() error {
 	o.ocne.Do(func() {
 		o.cancelFn()
 
+		shutdownCtx, cancelFn := context.WithTimeout(
+			context.Background(), 2*time.Second)
+		defer cancelFn()
+
+		o.jobs.Shutdown(shutdownCtx)
+
 		if o.shell != nil {
 			_ = o.shell.Close()
 		}
@@ -67,6 +75,10 @@ func (o *Session) Info() apicompat.SessionInfo {
 
 func (o *Session) IO() apicompat.SessionIO {
 	return o.io
+}
+
+func (o *Session) Jobs() *jobsctl.Ctl {
+	return o.jobs
 }
 
 func (o *Session) OnSignal(signalType uint8) {
@@ -92,52 +104,6 @@ func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
 
 func (o *Session) CommandStorage() *apicompat.CommandStorage {
 	return o.cmdStore
-}
-
-func (o *Session) RunCommandNext(parent context.Context, config apicompat.RunCommandConfig) (bool, error) {
-	if len(config.Argv) == 0 {
-		return false, nil
-	}
-
-	newCmdFn, hasIt := o.shared.Commands.Lookup(config.Argv[0])
-	if !hasIt {
-		return false, nil
-	}
-
-	ctx, cancelFn := context.WithCancel(parent)
-	defer func() {
-		o.clearCancel()
-		cancelFn()
-	}()
-
-	go func() {
-		select {
-		case <-ctx.Done():
-		case <-o.ctx.Done():
-			cancelFn()
-		}
-	}()
-
-	// install the cancel lever for OnSignal
-	o.setCancel(func() {
-		cancelFn()
-	})
-
-	cmd := newCmdFn(o)
-
-	result, err := cmd.Run(ctx, config.Argv[1:])
-	if err != nil {
-		return true, fmt.Errorf("%s failed: %w", cmd.Name(), err)
-	}
-
-	o.cmdStore.AddOutput(result)
-
-	if result.Result != nil {
-		config.Stdout.Write([]byte(result.Result.Human()))
-		config.Stdout.Write([]byte{'\n'})
-	}
-
-	return true, nil
 }
 
 func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) error {

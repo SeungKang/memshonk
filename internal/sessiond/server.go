@@ -171,10 +171,9 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 
 	_, err = o.newSession(ctx, SessionConfig{
 		IO: apicompat.SessionIO{
-			Stdin:        stdinConn,
-			Stdout:       stdout,
-			Stderr:       stdSplitterWriter{conn: stdErrAndOutConn, isStderr: true},
-			BuiltinUsage: stdout,
+			Stdin:  stdinConn,
+			Stdout: stdout,
+			Stderr: stdSplitterWriter{conn: stdErrAndOutConn, isStderr: true},
 			OptTerminal: goterm.NewVirtualTerminal(goterm.VirtualTerminalConfig{
 				Input:  stdinConn,
 				Output: stdSplitterWriter{conn: stdErrAndOutConn},

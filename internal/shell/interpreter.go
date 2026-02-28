@@ -3,9 +3,13 @@ package shell
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/commands"
@@ -25,10 +29,12 @@ func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Inte
 
 	sio := session.IO()
 
-	// Use an empty reader for stdin to avoid competing with readline for input.
-	// Built-in commands don't read from stdin, and external commands that need
-	// stdin piping would require a different approach (e.g., temporarily giving
-	// them exclusive access to the terminal).
+	// Use an empty reader for stdin to avoid competing
+	// with readline for input. Built-in commands don't
+	// read from stdin, and external commands that need
+	// stdin piping would require a different approach
+	// (e.g., temporarily giving them exclusive access
+	// to the terminal).
 	emptyStdin := bytes.NewReader(nil)
 
 	runner, err := interp.New(
@@ -45,7 +51,8 @@ func NewInterpreter(session apicompat.Session, registry *CommandRegistry) (*Inte
 	return i, nil
 }
 
-// Interpreter wraps mvdan/sh to provide shell interpretation with built-in command routing.
+// Interpreter wraps mvdan/sh to provide shell interpretation with built-in
+// command routing.
 type Interpreter struct {
 	session  apicompat.Session
 	registry *CommandRegistry
@@ -64,15 +71,23 @@ func (o *Interpreter) Execute(ctx context.Context, line string) error {
 	return o.runner.Run(ctx, file)
 }
 
-// execHandler routes command execution to built-in commands or external commands.
-func (o *Interpreter) execHandler(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+// execHandler routes command execution to built-in commands
+// or external programs.
+func (o *Interpreter) execHandler(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	return func(ctx context.Context, argv []string) error {
 		if len(argv) == 0 {
 			return nil
 		}
 
+		handlerCtx := interp.HandlerCtx(ctx)
+
 		// Check if it's a built-in command
-		wasHandled, err := o.session.RunCommandNext(ctx, argv)
+		wasHandled, err := o.session.RunCommandNext(ctx, apicompat.RunCommandConfig{
+			Argv:   argv,
+			Stdin:  handlerCtx.Stdin,
+			Stdout: handlerCtx.Stdout,
+			Stderr: handlerCtx.Stderr,
+		})
 		if err != nil {
 			return err
 		}
@@ -82,7 +97,66 @@ func (o *Interpreter) execHandler(next interp.ExecHandlerFunc) interp.ExecHandle
 		}
 
 		// Fall back to external command execution
-		return next(ctx, argv)
+		return execProgram(ctx, execProgramConfig{
+			Argv:   argv,
+			Env:    os.Environ(),
+			Stdin:  handlerCtx.Stdin,
+			Stdout: handlerCtx.Stdout,
+			Stderr: handlerCtx.Stderr,
+		})
+	}
+}
+
+type execProgramConfig struct {
+	Argv   []string
+	Env    []string
+	Cwd    string
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+func execProgram(ctx context.Context, config execProgramConfig) error {
+	program := exec.CommandContext(ctx, config.Argv[0], config.Argv[1:]...)
+
+	program.Dir = config.Cwd
+	program.Env = config.Env
+
+	program.Stdin = config.Stdin
+	program.Stdout = config.Stdout
+	program.Stderr = config.Stderr
+
+	err := program.Start()
+	if err != nil {
+		return fmt.Errorf("failed to exec %q - %w",
+			program.String(), err)
+	}
+
+	var exitErr *exec.ExitError
+
+	err = program.Wait()
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &exitErr):
+		// Based on code from the DefaultExecHandler
+		// function in:
+		// mvdan.cc/sh/v3/interp/handler.go
+		if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
+			if status.Signaled() {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+
+				return interp.NewExitStatus(uint8(128 + status.Signal()))
+			}
+
+			return interp.NewExitStatus(uint8(status.ExitStatus()))
+		}
+
+		return interp.NewExitStatus(1)
+	default:
+		return err
 	}
 }
 

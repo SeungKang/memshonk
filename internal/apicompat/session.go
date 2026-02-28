@@ -31,7 +31,7 @@ type Session interface {
 	RunCommand(context.Context, Command) error
 
 	// RunCommand runs a command.
-	RunCommandNext(ctx context.Context, argv []string) (bool, error)
+	RunCommandNext(context.Context, RunCommandConfig) (bool, error)
 
 	// CommandStorage returns information about the session's
 	// previously-run commands.
@@ -71,4 +71,22 @@ type SessionIO struct {
 	// it allocated one. This field is nil if
 	// no terminal has been allocated.
 	OptTerminal *goterm.VirtualTerminal
+}
+
+// RunCommandConfig provides the configuration for running
+// a command or an external program.
+type RunCommandConfig struct {
+	// Argv is the argv of the command to run (i.e., the first
+	// index is the command name or its path and the remaining
+	// elements are the command's arguments).
+	Argv []string
+
+	// Stdin is the client's standard input.
+	Stdin io.Reader
+
+	// Stdout is the client's standard output.
+	Stdout io.Writer
+
+	// Stderr is the client's standard error.
+	Stderr io.Writer
 }

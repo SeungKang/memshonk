@@ -90,12 +90,12 @@ func (o *Session) CommandStorage() *apicompat.CommandStorage {
 	return o.cmdStore
 }
 
-func (o *Session) RunCommandNext(parent context.Context, argv []string) (bool, error) {
-	if len(argv) == 0 {
+func (o *Session) RunCommandNext(parent context.Context, config apicompat.RunCommandConfig) (bool, error) {
+	if len(config.Argv) == 0 {
 		return false, nil
 	}
 
-	newCmdFn, hasIt := o.shared.Commands.Lookup(argv[0])
+	newCmdFn, hasIt := o.shared.Commands.Lookup(config.Argv[0])
 	if !hasIt {
 		return false, nil
 	}
@@ -121,7 +121,7 @@ func (o *Session) RunCommandNext(parent context.Context, argv []string) (bool, e
 
 	cmd := newCmdFn(o)
 
-	result, err := cmd.Run(ctx, argv[1:])
+	result, err := cmd.Run(ctx, config.Argv[1:])
 	if err != nil {
 		return true, fmt.Errorf("%s failed: %w", cmd.Name(), err)
 	}
@@ -129,8 +129,8 @@ func (o *Session) RunCommandNext(parent context.Context, argv []string) (bool, e
 	o.cmdStore.AddOutput(result)
 
 	if result.Result != nil {
-		o.io.Stdout.Write([]byte(result.Result.Human()))
-		o.io.Stdout.Write([]byte{'\n'})
+		config.Stdout.Write([]byte(result.Result.Human()))
+		config.Stdout.Write([]byte{'\n'})
 	}
 
 	return true, nil

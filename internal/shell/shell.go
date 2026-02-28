@@ -20,6 +20,11 @@ import (
 
 // NewShell creates a new shell for the given session.
 func NewShell(session apicompat.Session) (*Shell, error) {
+	terminal, hasTerm := session.Terminal()
+	if !hasTerm {
+		return nil, fmt.Errorf("the current session does not provide a terminal, which is required for shell functionality")
+	}
+
 	// Create the command registry
 	registry := NewCommandRegistry()
 	for _, cmdSchema := range commands.BuiltinCommands() {
@@ -27,7 +32,12 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 	}
 
 	// Build readline configuration for virtual terminal
-	readlineConfig := buildReadlineConfig(session)
+	readlineConfig := buildReadlineConfig(readlineIO{
+		Stdin:    io.NopCloser(session.IO().Stdin),
+		Stdout:   session.IO().Stdout,
+		Stderr:   session.IO().Stderr,
+		Terminal: terminal,
+	})
 	readlineConfig.AutoComplete = NewCompleter(registry)
 
 	// History setup

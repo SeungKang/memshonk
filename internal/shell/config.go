@@ -3,22 +3,26 @@ package shell
 import (
 	"io"
 
-	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 
 	"github.com/chzyer/readline"
 )
 
+type readlineIO struct {
+	Stdin    io.ReadCloser
+	Stdout   io.Writer
+	Stderr   io.Writer
+	Terminal goterm.TerminalWithNotifications
+}
+
 // buildReadlineConfig creates a readline.Config configured for virtual terminal I/O.
 // This avoids the global state issues in the readline library by providing explicit
 // I/O streams and terminal function overrides for each session.
-func buildReadlineConfig(session apicompat.Session) *readline.Config {
-	sio := session.IO()
-
-	readlineConfig := &readline.Config{
-		Stdin:  io.NopCloser(sio.Stdin),
-		Stdout: sio.Stdout,
-		Stderr: sio.Stderr,
+func buildReadlineConfig(rlIO readlineIO) *readline.Config {
+	return &readline.Config{
+		Stdin:  rlIO.Stdin,
+		Stdout: rlIO.Stdout,
+		Stderr: rlIO.Stderr,
 
 		// Force interactive mode even though we're not connected to a real TTY.
 		FuncIsTerminal:      func() bool { return true },
@@ -28,29 +32,21 @@ func buildReadlineConfig(session apicompat.Session) *readline.Config {
 		// The actual terminal handling is done by the client.
 		FuncMakeRaw: func() error { return nil },
 		FuncExitRaw: func() error { return nil },
-	}
 
-	// Set up width handling from the virtual terminal if available.
-	if term := sio.OptTerminal; term != nil {
-		readlineConfig.FuncGetWidth = func() int {
-			size, err := term.Size()
+		FuncGetWidth: func() int {
+			size, err := rlIO.Terminal.Size()
 			if err != nil {
 				return 80 // fallback
 			}
 			return size.Cols
-		}
+		},
 
 		// Set up per-session resize notification.
 		// This avoids the global SIGWINCH handler race condition in readline.
-		readlineConfig.FuncOnWidthChanged = func(callback func()) {
-			setupWidthChangeHandler(term, callback)
-		}
-	} else {
-		readlineConfig.FuncGetWidth = func() int { return 80 }
-		readlineConfig.FuncOnWidthChanged = func(func()) {} // no-op
+		FuncOnWidthChanged: func(callback func()) {
+			setupWidthChangeHandler(rlIO.Terminal, callback)
+		},
 	}
-
-	return readlineConfig
 }
 
 // setupWidthChangeHandler sets up a per-session width change handler

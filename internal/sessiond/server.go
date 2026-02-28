@@ -45,6 +45,8 @@ type ServerConfig struct {
 type Shell interface {
 	Run(context.Context) error
 
+	Signal(interface{})
+
 	Close() error
 }
 

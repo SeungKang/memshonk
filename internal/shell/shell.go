@@ -81,11 +81,25 @@ type Shell struct {
 	ctx      context.Context
 	cancelFn func()
 
+	cancelCmdCtxFnMu sync.Mutex
+	cancelCmdCtxFn   func()
+
 	attachEvents   *events.Sub[progctl.AttachedEvent]
 	detachEvents   *events.Sub[progctl.DetachedEvent]
 	exitedEvents   *events.Sub[progctl.ProcessExitedEvent]
 	loadedEvents   *events.Sub[plugins.LoadedEvent]
 	unloadedEvents *events.Sub[plugins.UnloadedEvent]
+}
+
+func (o *Shell) Signal(interface{}) {
+	o.cancelCmdCtxFnMu.Lock()
+	defer o.cancelCmdCtxFnMu.Unlock()
+
+	if o.cancelCmdCtxFn != nil {
+		o.cancelCmdCtxFn()
+
+		o.cancelCmdCtxFn = nil
+	}
 }
 
 func (o *Shell) Close() error {
@@ -163,8 +177,18 @@ func (o *Shell) Run(ctx context.Context) error {
 			// Keep going.
 		}
 
+		// Create a context.Context for only *this* shell
+		// command execution so that backgrounded shell
+		// jobs are not cancelled if the shell is signaled.
+		cmdCtx, cancelFn := context.WithCancel(ctx)
+
+		o.cancelCmdCtxFnMu.Lock()
+		o.cancelCmdCtxFn = cancelFn
+		o.cancelCmdCtxFnMu.Unlock()
+
 		// Execute through interpreter
-		if err := o.interp.Execute(ctx, line); err != nil {
+		err = o.interp.Execute(cmdCtx, line)
+		if err != nil {
 			fmt.Fprintf(o.session.IO().Stderr, "error - %v\n", err)
 		}
 	}

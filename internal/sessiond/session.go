@@ -73,6 +73,10 @@ func (o *Session) OnSignal(signalType uint8) {
 	switch signalType {
 	case IntSignalType:
 		o.cancelCurrentCommand()
+
+		if o.shell != nil {
+			o.shell.Signal(nil)
+		}
 	default:
 		// ignore or log unknown signals
 	}

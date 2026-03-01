@@ -6,80 +6,49 @@ import (
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 )
 
 const (
-	sessionsCommandName = "sessions"
+	SessionsCommandName = "sessions"
 )
 
-func SessionsCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      sessionsCommandName,
-		ShortHelp: "manage sessions",
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "command",
-				Desc:     "the sessions command ('info', 'ls', 'rm')",
-				DefValue: "info",
-				DataType: "",
-			},
-			{
-				Name:     "session-ids",
-				Desc:     "one or more session IDs to operate on",
-				DataType: []string{},
-				DefValue: nil,
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return NewSessionsCommand(SessionsCommandArgs{
-				Mode:       c.NonFlags.String("command"),
-				SessionIDs: c.NonFlags.StringList("session-ids"),
-			}), nil
-		},
+func NewSessionsCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &SessionsCommand{
+		session: config.Session,
 	}
-}
 
-type SessionsCommandArgs struct {
-	Mode       string
-	SessionIDs []string
-}
+	root := fx.NewCommand(SessionsCommandName, "manage sessions", cmd.info)
 
-func NewSessionsCommand(args SessionsCommandArgs) SessionsCommand {
-	return SessionsCommand{
-		args: args,
+	info := root.AddSubcommand("info", "show session info", cmd.info)
+	root.AddSubcommand("ls", "list sessions", cmd.ls)
+	rm := root.AddSubcommand("rm", "remove sessions", cmd.rm)
+
+	// register session-ids on info and rm (not ls)
+	for _, c := range []*fx.Command{info, rm} {
+		c.FlagSet.StringSliceNf(&cmd.sessionIDs, fx.ArgConfig{
+			Name:        "session-ids",
+			Description: "one or more session IDs to operate on",
+		})
 	}
+
+	return root
 }
 
 type SessionsCommand struct {
-	args SessionsCommandArgs
+	session    apicompat.Session
+	sessionIDs []string
 }
 
-func (o SessionsCommand) Name() string {
-	return sessionsCommandName
-}
-
-func (o SessionsCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	switch o.args.Mode {
-	case "info":
-		return o.info(s)
-	case "ls":
-		return o.ls(s)
-	case "rm":
-		return nil, o.rm(s)
-	default:
-		return nil, fmt.Errorf("unknown sessions command; %q", o.args.Mode)
-	}
-}
-
-func (o SessionsCommand) info(s apicompat.Session) (apicompat.CommandResult, error) {
-	if len(o.args.SessionIDs) == 0 {
-		return HumanCommandResult(s.Info().String()), nil
+func (o *SessionsCommand) info(_ context.Context) (fx.CommandResult, error) {
+	if len(o.sessionIDs) == 0 {
+		return fx.NewHumanCommandResult(o.session.Info().String()), nil
 	}
 
 	var b strings.Builder
 
-	for i, id := range o.args.SessionIDs {
-		session, ok := s.SharedState().Sessions.GetSession(id)
+	for i, id := range o.sessionIDs {
+		session, ok := o.session.SharedState().Sessions.GetSession(id)
 		if !ok {
 			return nil, fmt.Errorf("session not found: %q", id)
 		}
@@ -91,11 +60,11 @@ func (o SessionsCommand) info(s apicompat.Session) (apicompat.CommandResult, err
 		b.WriteString(session.Info().String())
 	}
 
-	return HumanCommandResult(b.String()), nil
+	return fx.NewHumanCommandResult(b.String()), nil
 }
 
-func (o SessionsCommand) ls(s apicompat.Session) (apicompat.CommandResult, error) {
-	sessions := s.SharedState().Sessions.Sessions()
+func (o *SessionsCommand) ls(_ context.Context) (fx.CommandResult, error) {
+	sessions := o.session.SharedState().Sessions.Sessions()
 
 	var b strings.Builder
 
@@ -107,13 +76,13 @@ func (o SessionsCommand) ls(s apicompat.Session) (apicompat.CommandResult, error
 		b.WriteString(session.Info().String())
 	}
 
-	return HumanCommandResult(b.String()), nil
+	return fx.NewHumanCommandResult(b.String()), nil
 }
 
-func (o SessionsCommand) rm(s apicompat.Session) error {
-	for _, id := range o.args.SessionIDs {
-		s.SharedState().Sessions.RemoveSession(id)
+func (o *SessionsCommand) rm(_ context.Context) (fx.CommandResult, error) {
+	for _, id := range o.sessionIDs {
+		o.session.SharedState().Sessions.RemoveSession(id)
 	}
 
-	return nil
+	return nil, nil
 }

@@ -435,7 +435,15 @@ func beDaemon(state mainState) error {
 func setupCommands() *apicompat.CommandRegistry {
 	reg := apicompat.NewEmptyCommandRegistry()
 
-	reg.Register("plugins", commands.NewPluginsCommandX)
+	reg.Register(commands.AttachCommandName, commands.NewAttachCommand)
+	reg.Register(commands.DetachCommandName, commands.NewDetachCommand)
+	reg.Register(commands.FindCommandName, commands.NewFindCommand)
+	reg.Register(commands.PluginsCommandName, commands.NewPluginsCommand)
+	reg.Register(commands.ReadCommandName, commands.NewReadCommand)
+	reg.Register(commands.SessionsCommandName, commands.NewSessionsCommand)
+	reg.Register(commands.VmmapCommandName, commands.NewVmmapCommand)
+	reg.Register(commands.WatchCommandName, commands.NewWatchCommand)
+	reg.Register(commands.WriteCommandName, commands.NewWriteCommand)
 
 	return reg
 }

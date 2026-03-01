@@ -11,75 +11,53 @@ import (
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 )
 
 const (
-	writeCommandName = "write"
+	WriteCommandName = "writem"
 )
 
-func WriteCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      writeCommandName,
-		ShortHelp: "write value to addr",
-		Flags: []FlagSchema{
-			{
-				Short:      "e",
-				Long:       "encoding",
-				Desc:       "Optional: Specify output encoding format",
-				DataType:   "",
-				DefaultVal: "hex",
-			},
-		},
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "data",
-				Desc:     "data to write",
-				DefValue: "",
-				DataType: "",
-			},
-			{
-				Name:     "addr",
-				Desc:     "address to write to",
-				DataType: "",
-				DefValue: "",
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return NewWriteCommand(WriteCommandArgs{
-				EncodingFormat: c.Flags.String("encoding"),
-				DataStr:        c.NonFlags.String("data"),
-				AddrStr:        c.NonFlags.String("addr"),
-			}), nil
-		},
+func NewWriteCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &WriteCommand{
+		session: config.Session,
 	}
-}
 
-type WriteCommandArgs struct {
-	EncodingFormat string
-	DataStr        string
-	AddrStr        string
-}
+	root := fx.NewCommand(WriteCommandName, "write value to addr", cmd.write)
 
-func NewWriteCommand(args WriteCommandArgs) WriteCommand {
-	return WriteCommand{
-		args: args,
-	}
+	root.FlagSet.StringFlag(&cmd.encodingFormat, "raw", fx.ArgConfig{
+		Name:        "encoding",
+		Description: "Optional: Specify output encoding format",
+	})
+
+	root.FlagSet.StringNf(&cmd.dataStr, fx.ArgConfig{
+		Name:        "data",
+		Description: "data to write",
+		Required:    true,
+	})
+
+	root.FlagSet.StringNf(&cmd.addrStr, fx.ArgConfig{
+		Name:        "addr",
+		Description: "address to write to",
+		Required:    true,
+	})
+
+	return root
 }
 
 type WriteCommand struct {
-	args WriteCommandArgs
+	session        apicompat.Session
+	encodingFormat string
+	dataStr        string
+	addrStr        string
 }
 
-func (o WriteCommand) Name() string {
-	return writeCommandName
-}
-
-func (o WriteCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	dataStr := o.args.DataStr
+func (o *WriteCommand) write(ctx context.Context) (fx.CommandResult, error) {
+	dataStr := o.dataStr
 	var data []byte
 
 	// TODO: Document encoding formats
-	encodingFormat := o.args.EncodingFormat
+	encodingFormat := o.encodingFormat
 	switch encodingFormat {
 	case "raw":
 		data = []byte(dataStr)
@@ -120,7 +98,7 @@ func (o WriteCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.C
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	_, err := s.SharedState().Progctl.WriteToLookup(ctx, o.args.AddrStr, data)
+	_, err := o.session.SharedState().Progctl.WriteToLookup(ctx, o.addrStr, data)
 	if err != nil {
 		return nil, err
 	}

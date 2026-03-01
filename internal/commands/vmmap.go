@@ -7,87 +7,73 @@ import (
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
 const (
-	vmmapCommandName = "vmmap"
+	VmmapCommandName = "vmmap"
 )
 
-func VmmapCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      vmmapCommandName,
-		Aliases:   []string{"v"},
-		ShortHelp: "view the process's memory regions",
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "search-str",
-				Desc:     "address or name to filter regions",
-				DefValue: "",
-				DataType: "",
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return VmmapCommand{
-				args: VmmapCommandArgs{
-					searchStr: c.NonFlags.String("search-str"),
-				},
-			}, nil
-		},
+func NewVmmapCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &VmmapCommand{
+		session: config.Session,
 	}
-}
 
-type VmmapCommandArgs struct {
-	searchStr string
+	root := fx.NewCommand(VmmapCommandName, "view the process's memory regions", cmd.run)
+
+	root.FlagSet.StringNf(&cmd.searchStr, fx.ArgConfig{
+		Name:        "search-str",
+		Description: "address or name to filter regions",
+	})
+
+	return root
 }
 
 type VmmapCommand struct {
-	args VmmapCommandArgs
+	session   apicompat.Session
+	searchStr string
 }
 
-func (o VmmapCommand) Name() string {
-	return vmmapCommandName
-}
-
-func (o VmmapCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	process := s.SharedState().Progctl
+func (o *VmmapCommand) run(ctx context.Context) (fx.CommandResult, error) {
+	process := o.session.SharedState().Progctl
 
 	regions, err := process.Regions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if o.args.searchStr != "" {
-		return o.search(ctx, regions, s)
+	if o.searchStr != "" {
+		return o.search(ctx, regions)
 	}
 
 	return o.list(ctx, regions)
 }
 
-func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s apicompat.Session) (apicompat.CommandResult, error) {
-	if strings.HasPrefix(o.args.searchStr, "0x") {
-		ptr, err := memory.CreatePointerFromString(o.args.searchStr)
+func (o *VmmapCommand) search(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
+	if strings.HasPrefix(o.searchStr, "0x") {
+		ptr, err := memory.CreatePointerFromString(o.searchStr)
 		if err != nil {
 			return nil, err
 		}
 
-		resolvedPtr, err := s.SharedState().Progctl.ResolvePointer(ctx, ptr)
+		resolvedPtr, err := o.session.SharedState().Progctl.ResolvePointer(ctx, ptr)
 		if err != nil {
 			return nil, err
 		}
 
 		region, foundRegion := regions.HasAddr(resolvedPtr)
 		if foundRegion {
-			return HumanCommandResult(region.String()), nil
+			return fx.NewHumanCommandResult(region.String()), nil
 		}
 
-		return nil, fmt.Errorf("address not found for %s", o.args.searchStr)
+		return nil, fmt.Errorf("address not found for %s", o.searchStr)
 	}
 
 	var out bytes.Buffer
 
 	err := regions.IterObjects(func(object memory.Object) error {
-		if !object.NameOrPathContains(o.args.searchStr) {
+		if !object.NameOrPathContains(o.searchStr) {
 			return nil
 		}
 
@@ -104,13 +90,13 @@ func (o VmmapCommand) search(ctx context.Context, regions memory.Regions, s apic
 	}
 
 	if out.Len() == 0 {
-		return nil, fmt.Errorf("failed to find object matching: %q", o.args.searchStr)
+		return nil, fmt.Errorf("failed to find object matching: %q", o.searchStr)
 	}
 
-	return HumanCommandResult(out.String()), nil
+	return fx.NewHumanCommandResult(out.String()), nil
 }
 
-func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (apicompat.CommandResult, error) {
+func (o *VmmapCommand) list(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
 	var out bytes.Buffer
 
 	err := regions.IterObjects(func(obj memory.Object) error {
@@ -127,7 +113,7 @@ func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (apicomp
 	}
 
 	if regions.NonObjectsLen() == 0 {
-		return HumanCommandResult(out.String()), nil
+		return fx.NewHumanCommandResult(out.String()), nil
 	}
 
 	out.WriteString("\nothers:")
@@ -149,5 +135,5 @@ func (o VmmapCommand) list(ctx context.Context, regions memory.Regions) (apicomp
 		return nil, err
 	}
 
-	return HumanCommandResult(out.String()), nil
+	return fx.NewHumanCommandResult(out.String()), nil
 }

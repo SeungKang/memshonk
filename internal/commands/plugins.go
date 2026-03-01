@@ -2,124 +2,103 @@ package commands
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
 const (
-	pluginsCommandName = "plugins"
+	PluginsCommandName = "plugins"
 )
 
-func PluginsCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      pluginsCommandName,
-		ShortHelp: "manage plugins",
-		NonFlags: []NonFlagSchema{
-			{
-				Name: "command",
-				Desc: "the plugin command ('list', 'ls', " +
-					"'load', 'unload', 'reload')",
-				DefValue: "list",
-				DataType: "",
-			},
-			{
-				Name:     "name",
-				Desc:     "the plugin name to operate on",
-				DataType: "",
-				DefValue: "",
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return NewPluginsCommand(PluginsCommandArgs{
-				Mode:                 c.NonFlags.String("command"),
-				PluginNameOrFilePath: c.NonFlags.String("name"),
-			}), nil
-		},
-	}
-}
+func NewPluginsCommand(config apicompat.NewCommandConfig) *fx.Command {
+	pluginsCtl, pluginsEnabled := config.Session.SharedState().HasPlugins()
 
-type PluginsCommandArgs struct {
-	Mode                 string
-	PluginNameOrFilePath string
-}
-
-func NewPluginsCommand(args PluginsCommandArgs) PluginsCommand {
-	return PluginsCommand{
-		args: args,
+	pluginsCmd := PluginsCommand{
+		Ctl: pluginsCtl,
 	}
+
+	root := fx.NewCommand(PluginsCommandName, "manage plugins", pluginsCmd.list)
+
+	root.OptPreRunFn = func(context.Context) error {
+		if pluginsEnabled {
+			return nil
+		}
+
+		return plugins.ErrPluginsDisabled
+	}
+
+	ls := root.AddSubcommand("ls", "list loaded plugins", pluginsCmd.list)
+
+	root.AddSubcommand("load", "load a plugin", pluginsCmd.load)
+
+	root.AddSubcommand("reload", "reload a plugin", pluginsCmd.reload)
+
+	root.AddSubcommand("unload", "unload a plugin", pluginsCmd.unload)
+
+	root.VisitAll(func(c *fx.Command) {
+		required := true
+
+		if c.Name() == root.Name() || c.Name() == ls.Name() {
+			required = false
+		}
+
+		c.FlagSet.StringNf(&pluginsCmd.PluginNameOrFilePath, fx.ArgConfig{
+			Name:        "plugin-name-or-path",
+			Description: "name of a plugin or its file path",
+			Required:    required,
+		})
+	})
+
+	return root
 }
 
 type PluginsCommand struct {
-	args PluginsCommandArgs
+	PluginNameOrFilePath string
+	Ctl                  plugins.Ctl
 }
 
-func (o PluginsCommand) Name() string {
-	return pluginsCommandName
-}
-
-func (o PluginsCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	pluginsCtl, enabled := s.SharedState().HasPlugins()
-	if !enabled {
-		return nil, plugins.ErrPluginsDisabled
-	}
-
-	switch o.args.Mode {
-	case "list", "ls":
-		return o.list(pluginsCtl)
-	case "load":
-		return o.load(pluginsCtl)
-	case "reload":
-		return nil, o.reload(ctx, pluginsCtl)
-	case "unload":
-		return nil, o.unload(pluginsCtl)
-	default:
-		return nil, fmt.Errorf("unknown plugins command; %q",
-			o.args.Mode)
-	}
-}
-
-func (o PluginsCommand) list(ctl plugins.Ctl) (apicompat.CommandResult, error) {
-	if o.args.PluginNameOrFilePath != "" {
-		plugin, err := ctl.Plugin(o.args.PluginNameOrFilePath)
+func (o PluginsCommand) list(_ context.Context) (fx.CommandResult, error) {
+	if o.PluginNameOrFilePath != "" {
+		plugin, err := o.Ctl.Plugin(o.PluginNameOrFilePath)
 		if err != nil {
 			return nil, err
 		}
 
-		return HumanCommandResult(plugin.PrettyString("")), nil
+		return fx.NewHumanCommandResult(plugin.PrettyString("")), nil
 	}
 
-	return HumanCommandResult(ctl.PrettyString("")), nil
+	return fx.NewHumanCommandResult(o.Ctl.PrettyString("")), nil
 }
 
-func (o PluginsCommand) load(ctl plugins.Ctl) (apicompat.CommandResult, error) {
-	plugin, err := ctl.Load(plugins.PluginConfig{
-		FilePath: o.args.PluginNameOrFilePath,
+func (o PluginsCommand) load(_ context.Context) (fx.CommandResult, error) {
+	plugin, err := o.Ctl.Load(plugins.PluginConfig{
+		FilePath: o.PluginNameOrFilePath,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return HumanCommandResult(plugin.PrettyString("")), nil
+	return fx.NewHumanCommandResult(plugin.PrettyString("")), nil
 }
 
-func (o PluginsCommand) reload(ctx context.Context, ctl plugins.Ctl) error {
-	err := ctl.Reload(ctx, o.args.PluginNameOrFilePath)
+func (o PluginsCommand) reload(ctx context.Context) (fx.CommandResult, error) {
+	err := o.Ctl.Reload(ctx, o.PluginNameOrFilePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
-func (o PluginsCommand) unload(ctl plugins.Ctl) error {
-	err := ctl.Unload(o.args.PluginNameOrFilePath)
+func (o PluginsCommand) unload(_ context.Context) (fx.CommandResult, error) {
+	err := o.Ctl.Unload(o.PluginNameOrFilePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }
 
 func NewCommandFromPlugin(cmd plugins.Command, plugin plugins.Plugin, args []string) *CommandFromPlugin {

@@ -21,8 +21,12 @@ var (
 	ErrExitedNormally = errors.New("process exited without error")
 )
 
+type AttachConfig struct {
+	OptPID int
+}
+
 type Process interface {
-	Attach(ctx context.Context) (int, error)
+	Attach(ctx context.Context, cfg AttachConfig) (int, error)
 
 	ProcessInfo(ctx context.Context) (ProcessInfo, error)
 
@@ -91,7 +95,7 @@ type Ctl struct {
 	current       *processThread
 }
 
-func (o *Ctl) Attach(ctx context.Context) (int, error) {
+func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -114,17 +118,32 @@ func (o *Ctl) Attach(ctx context.Context) (int, error) {
 
 	foundPID := -1
 	var foundExeName string
-	for _, psProc := range processes {
-		if strings.ToLower(psProc.Executable()) == targetExeNameLower {
-			foundPID = psProc.Pid()
-			foundExeName = psProc.Executable()
-			break
-		}
-	}
 
-	if foundExeName == "" {
-		return 0, fmt.Errorf("failed to find a matching process for: %q",
-			targetExeName)
+	if cfg.OptPID > 0 {
+		for _, psProc := range processes {
+			if psProc.Pid() == cfg.OptPID {
+				foundPID = psProc.Pid()
+				foundExeName = psProc.Executable()
+				break
+			}
+		}
+
+		if foundExeName == "" {
+			return 0, fmt.Errorf("failed to find a process with pid: %d", cfg.OptPID)
+		}
+	} else {
+		for _, psProc := range processes {
+			if strings.ToLower(psProc.Executable()) == targetExeNameLower {
+				foundPID = psProc.Pid()
+				foundExeName = psProc.Executable()
+				break
+			}
+		}
+
+		if foundExeName == "" {
+			return 0, fmt.Errorf("failed to find a matching process for: %q",
+				targetExeName)
+		}
 	}
 
 	unexpectedExitMon := newExitMonitor(o.processExited)

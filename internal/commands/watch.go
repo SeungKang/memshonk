@@ -9,72 +9,66 @@ import (
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/hexdump"
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
 )
 
 const (
-	watchCommandName = "watch"
+	WatchCommandName = "watch"
 )
 
-func WatchCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      watchCommandName,
-		ShortHelp: "watch data at an address for changes",
-		Aliases:   []string{"w"},
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "size",
-				Desc:     "number of bytes to read",
-				DataType: uint64(0),
-			},
-			{
-				Name:     "addrs",
-				Desc:     "one or more addresses to watch",
-				DataType: []string{},
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return WatchCommand{
-				AddrStrs:  c.NonFlags.StringList("addrs"),
-				SizeBytes: c.NonFlags.Uint64("size"),
-			}, nil
-		},
+func NewWatchCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &WatchCommand{
+		session: config.Session,
 	}
+
+	root := fx.NewCommand(WatchCommandName, "watch data at an address for changes", cmd.run)
+
+	root.FlagSet.Uint64Nf(&cmd.sizeBytes, fx.ArgConfig{
+		Name:        "size",
+		Description: "number of bytes to read",
+		Required:    true,
+	})
+
+	root.FlagSet.StringSliceNf(&cmd.addrStrs, fx.ArgConfig{
+		Name:        "addrs",
+		Description: "one or more addresses to watch",
+		Required:    true,
+	})
+
+	return root
 }
 
 type WatchCommand struct {
-	SizeBytes uint64
-	AddrStrs  []string
+	session   apicompat.Session
+	sizeBytes uint64
+	addrStrs  []string
 }
 
-func (o WatchCommand) Name() string {
-	return watchCommandName
-}
-
-func (o WatchCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+func (o *WatchCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	var cancelFn func()
 	ctx, cancelFn = context.WithCancel(ctx)
 	defer cancelFn()
 
-	exeInfo, err := s.SharedState().Progctl.ExeInfo(ctx)
+	exeInfo, err := o.session.SharedState().Progctl.ExeInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	terminal, hasTerm := s.Terminal()
+	terminal, hasTerm := o.session.Terminal()
 	if !hasTerm {
 		return nil, errCommandNeedsTerminal
 	}
 
 	screen := goterm.NewScreen(terminal)
 
-	rows := make([]watchCommandRow, len(o.AddrStrs))
+	rows := make([]watchCommandRow, len(o.addrStrs))
 
-	reads := make(chan watchReadEvent, len(o.AddrStrs))
+	reads := make(chan watchReadEvent, len(o.addrStrs))
 
-	for i, addrStr := range o.AddrStrs {
-		watcher, err := s.SharedState().Progctl.WatchLookup(ctx, addrStr, o.SizeBytes)
+	for i, addrStr := range o.addrStrs {
+		watcher, err := o.session.SharedState().Progctl.WatchLookup(ctx, addrStr, o.sizeBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create memory watcher for %s - %w",
 				addrStr, err)
@@ -119,7 +113,7 @@ func (o WatchCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.C
 		OptOffsetBits: exeInfo.Bits,
 	}
 
-	_, numLinesPerHexdump, err := hexdumpConfig.OutputLen(o.SizeBytes)
+	_, numLinesPerHexdump, err := hexdumpConfig.OutputLen(o.sizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate hexdump output length per watcher - %w",
 			err)

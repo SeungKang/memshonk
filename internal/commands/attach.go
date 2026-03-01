@@ -5,78 +5,50 @@ import (
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/memory"
+	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
 const (
-	attachCommandName = "attach"
+	AttachCommandName = "attach"
 )
 
-func AttachCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      attachCommandName,
-		Aliases:   []string{"a"},
-		ShortHelp: "attach to the process",
-		Flags: []FlagSchema{
-			{
-				Short:      "p",
-				Long:       "pid",
-				Desc:       "Optional: Specify the process' PID",
-				DataType:   0,
-				DefaultVal: 0,
-			},
-			{
-				Short:      "n",
-				Long:       "name",
-				Desc:       "Optional: Specify the process' name",
-				DataType:   "",
-				DefaultVal: "",
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return NewAttachCommand(AttachCommandArgs{
-				OptPid:  c.Flags.Int("pid"),
-				OptName: c.Flags.String("name"),
-			}), nil
-		},
+func NewAttachCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &AttachCommand{
+		progctl: config.Session.SharedState().Progctl,
 	}
-}
 
-type AttachCommandArgs struct {
-	OptPid  int
-	OptName string
-}
+	root := fx.NewCommand(AttachCommandName, "attach to the process", cmd.attach)
 
-func NewAttachCommand(args AttachCommandArgs) AttachCommand {
-	return AttachCommand{
-		args: args,
-	}
+	root.FlagSet.IntFlag(&cmd.pid, 0, fx.ArgConfig{
+		Name:        "pid",
+		Description: "Optional: Specify the process' PID",
+	})
+
+	return root
 }
 
 type AttachCommand struct {
-	args AttachCommandArgs
+	progctl *progctl.Ctl
+	pid     int
 }
 
-func (o AttachCommand) Name() string {
-	return attachCommandName
-}
-
-func (o AttachCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	// TODO: Support AttachCommandArgs
-	pid, err := s.SharedState().Progctl.Attach(ctx)
+func (o *AttachCommand) attach(ctx context.Context) (fx.CommandResult, error) {
+	pid, err := o.progctl.Attach(ctx, progctl.AttachConfig{OptPID: o.pid})
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := s.SharedState().Progctl.ExeInfo(ctx)
+	info, err := o.progctl.ExeInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return AttachCommandResult{
+	return fx.NewSerialCommandResult(AttachCommandResult{
 		PID:    pid,
 		ExeObj: info.Obj,
-	}, nil
+	}), nil
 }
 
 type AttachCommandResult struct {

@@ -4,35 +4,30 @@ import (
 	"context"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
+	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
 const (
-	detachCommandName = "detach"
+	DetachCommandName = "detach"
 )
 
-func DetachCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      detachCommandName,
-		Aliases:   []string{"d"},
-		ShortHelp: "detach from the process",
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return &DetachCommand{args: DetachCommandArgs{}}, nil
-		},
+func NewDetachCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &DetachCommand{
+		progctl: config.Session.SharedState().Progctl,
 	}
-}
 
-type DetachCommandArgs struct{}
+	root := fx.NewCommand(DetachCommandName, "detach from the process", cmd.detach)
+
+	return root
+}
 
 type DetachCommand struct {
-	args DetachCommandArgs
+	progctl *progctl.Ctl
 }
 
-func (o DetachCommand) Name() string {
-	return detachCommandName
-}
-
-func (o DetachCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
-	err := s.SharedState().Progctl.Detach(ctx)
+func (o *DetachCommand) detach(ctx context.Context) (fx.CommandResult, error) {
+	err := o.progctl.Detach(ctx)
 	if err != nil {
 		return nil, err
 	}

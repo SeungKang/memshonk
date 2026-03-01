@@ -8,77 +8,56 @@ import (
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/hexdump"
 )
 
 const (
-	readCommandName = "read"
+	ReadCommandName = "readm"
 )
 
-func ReadCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      readCommandName,
-		Aliases:   []string{"r"},
-		ShortHelp: "read n bytes from addr",
-		Flags: []FlagSchema{
-			{
-				Short:      "e",
-				Long:       "encoding",
-				Desc:       "Optional: Specify output encoding format",
-				DataType:   "",
-				DefaultVal: "hexdump",
-			},
-		},
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "size",
-				Desc:     "number of bytes to read",
-				DataType: uint64(0),
-			},
-			{
-				Name:     "addr",
-				Desc:     "address to read from",
-				DataType: "",
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return NewReadCommand(ReadCommandArgs{
-				EncodingFormat: c.Flags.String("encoding"),
-				SizeBytes:      c.NonFlags.Uint64("size"),
-				AddrStr:        c.NonFlags.String("addr"),
-			}), nil
-		},
+func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &ReadCommand{
+		session: config.Session,
 	}
-}
 
-type ReadCommandArgs struct {
-	EncodingFormat string
-	SizeBytes      uint64
-	AddrStr        string
-}
+	root := fx.NewCommand(ReadCommandName, "read n bytes from addr", cmd.read)
 
-func NewReadCommand(args ReadCommandArgs) ReadCommand {
-	return ReadCommand{
-		args: args,
-	}
+	root.FlagSet.StringFlag(&cmd.encodingFormat, "hexdump", fx.ArgConfig{
+		Name:        "encoding",
+		Description: "Optional: Specify output encoding format",
+	})
+
+	root.FlagSet.Uint64Nf(&cmd.sizeBytes, fx.ArgConfig{
+		Name:        "size",
+		Description: "number of bytes to read",
+		Required:    true,
+	})
+
+	root.FlagSet.StringNf(&cmd.addrStr, fx.ArgConfig{
+		Name:        "addr",
+		Description: "address to read from",
+		Required:    true,
+	})
+
+	return root
 }
 
 type ReadCommand struct {
-	args ReadCommandArgs
+	session        apicompat.Session
+	encodingFormat string
+	sizeBytes      uint64
+	addrStr        string
 }
 
-func (o ReadCommand) Name() string {
-	return readCommandName
-}
-
-func (o ReadCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+func (o *ReadCommand) read(ctx context.Context) (fx.CommandResult, error) {
 	var fmtFn func([]byte, uintptr) (string, error)
 
 	// TODO: Document encoding formats
-	encodingFormat := o.args.EncodingFormat
+	encodingFormat := o.encodingFormat
 	switch encodingFormat {
 	case "hexdump":
-		info, err := s.SharedState().Progctl.ExeInfo(ctx)
+		info, err := o.session.SharedState().Progctl.ExeInfo(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +90,7 @@ func (o ReadCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)
 	}
 
-	data, actualAddr, err := s.SharedState().Progctl.ReadFromLookup(ctx, o.args.AddrStr, o.args.SizeBytes)
+	data, actualAddr, err := o.session.SharedState().Progctl.ReadFromLookup(ctx, o.addrStr, o.sizeBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -121,5 +100,5 @@ func (o ReadCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		return nil, err
 	}
 
-	return HumanCommandResult(encoded), nil
+	return fx.NewHumanCommandResult(encoded), nil
 }

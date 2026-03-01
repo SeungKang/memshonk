@@ -5,64 +5,55 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/SeungKang/memshonk/internal/progctl"
 )
 
 const (
-	findCommandName = "find"
+	FindCommandName = "find"
 )
 
-func FindCommandSchema() CommandSchema {
-	return CommandSchema{
-		Name:      findCommandName,
-		Aliases:   []string{"f"},
-		ShortHelp: "find a pattern in memory",
-		Flags: []FlagSchema{
-			{
-				Short:      "e",
-				Long:       "encoding",
-				Desc:       "Optional: Specify encoding format of pattern",
-				DataType:   "",
-				DefaultVal: "pattern",
-			},
-		},
-		NonFlags: []NonFlagSchema{
-			{
-				Name:     "pattern",
-				Desc:     "byte pattern to search for",
-				DataType: []string{},
-				DefValue: nil,
-			},
-		},
-		CreateFn: func(c CommandConfig) (apicompat.Command, error) {
-			return FindCommand{
-				EncodingFormat: c.Flags.String("encoding"),
-				Pattern:        c.NonFlags.StringList("pattern"),
-			}, nil
-		},
+func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &FindCommand{
+		session: config.Session,
+		stderr:  config.Stderr,
 	}
+
+	root := fx.NewCommand(FindCommandName, "find a pattern in memory", cmd.run)
+
+	root.FlagSet.StringFlag(&cmd.encodingFormat, "pattern", fx.ArgConfig{
+		Name:        "encoding",
+		Description: "Optional: Specify encoding format of pattern",
+	})
+
+	root.FlagSet.StringSliceNf(&cmd.pattern, fx.ArgConfig{
+		Name:        "pattern",
+		Description: "Byte pattern to search for",
+		Required:    true,
+	})
+
+	return root
 }
 
 type FindCommand struct {
-	EncodingFormat string
-	Pattern        []string
+	session        apicompat.Session
+	encodingFormat string
+	pattern        []string
+	stderr         io.Writer
 }
 
-func (o FindCommand) Name() string {
-	return findCommandName
-}
-
-func (o FindCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.CommandResult, error) {
+func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	var parsedPattern memory.ParsedPattern
 	var err error
-	stringList := strings.Join(o.Pattern, " ")
+	stringList := strings.Join(o.pattern, " ")
 
 	// TODO: Document encoding formats
-	encodingFormat := o.EncodingFormat
+	encodingFormat := o.encodingFormat
 	switch encodingFormat {
 	case "string", "utf8":
 		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
@@ -79,18 +70,16 @@ func (o FindCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		return nil, err
 	}
 
-	regions, err := s.SharedState().Progctl.Regions(ctx)
+	regions, err := o.session.SharedState().Progctl.Regions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	process := s.SharedState().Progctl
+	process := o.session.SharedState().Progctl
 
 	var matches FindCommandResult
 
-	inputOutput := s.IO()
-
-	fmt.Fprint(inputOutput.Stderr, "searching")
+	fmt.Fprint(o.stderr, "searching")
 
 	err = regions.Iter(func(i int, region memory.Region) error {
 		if !region.Readable {
@@ -109,7 +98,7 @@ func (o FindCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		}
 
 		if i%step == 0 {
-			_, err = fmt.Fprint(inputOutput.Stderr, ".")
+			_, err = fmt.Fprint(o.stderr, ".")
 			if err != nil {
 				return err
 			}
@@ -120,16 +109,16 @@ func (o FindCommand) Run(ctx context.Context, s apicompat.Session) (apicompat.Co
 		return nil
 	})
 
-	fmt.Fprintln(inputOutput.Stderr, "")
+	fmt.Fprintln(o.stderr, "")
 
 	if err != nil {
 		return nil, err
 	}
 
-	return matches, nil
+	return fx.NewSerialCommandResult(matches), nil
 }
 
-func (o FindCommand) searchRegion(ctx context.Context, parsedPattern memory.ParsedPattern, region memory.Region, process progctl.Process) ([]memory.FindResult, error) {
+func (o *FindCommand) searchRegion(ctx context.Context, parsedPattern memory.ParsedPattern, region memory.Region, process progctl.Process) ([]memory.FindResult, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

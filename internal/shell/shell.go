@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
-	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
-	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 
 	"github.com/chzyer/readline"
@@ -25,12 +23,6 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 		return nil, fmt.Errorf("the current session does not provide a terminal, which is required for shell functionality")
 	}
 
-	// Create the command registry
-	registry := NewCommandRegistry()
-	for _, cmdSchema := range commands.BuiltinCommands() {
-		registry.Register(cmdSchema)
-	}
-
 	// Build readline configuration for virtual terminal
 	readlineConfig := buildReadlineConfig(readlineIO{
 		Stdin:    io.NopCloser(session.IO().Stdin),
@@ -38,7 +30,7 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 		Stderr:   session.IO().Stderr,
 		Terminal: terminal,
 	})
-	readlineConfig.AutoComplete = NewCompleter(registry)
+	readlineConfig.AutoComplete = NewCompleter(session.SharedState().Commands)
 
 	// History setup
 	wsConfig := session.SharedState().Project.WorkspaceConfig()
@@ -53,18 +45,17 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 		return nil, fmt.Errorf("failed to create readline - %w", err)
 	}
 
-	interpreter, err := NewInterpreter(session, apicompat.NewCommandHandler(session), registry)
+	interpreter, err := NewInterpreter(session, apicompat.NewCommandHandler(session))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create interpreter - %w", err)
 	}
 
 	return &Shell{
-		session:  session,
-		rl:       readLine,
-		interp:   interpreter,
-		registry: registry,
-		colorFn:  color.New(color.FgCyan).SprintFunc(),
-		prompt:   "$ ",
+		session: session,
+		rl:      readLine,
+		interp:  interpreter,
+		colorFn: color.New(color.FgCyan).SprintFunc(),
+		prompt:  "$ ",
 	}, nil
 }
 
@@ -74,7 +65,6 @@ type Shell struct {
 	session  apicompat.Session
 	rl       *readline.Instance
 	interp   *Interpreter
-	registry *CommandRegistry
 	colorFn  func(a ...interface{}) string
 	promptMu sync.RWMutex
 	prompt   string
@@ -84,11 +74,9 @@ type Shell struct {
 	cancelCmdCtxFnMu sync.Mutex
 	cancelCmdCtxFn   func()
 
-	attachEvents   *events.Sub[progctl.AttachedEvent]
-	detachEvents   *events.Sub[progctl.DetachedEvent]
-	exitedEvents   *events.Sub[progctl.ProcessExitedEvent]
-	loadedEvents   *events.Sub[plugins.LoadedEvent]
-	unloadedEvents *events.Sub[plugins.UnloadedEvent]
+	attachEvents *events.Sub[progctl.AttachedEvent]
+	detachEvents *events.Sub[progctl.DetachedEvent]
+	exitedEvents *events.Sub[progctl.ProcessExitedEvent]
 }
 
 func (o *Shell) Signal(interface{}) {
@@ -127,12 +115,6 @@ func (o *Shell) Run(ctx context.Context) error {
 
 	o.exitedEvents = events.NewSubscriber[progctl.ProcessExitedEvent](eventGroups)
 	defer o.exitedEvents.Unsubscribe()
-
-	o.loadedEvents = events.NewSubscriber[plugins.LoadedEvent](eventGroups)
-	defer o.loadedEvents.Unsubscribe()
-
-	o.unloadedEvents = events.NewSubscriber[plugins.UnloadedEvent](eventGroups)
-	defer o.unloadedEvents.Unsubscribe()
 
 	go o.handleEvents(ctx)
 
@@ -208,15 +190,6 @@ func (o *Shell) handleBuiltinShellCommand(line string) handleBuiltinShellCommand
 	}
 
 	switch words[0] {
-	case "help":
-		cmdName := ""
-		if len(words) > 1 {
-			cmdName = words[1]
-		}
-
-		o.interp.PrintHelp(o.session.IO().Stdout, cmdName)
-
-		return builtinHandled
 	case "exit", "quit":
 		return builtinExit
 	default:
@@ -261,33 +234,6 @@ func (o *Shell) handleEvents(ctx context.Context) {
 		case e := <-o.exitedEvents.RecvCh():
 			o.setPrompt(0)
 			log.Printf("process exited - %v", e.Reason)
-		case e := <-o.loadedEvents.RecvCh():
-			o.registerPlugin(e.Plugin)
-		case e := <-o.unloadedEvents.RecvCh():
-			o.registry.Unregister(e.Plugin.Name())
 		}
 	}
-}
-
-// registerPlugin registers plugin commands in the registry.
-func (o *Shell) registerPlugin(plugin plugins.Plugin) {
-	// Create a command schema for the plugin
-	schema := commands.CommandSchema{
-		Name:      plugin.Name(),
-		ShortHelp: plugin.Description(),
-		CreateFn: func(cfg commands.CommandConfig) (apicompat.Command, error) {
-			// Plugin commands are handled specially
-			return nil, fmt.Errorf("plugin commands should use plugin execution path")
-		},
-	}
-
-	o.registry.Register(schema)
-
-	// TODO: Register subcommands for plugin commands and parsers
-	// This requires extending the registry to support hierarchical commands
-}
-
-// Registry returns the command registry for external use.
-func (o *Shell) Registry() *CommandRegistry {
-	return o.registry
 }

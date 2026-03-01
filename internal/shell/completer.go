@@ -5,17 +5,17 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/SeungKang/memshonk/internal/commands"
+	"github.com/SeungKang/memshonk/internal/apicompat"
 )
 
 // NewCompleter creates a new completer for the given command registry.
-func NewCompleter(registry *CommandRegistry) *Completer {
+func NewCompleter(registry *apicompat.CommandRegistry) *Completer {
 	return &Completer{registry: registry}
 }
 
 // Completer implements readline.AutoCompleter for the shell.
 type Completer struct {
-	registry *CommandRegistry
+	registry *apicompat.CommandRegistry
 }
 
 // Do implements readline.AutoCompleter.
@@ -49,9 +49,10 @@ func (o *Completer) Do(line []rune, pos int) ([][]rune, int) {
 		// Complete command names
 		candidates = o.completeCommandNames(prefix)
 	} else {
+		// TODO: Maybe implement command argument completion someday?
 		// Complete flags or arguments for a command
-		cmdName := words[0]
-		candidates = o.completeCommandArgs(cmdName, prefix, words[1:])
+		//cmdName := words[0]
+		//candidates = o.completeCommandArgs(cmdName, prefix, words[1:])
 	}
 
 	if len(candidates) == 0 {
@@ -80,62 +81,6 @@ func (o *Completer) completeCommandNames(prefix string) []string {
 	}
 
 	sort.Strings(matches)
-	return matches
-}
-
-// completeCommandArgs returns flag or argument completions for a command.
-func (o *Completer) completeCommandArgs(cmdName, prefix string, existingArgs []string) []string {
-	schema, found := o.registry.Lookup(cmdName)
-	if !found {
-		return nil
-	}
-
-	var matches []string
-
-	// If prefix starts with -, complete flags
-	if strings.HasPrefix(prefix, "-") {
-		matches = o.completeFlags(schema, prefix, existingArgs)
-	}
-
-	sort.Strings(matches)
-	return matches
-}
-
-// completeFlags returns flag completions for a command.
-func (o *Completer) completeFlags(schema commands.CommandSchema, prefix string, existingArgs []string) []string {
-	// Build a set of already-used flags
-	usedFlags := make(map[string]bool)
-	for _, arg := range existingArgs {
-		if strings.HasPrefix(arg, "--") {
-			usedFlags[strings.TrimPrefix(arg, "--")] = true
-		} else if strings.HasPrefix(arg, "-") {
-			usedFlags[strings.TrimPrefix(arg, "-")] = true
-		}
-	}
-
-	var matches []string
-
-	for _, flag := range schema.Flags {
-		// Skip already-used flags
-		if usedFlags[flag.Long] || usedFlags[flag.Short] {
-			continue
-		}
-
-		// Match long flags
-		longFlag := "--" + flag.Long
-		if strings.HasPrefix(longFlag, prefix) {
-			matches = append(matches, longFlag)
-		}
-
-		// Match short flags
-		if flag.Short != "" {
-			shortFlag := "-" + flag.Short
-			if strings.HasPrefix(shortFlag, prefix) {
-				matches = append(matches, shortFlag)
-			}
-		}
-	}
-
 	return matches
 }
 

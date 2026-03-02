@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -109,6 +110,26 @@ func (o *CommandRegistry) Lookup(nameOrAlias string) (func(NewCommandConfig) *fx
 	}
 
 	return nil, false
+}
+
+// AsSlice returns a fx.Command instance for each registered command,
+// in registration order. The provided session is passed to each command's
+// constructor via NewCommandConfig.
+func (o *CommandRegistry) AsSlice(session Session) []*fx.Command {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	cmds := make([]*fx.Command, 0, len(o.names))
+
+	for _, newCmdFn := range o.byName {
+		cmds = append(cmds, newCmdFn(NewCommandConfig{Session: session}))
+	}
+
+	sort.SliceStable(cmds, func(i, j int) bool {
+		return cmds[i].Name() < cmds[j].Name()
+	})
+
+	return cmds
 }
 
 // Names returns all registered command names (not aliases).

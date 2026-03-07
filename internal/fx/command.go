@@ -34,10 +34,16 @@ type Command struct {
 	Description string
 	Subcommands []*Command
 	Fn          func(context.Context) (CommandResult, error)
+	CustomFn    func(context.Context, RunCommandConfig) (CommandResult, error)
+
 	OptParent   *Command
 	OptPreRunFn func(context.Context) error
 
 	help bool
+}
+
+type RunCommandConfig struct {
+	Args []string
 }
 
 func (o *Command) Name() string {
@@ -155,7 +161,7 @@ func (o *Command) VisitAll(fn func(c *Command)) {
 func (o *Command) Run(ctx context.Context, args []string) (CommandResultWrapper, error) {
 	var result CommandResultWrapper
 
-	err := o.run(ctx, args, &result)
+	err := o.runRecurse(ctx, args, &result)
 	if err != nil {
 		return result, err
 	}
@@ -163,7 +169,26 @@ func (o *Command) Run(ctx context.Context, args []string) (CommandResultWrapper,
 	return result, nil
 }
 
-func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrapper) error {
+func (o *Command) runRecurse(ctx context.Context, args []string, r *CommandResultWrapper) error {
+	r.Commands = append(r.Commands, o.Name())
+
+	if o.CustomFn != nil {
+		if o.Fn != nil {
+			return fmt.Errorf("fn and custom fn fields cannot both be non-nil")
+		}
+
+		res, err := o.CustomFn(ctx, RunCommandConfig{
+			Args: args,
+		})
+		if err != nil {
+			return err
+		}
+
+		r.Result = res
+
+		return nil
+	}
+
 	err := o.FlagSet.Parse(args)
 	if o.help {
 		o.PrintUsage()
@@ -181,14 +206,12 @@ func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrappe
 		}
 	}
 
-	r.Commands = append(r.Commands, o.Name())
-
 	if len(o.Subcommands) > 0 && o.FlagSet.Actual().NArg() > 0 {
 		requestedSubCmd := o.FlagSet.Actual().Arg(0)
 
 		for _, possible := range o.Subcommands {
 			if possible.Name() == requestedSubCmd {
-				err := possible.run(ctx, o.FlagSet.Actual().Args()[1:], r)
+				err := possible.runRecurse(ctx, o.FlagSet.Actual().Args()[1:], r)
 				if err != nil {
 					return err
 				}
@@ -202,12 +225,14 @@ func (o *Command) run(ctx context.Context, args []string, r *CommandResultWrappe
 		}
 	}
 
-	res, err := o.Fn(ctx)
-	if err != nil {
-		return err
-	}
+	if o.Fn != nil {
+		res, err := o.Fn(ctx)
+		if err != nil {
+			return err
+		}
 
-	r.Result = res
+		r.Result = res
+	}
 
 	return nil
 }

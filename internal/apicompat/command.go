@@ -112,9 +112,7 @@ func (o *CommandRegistry) Lookup(nameOrAlias string) (func(NewCommandConfig) *fx
 	return nil, false
 }
 
-// AsSlice returns a fx.Command instance for each registered command,
-// in registration order. The provided session is passed to each command's
-// constructor via NewCommandConfig.
+// AsSlice returns a fx.Command instance for each registered command.
 func (o *CommandRegistry) AsSlice(session Session) []*fx.Command {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()

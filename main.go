@@ -398,11 +398,13 @@ func beDaemon(state mainState) error {
 	// TODO: Should loading plugins happen before setting up the session server?
 	if optPluginsCtl != nil {
 		for _, pluginConfig := range state.project.Plugins().Libraries {
-			_, err := optPluginsCtl.Load(pluginConfig)
+			plugin, err := optPluginsCtl.Load(pluginConfig)
 			if err != nil {
 				return fmt.Errorf("failed to load plugin: %q - %w",
 					pluginConfig.FilePath, err)
 			}
+
+			commands.RegisterPlugin(plugin, sharedState.Commands)
 		}
 	}
 

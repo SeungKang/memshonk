@@ -13,17 +13,12 @@
 
 ## multi session support
 
-- fix client shell history
-- fix history for server on windows
 - figure out better way of doing copyAndAddBackslashRLoop()
-- commands to manage sessions
-- add ability to name a session
 - fix incorrect prompt state when reconnecting after process has died (it still has the PID in it)
 
 ## plugin
 
 - add context as arguments to plugin.load and plugin.unload
-- investigate order of unload and load events being out of order
 - improve plugin user experience when unloading / reloading
   (i.e., be able to load a previously-unloaded plugin using
   only its name - maybe we can have a name -> plugin info
@@ -60,7 +55,6 @@
   this addr
 - outputs command
 - command performance measuring
-- remove aliases
 
 ## find
 
@@ -78,11 +72,8 @@
 
 ## shell
 
-- reverse search (ctrl+r) and selecting an entry does not save to history
 - disable color (needs to be a Session-level setting)
 - allow execution of external programs to be disabled
-- implement "-h" auto-generation
-- fix piping of built-in commands to external programs
 - replace shlex code in `internal/shell/completer.go` (`splitWords`)
 
 ## projects

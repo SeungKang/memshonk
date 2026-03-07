@@ -3,8 +3,6 @@ package plugins
 import (
 	"context"
 	"errors"
-
-	"github.com/SeungKang/memshonk/internal/events"
 )
 
 var (
@@ -15,7 +13,6 @@ var (
 )
 
 type CtlConfig struct {
-	Events  *events.Groups
 	Process Process
 }
 

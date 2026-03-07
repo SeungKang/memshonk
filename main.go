@@ -370,7 +370,7 @@ func beDaemon(state mainState) error {
 
 	progCtl := progctl.NewCtl(state.project.General().ExePath, eventGroups)
 
-	optPluginsCtl, err := maybeCreatePluginCtl(progCtl, eventGroups)
+	optPluginsCtl, err := maybeCreatePluginCtl(progCtl)
 	if err != nil {
 		return fmt.Errorf("failed to setup plugins - %w", err)
 	}
@@ -451,9 +451,8 @@ func setupCommands() *apicompat.CommandRegistry {
 	return reg
 }
 
-func maybeCreatePluginCtl(progCtl *progctl.Ctl, eventGroups *events.Groups) (plugins.Ctl, error) {
+func maybeCreatePluginCtl(progCtl *progctl.Ctl) (plugins.Ctl, error) {
 	pluginsCtl, err := pluginsctl.New(plugins.CtlConfig{
-		Events:  eventGroups,
 		Process: pluginscompat.WrapProcess(progCtl),
 	})
 	if err != nil {

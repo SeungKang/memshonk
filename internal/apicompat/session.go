@@ -1,7 +1,6 @@
 package apicompat
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"time"
@@ -31,9 +30,6 @@ type Session interface {
 	// if the client supports a terminal, otherwise it
 	// returns nil and false.
 	Terminal() (*goterm.VirtualTerminal, bool)
-
-	// RunCommand runs a command.
-	RunCommand(context.Context, Command) error
 
 	// CommandStorage returns information about the session's
 	// previously-run commands.

@@ -27,7 +27,7 @@ type Session struct {
 	cmdStore  *apicompat.CommandStorage
 	shell     Shell
 	ctx       context.Context
-	ocne      sync.Once
+	once      sync.Once
 	cancelFn  func()
 	apiConn   io.Closer
 
@@ -46,7 +46,7 @@ func (o *Session) Done() <-chan struct{} {
 func (o *Session) Close() error {
 	var err error
 
-	o.ocne.Do(func() {
+	o.once.Do(func() {
 		o.cancelFn()
 
 		shutdownCtx, cancelFn := context.WithTimeout(
@@ -84,8 +84,6 @@ func (o *Session) Jobs() *jobsctl.Ctl {
 func (o *Session) OnSignal(signalType uint8) {
 	switch signalType {
 	case IntSignalType:
-		o.cancelCurrentCommand()
-
 		if o.shell != nil {
 			o.shell.Signal(nil)
 		}
@@ -104,59 +102,4 @@ func (o *Session) Terminal() (*goterm.VirtualTerminal, bool) {
 
 func (o *Session) CommandStorage() *apicompat.CommandStorage {
 	return o.cmdStore
-}
-
-func (o *Session) RunCommand(parent context.Context, cmd apicompat.Command) error {
-	ctx, cancelFn := context.WithCancel(parent)
-	defer func() {
-		o.clearCancel()
-		cancelFn()
-	}()
-
-	go func() {
-		select {
-		case <-ctx.Done():
-		case <-o.ctx.Done():
-			cancelFn()
-		}
-	}()
-
-	// install the cancel lever for OnSignal
-	o.setCancel(func() {
-		cancelFn()
-	})
-
-	result, err := cmd.Run(ctx, o)
-	if err != nil {
-		return err
-	}
-
-	if result != nil {
-		o.io.Stdout.Write(result.Serialize())
-		o.io.Stdout.Write([]byte{'\n'})
-	}
-
-	return nil
-}
-
-func (o *Session) setCancel(fn context.CancelFunc) {
-	o.cancelCmdMu.Lock()
-	defer o.cancelCmdMu.Unlock()
-	o.cancelCmdCtx = fn
-}
-
-func (o *Session) clearCancel() {
-	o.cancelCmdMu.Lock()
-	defer o.cancelCmdMu.Unlock()
-	o.cancelCmdCtx = nil
-}
-
-func (o *Session) cancelCurrentCommand() {
-	o.cancelCmdMu.Lock()
-	fn := o.cancelCmdCtx
-	o.cancelCmdMu.Unlock()
-
-	if fn != nil {
-		fn()
-	}
 }

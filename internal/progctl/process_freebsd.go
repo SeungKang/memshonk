@@ -10,6 +10,10 @@ import (
 )
 
 func (o *processUnix) Regions() (memory.Regions, error) {
+	if o.optPtrace == nil {
+		return memory.Regions{}, errPtraceNotEnabled
+	}
+
 	needToResume := false
 
 	if !o.stopped {
@@ -21,7 +25,7 @@ func (o *processUnix) Regions() (memory.Regions, error) {
 		}
 	}
 
-	regions, regionsErr := fbsdmaps.Vmmap(o.ptrace)
+	regions, regionsErr := fbsdmaps.Vmmap(o.optPtrace)
 
 	if needToResume {
 		err := o.Resume()

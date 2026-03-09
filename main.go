@@ -444,6 +444,7 @@ func setupCommands() *apicompat.CommandRegistry {
 	reg.Register(commands.PluginsCommandName, commands.NewPluginsCommand)
 	reg.Register(commands.ReadCommandName, commands.NewReadCommand)
 	reg.Register(commands.SessionsCommandName, commands.NewSessionsCommand)
+	reg.Register(commands.ShonksetCommandName, commands.NewShonksetCommand)
 	reg.Register(commands.VmmapCommandName, commands.NewVmmapCommand)
 	reg.Register(commands.WatchCommandName, commands.NewWatchCommand)
 	reg.Register(commands.WriteCommandName, commands.NewWriteCommand)

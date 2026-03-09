@@ -5,12 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/SeungKang/memshonk/internal/events"
 	"github.com/SeungKang/memshonk/internal/memory"
 	"github.com/mitchellh/go-ps"
+)
+
+// various memory mode strings
+const (
+	kernel32MemoryMode = "kernel32"
+	ptraceMemoryMode   = "ptrace"
+	procfsMemoryMode   = "procfs"
 )
 
 var _ Process = (*Ctl)(nil)
@@ -26,6 +34,10 @@ type AttachConfig struct {
 }
 
 type Process interface {
+	SetMemoryMode(string) error
+
+	MemoryMode() string
+
 	Attach(ctx context.Context, cfg AttachConfig) (int, error)
 
 	ProcessInfo(ctx context.Context) (ProcessInfo, error)
@@ -55,7 +67,20 @@ type Process interface {
 	WatchLookup(ctx context.Context, addr string, sizeBytes uint64) (*Watcher, error)
 }
 
+type attachConfig struct {
+	exeName        string
+	pid            int
+	exitMon        *ExitMonitor
+	memoryModeName string
+}
+
+func unsupportedMemoryModeError(memoryMode string) error {
+	return fmt.Errorf("unsupported memory mode: %q", memoryMode)
+}
+
 type attachedProcess interface {
+	SetMemoryMode(string) error
+
 	ExitMonitor() *ExitMonitor
 
 	PID() int
@@ -92,7 +117,53 @@ type Ctl struct {
 	detachEvents  *events.Publisher[DetachedEvent]
 	processExited *events.Publisher[ProcessExitedEvent]
 	rwMu          sync.RWMutex
+	memMode       string
 	current       *processThread
+}
+
+func (o *Ctl) SetMemoryMode(modeName string) error {
+	o.rwMu.Lock()
+	defer o.rwMu.Unlock()
+
+	return o.setMemoryMode(modeName)
+}
+
+func (o *Ctl) setMemoryMode(modeName string) error {
+	switch runtime.GOOS {
+	case "windows":
+		switch modeName {
+		case "", kernel32MemoryMode:
+			o.memMode = kernel32MemoryMode
+		default:
+			return fmt.Errorf("unsupported memory mode: %q - supported options are: %q",
+				modeName, kernel32MemoryMode)
+		}
+	default:
+		switch modeName {
+		case "", ptraceMemoryMode:
+			o.memMode = ptraceMemoryMode
+		case procfsMemoryMode:
+			o.memMode = procfsMemoryMode
+		default:
+			return fmt.Errorf("unsupported memory mode: %q - supported options are: %q or %q",
+				modeName, procfsMemoryMode, procfsMemoryMode)
+		}
+	}
+
+	if o.current != nil {
+		return o.current.Do(context.Background(), func(process attachedProcess) error {
+			return process.SetMemoryMode(o.memMode)
+		})
+	}
+
+	return nil
+}
+
+func (o *Ctl) MemoryMode() string {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	return o.memMode
 }
 
 func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
@@ -146,9 +217,22 @@ func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 		}
 	}
 
+	// set memory mode to default if none specified
+	if o.memMode == "" {
+		err := o.setMemoryMode("")
+		if err != nil {
+			return 0, fmt.Errorf("failed to set initial memory mode, this should never happen: %w", err)
+		}
+	}
+
 	unexpectedExitMon := newExitMonitor(o.processExited)
 
-	proc, err := newProcessThread(foundExeName, foundPID, unexpectedExitMon)
+	proc, err := newProcessThread(attachConfig{
+		exeName:        foundExeName,
+		pid:            foundPID,
+		exitMon:        unexpectedExitMon,
+		memoryModeName: o.memMode,
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to attach to process %d (%q) - %w",
 			foundPID, foundExeName, err)

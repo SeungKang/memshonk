@@ -8,16 +8,16 @@ import (
 	"time"
 )
 
-func newProcessThread(exeName string, pid int, exitMon *ExitMonitor) (*processThread, error) {
+func newProcessThread(config attachConfig) (*processThread, error) {
 	thread := &processThread{
 		callbacks:  make(chan *processThreadCallback),
 		addWatcher: make(chan *Watcher),
-		exitMon:    exitMon,
+		exitMon:    config.exitMon,
 	}
 
 	attachResult := make(chan error, 1)
 
-	go thread.loop(exeName, pid, attachResult)
+	go thread.loop(config, attachResult)
 
 	err := <-attachResult
 	if err != nil {
@@ -74,12 +74,12 @@ func (o *processThread) AddWatcher(ctx context.Context, watcher *Watcher) error 
 	}
 }
 
-func (o *processThread) loop(exeName string, pid int, attachResult chan error) {
+func (o *processThread) loop(config attachConfig, attachResult chan error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
 	var err error
-	o.process, err = attach(exeName, pid, o.exitMon)
+	o.process, err = attach(config)
 	if err != nil {
 		attachResult <- fmt.Errorf("attach failure - %w", err)
 		return

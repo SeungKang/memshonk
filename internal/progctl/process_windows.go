@@ -16,8 +16,8 @@ import (
 
 var _ attachedProcess = (*processWindows)(nil)
 
-func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, error) {
-	handle, err := kernel32.GetReadWriteHandle(pid)
+func attach(config attachConfig) (*processWindows, error) {
+	handle, err := kernel32.GetReadWriteHandle(config.pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open process memory - %w",
 			err)
@@ -46,7 +46,7 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 			err)
 	}
 
-	exeObj, err := regions.FirstObjectMatching(exeName)
+	exeObj, err := regions.FirstObjectMatching(config.exeName)
 	if err != nil {
 		_ = syscall.CloseHandle(handle)
 
@@ -56,12 +56,13 @@ func attach(exeName string, pid int, exitMon *ExitMonitor) (*processWindows, err
 
 	proc := &processWindows{
 		handle:  handle,
-		pid:     pid,
-		exitMon: exitMon,
+		pid:     config.pid,
+		exitMon: config.exitMon,
 		exeInfo: ExeInfo{
 			Bits: bits,
 			Obj:  exeObj,
 		},
+		memMode: config.memoryModeName,
 	}
 
 	go func() {
@@ -90,6 +91,12 @@ type processWindows struct {
 	pid     int
 	exeInfo ExeInfo
 	exitMon *ExitMonitor
+	memMode string
+}
+
+func (o *processWindows) SetMemoryMode(modeName string) error {
+	o.memMode = modeName
+	return nil
 }
 
 func (o *processWindows) isAlive() error {
@@ -121,14 +128,26 @@ func (o *processWindows) ExeInfo() ExeInfo {
 }
 
 func (o *processWindows) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+	if o.memMode != kernel32MemoryMode {
+		return nil, unsupportedMemoryModeError(o.memMode)
+	}
+
 	return kernel32.ReadProcessMemory(o.handle, addr, uintptr(sizeBytes))
 }
 
 func (o *processWindows) WriteBytes(b []byte, addr uintptr) error {
+	if o.memMode != kernel32MemoryMode {
+		return unsupportedMemoryModeError(o.memMode)
+	}
+
 	return kernel32.WriteProcessMemory(o.handle, addr, b)
 }
 
 func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
+	if o.memMode != kernel32MemoryMode {
+		return 0, unsupportedMemoryModeError(o.memMode)
+	}
+
 	if o.exeInfo.Bits == 32 {
 		return kernel32.ReadPtr(o.handle, at, 4, binary.LittleEndian)
 	} else {

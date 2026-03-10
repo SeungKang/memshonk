@@ -2,10 +2,15 @@
 
 ## next stopping point
 
+- readme
+- look through animal list and add cute names (shonk, chappie, ferris, ghosty, rat, sharon, bee)
+- fix sessions command only showing current session
+- windows does not show input on launch sometimes :S
+- daemon info message when connecting (message when starting daemon or connecting to existing daemon) put into main.go
+- daemon management command (server kill)
 - command output support (access the result of previous commands)
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
-- instant messaging :)
 
 ## diff
 
@@ -15,6 +20,7 @@
 
 - figure out better way of doing copyAndAddBackslashRLoop()
 - fix incorrect prompt state when reconnecting after process has died (it still has the PID in it)
+- instant messaging :)
 
 ## plugin
 
@@ -24,7 +30,7 @@
   only its name - maybe we can have a name -> plugin info
   cache?)
 
-### mskit
+## mskit
 
 - helper function for reading a pointer from process
 - helper function for reading data from process using a pointer to a Vec<u8>
@@ -72,6 +78,9 @@
 
 ## shell
 
+- memshonk exec mode to run a memshonk command (allow you to run memshonk from shell script)
+- test scripting within memshonk shell
+- need to consider tab completion for external program
 - disable color (needs to be a Session-level setting)
 - allow execution of external programs to be disabled
 - replace shlex code in `internal/shell/completer.go` (`splitWords`)

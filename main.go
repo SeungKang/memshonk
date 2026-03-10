@@ -210,6 +210,12 @@ func beClient(state mainState) error {
 		OptTerminalResizes: resizeEvents,
 	}
 
+	termState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to make raw - %w", err)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), termState)
+
 	setupCtx, cancelFn := context.WithTimeout(context.Background(), time.Second)
 	defer cancelFn()
 
@@ -234,12 +240,6 @@ func beClient(state mainState) error {
 		}
 	}
 	defer client.Close()
-
-	termState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return fmt.Errorf("failed to make raw - %w", err)
-	}
-	defer term.Restore(int(os.Stdin.Fd()), termState)
 
 	<-client.Done()
 

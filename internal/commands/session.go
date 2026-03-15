@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"strings"
 
@@ -10,37 +11,44 @@ import (
 )
 
 const (
-	SessionsCommandName = "sessions"
+	SessionCommandName = "session"
 )
 
-func NewSessionsCommand(config apicompat.NewCommandConfig) *fx.Command {
-	cmd := &SessionsCommand{
+func NewSessionCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &SessionCommand{
 		session: config.Session,
 	}
 
-	root := fx.NewCommand(SessionsCommandName, "manage sessions", cmd.info)
+	root := fx.NewCommand(SessionCommandName, "manage session", nil)
+	root.Fn = func(_ context.Context) (fx.CommandResult, error) {
+		root.PrintUsage()
+		return nil, flag.ErrHelp
+	}
 
 	info := root.AddSubcommand("info", "show session info", cmd.info)
 	root.AddSubcommand("ls", "list sessions", cmd.ls)
-	rm := root.AddSubcommand("rm", "remove sessions", cmd.rm)
+	rm := root.AddSubcommand("rm", "remove session", cmd.rm)
 
-	// register session-ids on info and rm (not ls)
-	for _, c := range []*fx.Command{info, rm} {
-		c.FlagSet.StringSliceNf(&cmd.sessionIDs, fx.ArgConfig{
-			Name:        "session-ids",
-			Description: "one or more session IDs to operate on",
-		})
-	}
+	info.FlagSet.StringSliceNf(&cmd.sessionIDs, fx.ArgConfig{
+		Name:        "session-ids",
+		Description: "one or more session IDs to operate on",
+	})
+
+	rm.FlagSet.StringSliceNf(&cmd.sessionIDs, fx.ArgConfig{
+		Name:        "session-ids",
+		Description: "one or more session IDs to remove",
+		Required:    true,
+	})
 
 	return root
 }
 
-type SessionsCommand struct {
+type SessionCommand struct {
 	session    apicompat.Session
 	sessionIDs []string
 }
 
-func (o *SessionsCommand) info(_ context.Context) (fx.CommandResult, error) {
+func (o *SessionCommand) info(_ context.Context) (fx.CommandResult, error) {
 	if len(o.sessionIDs) == 0 {
 		return fx.NewHumanCommandResult(o.session.Info().String()), nil
 	}
@@ -63,7 +71,7 @@ func (o *SessionsCommand) info(_ context.Context) (fx.CommandResult, error) {
 	return fx.NewHumanCommandResult(b.String()), nil
 }
 
-func (o *SessionsCommand) ls(_ context.Context) (fx.CommandResult, error) {
+func (o *SessionCommand) ls(_ context.Context) (fx.CommandResult, error) {
 	sessions := o.session.SharedState().Sessions.Sessions()
 
 	var b strings.Builder
@@ -79,8 +87,12 @@ func (o *SessionsCommand) ls(_ context.Context) (fx.CommandResult, error) {
 	return fx.NewHumanCommandResult(b.String()), nil
 }
 
-func (o *SessionsCommand) rm(_ context.Context) (fx.CommandResult, error) {
+func (o *SessionCommand) rm(_ context.Context) (fx.CommandResult, error) {
 	for _, id := range o.sessionIDs {
+		if _, ok := o.session.SharedState().Sessions.GetSession(id); !ok {
+			return nil, fmt.Errorf("session not found: %q", id)
+		}
+
 		o.session.SharedState().Sessions.RemoveSession(id)
 	}
 

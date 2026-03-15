@@ -47,7 +47,7 @@ func adjectives() []string {
 		"elegant", "exotic", "fantastic", "fascinating", "fierce", "friendly", "funny", "gorgeous",
 		"harmless", "intelligent", "intriguing", "kind", "lively", "lovely", "magnificent", "mysterious",
 		"playful", "quaint", "quirky", "remarkable", "sophisticated", "spectacular", "spunky", "stunning",
-		"unusual", "vibrant", "wonderful", "x-traordinary", "youthful", "zany",
+		"unusual", "vibrant", "wonderful", "youthful", "zany",
 	}
 }
 
@@ -59,5 +59,6 @@ func animals() []string {
 		"wolf", "fox", "deer", "squirrel", "chipmunk", "otter", "seal", "dolphin", "whale", "shark",
 		"octopus", "squid", "crab", "lobster", "turtle", "alligator", "rhinoceros", "hippopotamus", "hyena",
 		"cheetah", "leopard", "jaguar", "panda", "gorilla", "chimpanzee", "orangutan", "lemur", "meerkat",
+		"shonk", "chappie", "ferris", "ghosty", "rat", "sharon", "bee",
 	}
 }

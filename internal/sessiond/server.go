@@ -65,6 +65,7 @@ func NewServer(ctx context.Context, config ServerConfig) (*Server, error) {
 		config:     config,
 		listener:   listener,
 		socketPath: socketPath,
+		exited:     make(chan struct{}),
 	}
 
 	server.config.SharedState.Sessions = server
@@ -86,6 +87,8 @@ type Server struct {
 	rwMu       sync.RWMutex
 	randStr    *randomStringer
 	sessions   map[string]sessionWrapper
+	closeOnce  sync.Once
+	exited     chan struct{}
 }
 
 type sessionWrapper struct {
@@ -93,16 +96,24 @@ type sessionWrapper struct {
 	clientConn *fromClient
 }
 
+func (o *Server) Done() <-chan struct{} {
+	return o.exited
+}
+
 func (o *Server) Close() error {
-	o.rwMu.Lock()
-	defer o.rwMu.Unlock()
+	o.closeOnce.Do(func() {
+		o.rwMu.Lock()
+		defer o.rwMu.Unlock()
 
-	_ = o.listener.Close()
-	_ = os.Remove(o.socketPath)
+		_ = o.listener.Close()
+		_ = os.Remove(o.socketPath)
 
-	for _, wrapper := range o.sessions {
-		_ = wrapper.session.Close()
-	}
+		for _, wrapper := range o.sessions {
+			_ = wrapper.session.Close()
+		}
+
+		close(o.exited)
+	})
 
 	return nil
 }

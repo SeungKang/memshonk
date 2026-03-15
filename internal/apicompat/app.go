@@ -46,4 +46,6 @@ type SessionManager interface {
 	// RemoveSession removes the specified session b
 	// its ID.
 	RemoveSession(id string)
+
+	Close() error
 }

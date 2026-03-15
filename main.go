@@ -429,7 +429,10 @@ func beDaemon(state mainState) error {
 	}
 	tmp.Close()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-server.Done():
+	}
 
 	return nil
 }
@@ -439,6 +442,7 @@ func setupCommands() *apicompat.CommandRegistry {
 
 	reg.Register(commands.HelpCommandName, commands.NewHelpCommand)
 	reg.Register(commands.AttachCommandName, commands.NewAttachCommand)
+	reg.Register(commands.DaemonCommandName, commands.NewDaemonCommand)
 	reg.Register(commands.DetachCommandName, commands.NewDetachCommand)
 	reg.Register(commands.FindCommandName, commands.NewFindCommand)
 	reg.Register(commands.PluginsCommandName, commands.NewPluginsCommand)

@@ -43,7 +43,5 @@ func (o *DaemonCommand) kill(_ context.Context) (fx.CommandResult, error) {
 
 	_ = o.config.Session.SharedState().Sessions.Close()
 
-	fmt.Println("TODO ")
-
 	return nil, nil
 }

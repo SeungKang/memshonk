@@ -8,12 +8,31 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// New creates a new Tracer.
+//
+// Warning: Only call this function if you know what you are doing.
+//
+// Callers should access the Tracer using the TracerThread to ensure
+// that per-process ptrace calls originate from the same thread.
+//
+// Failing to use a dedicated OS thread for ptrace calls will likely
+// result in the ptrace call failing with errors like ECHILD (no
+// child process).
 func New(pid int) *Tracer {
 	return &Tracer{
 		pid: pid,
 	}
 }
 
+// Tracer provides a simple API for consuming ptrace functionality for
+// a specific process.
+//
+// Callers should access the Tracer using the TracerThread to ensure
+// that per-process ptrace calls originate from the same thread.
+//
+// Failing to use a dedicated OS thread for ptrace calls will likely
+// result in the ptrace call failing with errors like ECHILD (no
+// child process).
 type Tracer struct {
 	pid int
 }

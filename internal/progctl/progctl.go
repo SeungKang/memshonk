@@ -78,30 +78,6 @@ func unsupportedMemoryModeError(memoryMode string) error {
 	return fmt.Errorf("unsupported memory mode: %q", memoryMode)
 }
 
-type attachedProcess interface {
-	SetMemoryMode(string) error
-
-	ExitMonitor() *ExitMonitor
-
-	PID() int
-
-	ExeInfo() ExeInfo
-
-	ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error)
-
-	WriteBytes(b []byte, addr uintptr) error
-
-	ReadPtr(at uintptr) (uintptr, error)
-
-	Regions() (memory.Regions, error)
-
-	Suspend() error
-
-	Resume() error
-
-	Close() error
-}
-
 func NewCtl(exePath string, eventGroups *events.Groups) *Ctl {
 	return &Ctl{
 		exePath:       exePath,
@@ -118,7 +94,7 @@ type Ctl struct {
 	processExited *events.Publisher[ProcessExitedEvent]
 	rwMu          sync.RWMutex
 	memMode       string
-	current       *processThread
+	current       *attachedProcess
 }
 
 func (o *Ctl) SetMemoryMode(modeName string) error {
@@ -151,9 +127,7 @@ func (o *Ctl) setMemoryMode(modeName string) error {
 	}
 
 	if o.current != nil {
-		return o.current.Do(context.Background(), func(process attachedProcess) error {
-			return process.SetMemoryMode(o.memMode)
-		})
+		return o.current.process.SetMemoryMode(modeName)
 	}
 
 	return nil
@@ -172,10 +146,11 @@ func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 
 	if o.current != nil {
 		select {
-		case <-o.current.ExitMonitor().Done():
+		case <-o.current.config.exitMon.Done():
 			// Go ahead with reattach.
 		default:
-			return 0, fmt.Errorf("already attached to pid: %d", o.current.PID())
+			return 0, fmt.Errorf("already attached to pid: %d",
+				o.current.config.pid)
 		}
 	}
 
@@ -227,7 +202,7 @@ func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 
 	unexpectedExitMon := newExitMonitor(o.processExited)
 
-	proc, err := newProcessThread(attachConfig{
+	proc, err := attachShared(attachConfig{
 		exeName:        foundExeName,
 		pid:            foundPID,
 		exitMon:        unexpectedExitMon,
@@ -263,7 +238,7 @@ func (o *Ctl) processInfo(context.Context) (ProcessInfo, error) {
 	}
 
 	return ProcessInfo{
-		PID: o.current.PID(),
+		PID: o.current.config.pid,
 	}, nil
 }
 
@@ -299,12 +274,7 @@ func (o *Ctl) Regions(ctx context.Context) (memory.Regions, error) {
 }
 
 func (o *Ctl) regions(ctx context.Context) (memory.Regions, error) {
-	var regions memory.Regions
-	err := o.current.Do(ctx, func(process attachedProcess) error {
-		var err error
-		regions, err = process.Regions()
-		return err
-	})
+	regions, err := o.current.process.Regions()
 
 	return regions, err
 }
@@ -325,7 +295,7 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 		return ptr.FirstAddr(), nil
 	}
 
-	baseAddr := o.current.ExeObj().Obj.BaseAddr
+	baseAddr := o.current.process.ExeInfo().Obj.BaseAddr
 
 	if ptr.OptModule != "" {
 		regions, err := o.regions(ctx)
@@ -346,12 +316,7 @@ func (o *Ctl) resolvePointer(ctx context.Context, ptr memory.Pointer) (uintptr, 
 		baseAddr = object.BaseAddr
 	}
 
-	var addr uintptr
-	err := o.current.Do(ctx, func(process attachedProcess) error {
-		var err error
-		addr, err = resolvePointerChain(baseAddr, ptr, process.ReadPtr)
-		return err
-	})
+	addr, err := resolvePointerChain(baseAddr, ptr, o.current.process.ReadPtr)
 	if err != nil {
 		return 0, fmt.Errorf("failed to resolve pointer chain - %w",
 			err)
@@ -377,12 +342,7 @@ func (o *Ctl) readFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 		return nil, 0, fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
-	var buf []byte
-	err = o.current.Do(ctx, func(process attachedProcess) error {
-		var err error
-		buf, err = process.ReadBytes(addr, sizeBytes)
-		return err
-	})
+	buf, err := o.current.process.ReadBytes(addr, sizeBytes)
 
 	return buf, addr, err
 }
@@ -416,9 +376,7 @@ func (o *Ctl) writeToAddr(ctx context.Context, to memory.Pointer, data []byte) (
 		return 0, fmt.Errorf("failed to resolve pointer - %w", err)
 	}
 
-	return addr, o.current.Do(ctx, func(process attachedProcess) error {
-		return process.WriteBytes(data, addr)
-	})
+	return addr, o.current.process.WriteBytes(data, addr)
 }
 
 func (o *Ctl) WriteToLookup(ctx context.Context, addr string, p []byte) (uintptr, error) {
@@ -452,7 +410,7 @@ func (o *Ctl) watchAddr(ctx context.Context, ptr memory.Pointer, sizeBytes uint6
 
 	watcher := newWatcher(ctx, addr, sizeBytes)
 
-	err = o.current.AddWatcher(ctx, watcher)
+	err = o.current.watchers.AddWatcher(ctx, watcher)
 	if err != nil {
 		return nil, err
 	}
@@ -480,9 +438,7 @@ func (o *Ctl) Suspend(ctx context.Context) error {
 		return nil
 	}
 
-	return o.current.Do(ctx, func(process attachedProcess) error {
-		return process.Suspend()
-	})
+	return o.current.process.Suspend()
 }
 
 func (o *Ctl) Resume(ctx context.Context) error {
@@ -493,9 +449,7 @@ func (o *Ctl) Resume(ctx context.Context) error {
 		return nil
 	}
 
-	return o.current.Do(ctx, func(process attachedProcess) error {
-		return process.Resume()
-	})
+	return o.current.process.Resume()
 }
 
 func (o *Ctl) Detach(ctx context.Context) error {

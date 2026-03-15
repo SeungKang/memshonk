@@ -4,20 +4,20 @@ package progctl
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
 
 	"github.com/SeungKang/memshonk/internal/ptrace"
+
 	"golang.org/x/sys/unix"
 )
 
 var errPtraceNotEnabled = fmt.Errorf("ptrace memory mode is not enabled")
 
-var _ attachedProcess = (*processUnix)(nil)
-
-func attach(config attachConfig) (*processUnix, error) {
-	proc := &processUnix{
+func attach(config attachConfig) (*process, error) {
+	proc := &process{
 		pid:     config.pid,
 		endian:  binary.LittleEndian,
 		exitMon: config.exitMon,
@@ -73,7 +73,7 @@ func attach(config attachConfig) (*processUnix, error) {
 	return proc, nil
 }
 
-type processUnix struct {
+type process struct {
 	pid     int
 	stopped bool
 	endian  binary.ByteOrder
@@ -81,11 +81,11 @@ type processUnix struct {
 	exitMon *ExitMonitor
 	memMode string
 
-	optPtrace    *ptrace.Tracer
+	optPtrace    *ptrace.TracerThread
 	optProcFsMem *os.File
 }
 
-func (o *processUnix) SetMemoryMode(modeName string) error {
+func (o *process) SetMemoryMode(modeName string) error {
 	o.memMode = modeName
 	switch modeName {
 	case procfsMemoryMode:
@@ -99,26 +99,18 @@ func (o *processUnix) SetMemoryMode(modeName string) error {
 		}
 	case ptraceMemoryMode:
 		if o.optPtrace == nil {
-			o.optPtrace = ptrace.New(o.pid)
+			o.optPtrace = ptrace.NewTracerThread(o.pid)
 		}
 	}
 
 	return nil
 }
 
-func (o *processUnix) ExitMonitor() *ExitMonitor {
-	return o.exitMon
-}
-
-func (o *processUnix) PID() int {
-	return o.pid
-}
-
-func (o *processUnix) ExeInfo() ExeInfo {
+func (o *process) ExeInfo() ExeInfo {
 	return o.exeInfo
 }
 
-func (o *processUnix) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+func (o *process) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
 	switch o.memMode {
 	case ptraceMemoryMode:
 		return o.readBytesPtrace(addr, sizeBytes)
@@ -129,7 +121,7 @@ func (o *processUnix) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) 
 	}
 }
 
-func (o *processUnix) readBytesPtrace(addr uintptr, sizeBytes uint64) ([]byte, error) {
+func (o *process) readBytesPtrace(addr uintptr, sizeBytes uint64) ([]byte, error) {
 	if o.optPtrace == nil {
 		return nil, errPtraceNotEnabled
 	}
@@ -147,7 +139,7 @@ func (o *processUnix) readBytesPtrace(addr uintptr, sizeBytes uint64) ([]byte, e
 
 	b := make([]byte, sizeBytes)
 
-	_, peakErr := o.optPtrace.PeekData(addr, b)
+	_, peakErr := o.optPtrace.PeekData(context.Background(), addr, b)
 
 	if needToResume {
 		err := o.Resume()
@@ -159,7 +151,7 @@ func (o *processUnix) readBytesPtrace(addr uintptr, sizeBytes uint64) ([]byte, e
 	return b, peakErr
 }
 
-func (o *processUnix) readBytesProcfs(addr uintptr, sizeBytes uint64) ([]byte, error) {
+func (o *process) readBytesProcfs(addr uintptr, sizeBytes uint64) ([]byte, error) {
 	if o.optProcFsMem == nil {
 		return nil, fmt.Errorf("procfsmem is nil (this should never happen)")
 	}
@@ -174,7 +166,7 @@ func (o *processUnix) readBytesProcfs(addr uintptr, sizeBytes uint64) ([]byte, e
 	return out, nil
 }
 
-func (o *processUnix) WriteBytes(data []byte, addr uintptr) error {
+func (o *process) WriteBytes(data []byte, addr uintptr) error {
 	switch o.memMode {
 	case ptraceMemoryMode:
 		return o.writeBytesPtrace(data, addr)
@@ -185,7 +177,7 @@ func (o *processUnix) WriteBytes(data []byte, addr uintptr) error {
 	}
 }
 
-func (o *processUnix) writeBytesPtrace(data []byte, addr uintptr) error {
+func (o *process) writeBytesPtrace(data []byte, addr uintptr) error {
 	if o.optPtrace == nil {
 		return errPtraceNotEnabled
 	}
@@ -201,7 +193,7 @@ func (o *processUnix) writeBytesPtrace(data []byte, addr uintptr) error {
 		}
 	}
 
-	_, pokeErr := o.optPtrace.PokeData(addr, data)
+	_, pokeErr := o.optPtrace.PokeData(context.Background(), addr, data)
 
 	if needToResume {
 		err := o.Resume()
@@ -213,7 +205,7 @@ func (o *processUnix) writeBytesPtrace(data []byte, addr uintptr) error {
 	return pokeErr
 }
 
-func (o *processUnix) writeBytesProcfs(data []byte, addr uintptr) error {
+func (o *process) writeBytesProcfs(data []byte, addr uintptr) error {
 	if o.optProcFsMem == nil {
 		return fmt.Errorf("procfsmem is nil (this should never happen)")
 	}
@@ -222,7 +214,7 @@ func (o *processUnix) writeBytesProcfs(data []byte, addr uintptr) error {
 	return err
 }
 
-func (o *processUnix) ReadPtr(at uintptr) (uintptr, error) {
+func (o *process) ReadPtr(at uintptr) (uintptr, error) {
 	if o.exeInfo.Bits == 32 {
 		b, err := o.ReadBytes(at, 4)
 		if err != nil {
@@ -250,12 +242,12 @@ func (o *processUnix) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *processUnix) Suspend() error {
+func (o *process) Suspend() error {
 	if o.optPtrace == nil {
 		return errPtraceNotEnabled
 	}
 
-	err := o.optPtrace.AttachAndWaitStopped()
+	err := o.optPtrace.AttachAndWaitStopped(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to attach to process - %w", err)
 	}
@@ -265,12 +257,12 @@ func (o *processUnix) Suspend() error {
 	return nil
 }
 
-func (o *processUnix) Resume() error {
+func (o *process) Resume() error {
 	if o.optPtrace == nil {
 		return errPtraceNotEnabled
 	}
 
-	err := o.optPtrace.Detach()
+	err := o.optPtrace.Detach(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to ptrace detach - %w", err)
 	}
@@ -280,7 +272,7 @@ func (o *processUnix) Resume() error {
 	return nil
 }
 
-func (o *processUnix) Close() error {
+func (o *process) Close() error {
 	o.exitMon.SetExited(ErrDetached)
 
 	if o.optProcFsMem != nil {
@@ -303,10 +295,12 @@ func (o *processUnix) Close() error {
 		}
 	}
 
-	err := o.optPtrace.Detach()
+	err := o.optPtrace.Detach(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to ptrace detach - %w", err)
 	}
+
+	_ = o.optPtrace.Close()
 
 	return nil
 }

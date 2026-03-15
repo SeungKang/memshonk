@@ -3,13 +3,15 @@
 package progctl
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/SeungKang/memshonk/internal/fbsdmaps"
 	"github.com/SeungKang/memshonk/internal/memory"
+	"github.com/SeungKang/memshonk/internal/ptrace"
 )
 
-func (o *processUnix) Regions() (memory.Regions, error) {
+func (o *process) Regions() (memory.Regions, error) {
 	if o.optPtrace == nil {
 		return memory.Regions{}, errPtraceNotEnabled
 	}
@@ -25,7 +27,13 @@ func (o *processUnix) Regions() (memory.Regions, error) {
 		}
 	}
 
-	regions, regionsErr := fbsdmaps.Vmmap(o.optPtrace)
+	var regions memory.Regions
+
+	regionsErr := o.optPtrace.Do(context.Background(), func(_ context.Context, pt *ptrace.Tracer) error {
+		var err error
+		regions, err = fbsdmaps.Vmmap(pt)
+		return err
+	})
 
 	if needToResume {
 		err := o.Resume()

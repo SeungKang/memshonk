@@ -14,12 +14,10 @@ import (
 	"github.com/SeungKang/memshonk/internal/memory"
 )
 
-var _ attachedProcess = (*processWindows)(nil)
-
-func attach(config attachConfig) (*processWindows, error) {
+func attach(config attachConfig) (*process, error) {
 	handle, err := kernel32.GetReadWriteHandle(config.pid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open process memory - %w",
+		return nil, fmt.Errorf("failed to get read-write handle - %w",
 			err)
 	}
 
@@ -54,15 +52,13 @@ func attach(config attachConfig) (*processWindows, error) {
 			err)
 	}
 
-	proc := &processWindows{
-		handle:  handle,
-		pid:     config.pid,
-		exitMon: config.exitMon,
+	proc := &process{
+		config: config,
+		handle: handle,
 		exeInfo: ExeInfo{
 			Bits: bits,
 			Obj:  exeObj,
 		},
-		memMode: config.memoryModeName,
 	}
 
 	go func() {
@@ -71,12 +67,12 @@ func attach(config attachConfig) (*processWindows, error) {
 
 		for {
 			select {
-			case <-proc.exitMon.Done():
+			case <-proc.config.exitMon.Done():
 				return
 			case <-ticker.C:
 				err := proc.isAlive()
 				if err != nil {
-					proc.exitMon.SetExited(err)
+					proc.config.exitMon.SetExited(err)
 					return
 				}
 			}
@@ -86,20 +82,18 @@ func attach(config attachConfig) (*processWindows, error) {
 	return proc, nil
 }
 
-type processWindows struct {
+type process struct {
 	handle  syscall.Handle
-	pid     int
+	config  attachConfig
 	exeInfo ExeInfo
-	exitMon *ExitMonitor
-	memMode string
 }
 
-func (o *processWindows) SetMemoryMode(modeName string) error {
-	o.memMode = modeName
+func (o *process) SetMemoryMode(modeName string) error {
+	o.config.memoryModeName = modeName
 	return nil
 }
 
-func (o *processWindows) isAlive() error {
+func (o *process) isAlive() error {
 	var exitStatus uint32
 	err := syscall.GetExitCodeProcess(o.handle, &exitStatus)
 	if err != nil {
@@ -115,37 +109,29 @@ func (o *processWindows) isAlive() error {
 	return fmt.Errorf("process exited with status: %d", exitStatus)
 }
 
-func (o *processWindows) ExitMonitor() *ExitMonitor {
-	return o.exitMon
-}
-
-func (o *processWindows) PID() int {
-	return o.pid
-}
-
-func (o *processWindows) ExeInfo() ExeInfo {
+func (o *process) ExeInfo() ExeInfo {
 	return o.exeInfo
 }
 
-func (o *processWindows) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
-	if o.memMode != kernel32MemoryMode {
-		return nil, unsupportedMemoryModeError(o.memMode)
+func (o *process) ReadBytes(addr uintptr, sizeBytes uint64) ([]byte, error) {
+	if o.config.memoryModeName != kernel32MemoryMode {
+		return nil, unsupportedMemoryModeError(o.config.memoryModeName)
 	}
 
 	return kernel32.ReadProcessMemory(o.handle, addr, uintptr(sizeBytes))
 }
 
-func (o *processWindows) WriteBytes(b []byte, addr uintptr) error {
-	if o.memMode != kernel32MemoryMode {
-		return unsupportedMemoryModeError(o.memMode)
+func (o *process) WriteBytes(b []byte, addr uintptr) error {
+	if o.config.memoryModeName != kernel32MemoryMode {
+		return unsupportedMemoryModeError(o.config.memoryModeName)
 	}
 
 	return kernel32.WriteProcessMemory(o.handle, addr, b)
 }
 
-func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
-	if o.memMode != kernel32MemoryMode {
-		return 0, unsupportedMemoryModeError(o.memMode)
+func (o *process) ReadPtr(at uintptr) (uintptr, error) {
+	if o.config.memoryModeName != kernel32MemoryMode {
+		return 0, unsupportedMemoryModeError(o.config.memoryModeName)
 	}
 
 	if o.exeInfo.Bits == 32 {
@@ -155,7 +141,7 @@ func (o *processWindows) ReadPtr(at uintptr) (uintptr, error) {
 	}
 }
 
-func (o *processWindows) Regions() (memory.Regions, error) {
+func (o *process) Regions() (memory.Regions, error) {
 	return regionsForProcHandle(o.handle)
 }
 
@@ -309,16 +295,16 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 	return region
 }
 
-func (o *processWindows) Suspend() error {
+func (o *process) Suspend() error {
 	return nil
 }
 
-func (o *processWindows) Resume() error {
+func (o *process) Resume() error {
 	return nil
 }
 
-func (o *processWindows) Close() error {
-	o.exitMon.SetExited(ErrDetached)
+func (o *process) Close() error {
+	o.config.exitMon.SetExited(ErrDetached)
 
 	return syscall.CloseHandle(o.handle)
 }

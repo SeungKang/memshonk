@@ -222,14 +222,19 @@ func beClient(state mainState) error {
 	// Try to connect to an existing daemon process. If that
 	// fails, try starting a new daemon process and connect
 	// to the new  process.
+	fmt.Fprint(os.Stderr, "connecting to daemon...\r\n")
+
 	client, err := sessiond.SetupClient(setupCtx, clientConfig)
 	if err != nil {
 		cancelFn()
+
+		fmt.Fprint(os.Stderr, "starting daemon...\r\n")
 
 		setupCtx, cancelFn = context.WithTimeout(context.Background(), 2*time.Second)
 
 		err = execDaemon(setupCtx)
 		if err != nil {
+			cancelFn()
 			return fmt.Errorf("failed to start daemon - %w", err)
 		}
 

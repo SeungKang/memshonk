@@ -95,6 +95,7 @@ func (o *FlagSet) Parse(arguments []string) error {
 	for _, nf := range o.nonflags {
 		if nf.isSlice {
 			// Slice consumes all remaining arguments
+			startIdx := argIdx
 			for argIdx < len(args) {
 				err = nf.setter(args[argIdx])
 				if err != nil {
@@ -102,6 +103,10 @@ func (o *FlagSet) Parse(arguments []string) error {
 						args[argIdx], nf.config.Name, err)
 				}
 				argIdx++
+			}
+			if nf.config.Required && argIdx == startIdx {
+				return fmt.Errorf("required argument not provided: %s",
+					nf.config.Name)
 			}
 		} else {
 			if argIdx >= len(args) {

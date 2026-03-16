@@ -111,9 +111,12 @@ func (o *Thread[C]) loop(ctx context.Context) {
 func (o *Thread[C]) Close() error {
 	o.closeOnce.Do(func() {
 		o.cancelFn()
-
-		<-o.exited
 	})
 
 	return nil
+}
+
+// Done returns a channel that is closed when the thread exits.
+func (o *Thread[C]) Done() <-chan struct{} {
+	return o.exited
 }

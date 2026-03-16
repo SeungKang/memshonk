@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/events"
 )
@@ -38,15 +39,16 @@ func (o *ExitMonitor) SetDetached() {
 
 type ExitMonitorProcExitErr struct {
 	Source        string
+	OptTime       time.Time
 	OptMonitorErr error
 	OptExitStatus *int64
 }
 
 func (o ExitMonitorProcExitErr) Error() string {
-	header := o.Source + ": "
+	header := o.Source + "@" + o.OptTime.Format(time.Stamp) + ": "
 
 	if o.OptMonitorErr != nil {
-		msg := header + "process *may* have exited because process exit monitor failed - "
+		msg := header + "exit monitor failed - "
 
 		if o.OptMonitorErr == nil {
 			return msg + "no additional information available"
@@ -69,6 +71,10 @@ func (o ExitMonitorProcExitErr) Unwrap() error {
 
 func (o *ExitMonitor) SetExited(err *ExitMonitorProcExitErr) {
 	o.once.Do(func() {
+		if err.OptTime.Equal(time.Time{}) {
+			err.OptTime = time.Now()
+		}
+
 		switch err.OptMonitorErr {
 		case ErrDetached:
 			// Do not send an event.

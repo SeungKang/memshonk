@@ -98,6 +98,8 @@ func notifyOnExit(handle syscall.Handle, exitMon *ExitMonitor) error {
 				Source:        "wait for multiple objects",
 				OptMonitorErr: fmt.Errorf("WaitForMultipleObjects failed - %w", err),
 			})
+
+			return
 		}
 
 		switch event {

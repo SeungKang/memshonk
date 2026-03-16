@@ -3,7 +3,6 @@
 ## next stopping point
 
 - readme
-- fix sessions command only showing current session
 - support stdin reading for each command including supporting io.closer for cancellation
 - command output support (access the result of previous commands)
 - allow overwriting of executable mapped object name

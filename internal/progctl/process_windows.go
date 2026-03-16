@@ -8,14 +8,18 @@ import (
 	"fmt"
 	"sort"
 	"syscall"
-	"time"
 
 	"github.com/SeungKang/memshonk/internal/kernel32"
 	"github.com/SeungKang/memshonk/internal/memory"
+
+	"golang.org/x/sys/windows"
 )
 
 func attach(config attachConfig) (*process, error) {
-	handle, err := kernel32.GetReadWriteHandle(config.pid)
+	handle, err := syscall.OpenProcess(
+		kernel32.ProcessReadWriteRights,
+		false,
+		uint32(config.pid))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get read-write handle - %w",
 			err)
@@ -61,25 +65,65 @@ func attach(config attachConfig) (*process, error) {
 		},
 	}
 
-	go func() {
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
+	err = notifyOnExit(handle, config.exitMon)
+	if err != nil {
+		_ = syscall.CloseHandle(handle)
 
-		for {
-			select {
-			case <-proc.config.exitMon.Done():
-				return
-			case <-ticker.C:
-				err := proc.isAlive()
-				if err != nil {
-					proc.config.exitMon.SetExited(err)
-					return
-				}
+		return nil, fmt.Errorf("failed to setup process exit monitor - %w",
+			err)
+	}
+
+	return proc, nil
+}
+
+func notifyOnExit(handle syscall.Handle, exitMon *ExitMonitor) error {
+	cancelEvent, err := windows.CreateEvent(nil, 0, 0, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create cancel event - %w", err)
+	}
+
+	go func() {
+		<-exitMon.Done()
+
+		windows.SetEvent(cancelEvent)
+	}()
+
+	go func() {
+		processHandle := windows.Handle(handle)
+
+		handles := []windows.Handle{processHandle, cancelEvent}
+		event, err := windows.WaitForMultipleObjects(handles, false, windows.INFINITE)
+		if err != nil {
+			exitMon.SetExited(&ExitMonitorProcExitErr{
+				Source:        "wait for multiple objects",
+				OptMonitorErr: fmt.Errorf("WaitForMultipleObjects failed - %w", err),
+			})
+		}
+
+		switch event {
+		case windows.WAIT_OBJECT_0:
+			// Process exited.
+			var exitCode uint32
+
+			err := windows.GetExitCodeProcess(processHandle, &exitCode)
+			if err == nil {
+				status := int64(exitCode)
+
+				exitMon.SetExited(&ExitMonitorProcExitErr{
+					Source:        "wait for multiple objects",
+					OptExitStatus: &status,
+				})
+			} else {
+				exitMon.SetExited(&ExitMonitorProcExitErr{
+					Source: "wait for multiple objects",
+				})
 			}
+		case windows.WAIT_OBJECT_0 + 1:
+			// Cancelled.
 		}
 	}()
 
-	return proc, nil
+	return nil
 }
 
 type process struct {
@@ -304,8 +348,6 @@ func (o *process) Resume() error {
 }
 
 func (o *process) Close() error {
-	o.config.exitMon.SetExited(ErrDetached)
-
 	return syscall.CloseHandle(o.handle)
 }
 

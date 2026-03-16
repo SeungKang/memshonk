@@ -63,12 +63,13 @@ func attach(config attachConfig) (*process, error) {
 		proc.exeInfo.Bits = 64
 	}
 
-	// TODO: exit monitor
-	//
-	// go func() {
-	// 	_, err := osProc.Wait()
-	// 	proc.exitMon.SetExited(err)
-	// }()
+	err = notifyOnProcExit(config.pid, config.exitMon)
+	if err != nil {
+		_ = proc.Close()
+
+		return nil, fmt.Errorf("failed to setup process exit monitor notifications - %w",
+			err)
+	}
 
 	return proc, nil
 }
@@ -273,8 +274,6 @@ func (o *process) Resume() error {
 }
 
 func (o *process) Close() error {
-	o.exitMon.SetExited(ErrDetached)
-
 	if o.optProcFsMem != nil {
 		_ = o.optProcFsMem.Close()
 	}

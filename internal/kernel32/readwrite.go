@@ -3,24 +3,14 @@ package kernel32
 import (
 	"encoding/binary"
 	"fmt"
-	"golang.org/x/sys/windows"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
-// NeededProcessAccess is the combined windows process open flags needed for read and write functionality.
-const NeededProcessAccess = windows.PROCESS_VM_READ | windows.PROCESS_VM_WRITE | windows.PROCESS_VM_OPERATION | windows.PROCESS_QUERY_INFORMATION
-
-// GetReadWriteHandle returns a handle to the process with teh specified PID,
-// granting read and write access
-func GetReadWriteHandle(pid int) (syscall.Handle, error) {
-	hnd, err := syscall.OpenProcess(NeededProcessAccess, false, uint32(pid))
-	// hnd, ok := w32.OpenProcess(NeededProcessAccess, false, uint32(pid))
-	if err != nil {
-		return 0, err
-	}
-
-	return hnd, nil
-}
+// ProcessReadWriteRights is the combined windows process open flags needed
+// for read and write functionality.
+const ProcessReadWriteRights = windows.PROCESS_VM_READ | windows.PROCESS_VM_WRITE | windows.PROCESS_VM_OPERATION | windows.PROCESS_QUERY_INFORMATION | windows.SYNCHRONIZE
 
 func ReadProcessMemory(handle syscall.Handle, addr uintptr, byteSize uintptr) ([]byte, error) {
 	if byteSize == 0 {

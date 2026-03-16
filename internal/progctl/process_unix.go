@@ -283,6 +283,7 @@ func (o *process) Close() error {
 	if o.optPtrace == nil {
 		return nil
 	}
+	defer o.optPtrace.Close()
 
 	// TODO: on linux the process needs to be stopped according to the
 	// PTRACE_DETACH section in the linux manual page unsure what other
@@ -298,8 +299,6 @@ func (o *process) Close() error {
 	if err != nil {
 		return fmt.Errorf("failed to ptrace detach - %w", err)
 	}
-
-	_ = o.optPtrace.Close()
 
 	return nil
 }

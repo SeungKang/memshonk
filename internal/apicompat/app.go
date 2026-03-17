@@ -47,5 +47,7 @@ type SessionManager interface {
 	// its ID.
 	RemoveSession(id string)
 
+	// Close disconnects all clients and exits
+	// the SessionManager.
 	Close() error
 }

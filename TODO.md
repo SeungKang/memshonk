@@ -15,7 +15,6 @@
 ## multi session support
 
 - figure out better way of doing copyAndAddBackslashRLoop()
-- fix incorrect prompt state when reconnecting after process has died (it still has the PID in it)
 - instant messaging :)
 
 ## plugin

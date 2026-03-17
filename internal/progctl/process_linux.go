@@ -63,7 +63,7 @@ func notifyPidfdExited(pidFd int, exitMon *ExitMonitor) error {
 				continue
 			default:
 				exitMon.SetExited(&ExitMonitorProcExitErr{
-					Source:        "pidfd poll",
+					Source:        "pidfd-poll",
 					OptMonitorErr: fmt.Errorf("failed to poll proc fds - %w", err),
 				})
 
@@ -78,7 +78,7 @@ func notifyPidfdExited(pidFd int, exitMon *ExitMonitor) error {
 				}
 
 				exitMon.SetExited(&ExitMonitorProcExitErr{
-					Source: "pidfd poll",
+					Source: "pidfd-poll",
 				})
 
 				return
@@ -105,7 +105,7 @@ func notifyProcfsEntryGone(pid int, exitMon *ExitMonitor) error {
 				_, err := os.Stat(procFsPath)
 				if err != nil {
 					exitMon.SetExited(&ExitMonitorProcExitErr{
-						Source: "procfs checker",
+						Source: "procfs-checker",
 					})
 
 					return

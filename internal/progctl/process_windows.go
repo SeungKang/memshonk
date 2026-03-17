@@ -92,10 +92,11 @@ func notifyOnExit(handle syscall.Handle, exitMon *ExitMonitor) error {
 		processHandle := windows.Handle(handle)
 
 		handles := []windows.Handle{processHandle, cancelEvent}
+
 		event, err := windows.WaitForMultipleObjects(handles, false, windows.INFINITE)
 		if err != nil {
 			exitMon.SetExited(&ExitMonitorProcExitErr{
-				Source:        "wait for multiple objects",
+				Source:        "wait-for-multiple-objects",
 				OptMonitorErr: fmt.Errorf("WaitForMultipleObjects failed - %w", err),
 			})
 
@@ -112,12 +113,12 @@ func notifyOnExit(handle syscall.Handle, exitMon *ExitMonitor) error {
 				status := int64(exitCode)
 
 				exitMon.SetExited(&ExitMonitorProcExitErr{
-					Source:        "wait for multiple objects",
+					Source:        "wait-for-multiple-objects",
 					OptExitStatus: &status,
 				})
 			} else {
 				exitMon.SetExited(&ExitMonitorProcExitErr{
-					Source: "wait for multiple objects",
+					Source: "wait-for-multiple-objects",
 				})
 			}
 		case windows.WAIT_OBJECT_0 + 1:

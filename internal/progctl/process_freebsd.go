@@ -93,6 +93,14 @@ func notifyOnProcExit(pid int, exitMon *ExitMonitor) error {
 		// This blocks until the process exits or
 		// the pipe is written to.
 		n, err := unix.Kevent(kq, changes, events, nil)
+		if err != nil {
+			exitMon.SetExited(&ExitMonitorProcExitErr{
+				Source:        "kqueue",
+				OptMonitorErr: fmt.Errorf("kevent failed - %w", err),
+			})
+
+			return
+		}
 
 		if n > 0 && events[0].Fflags&unix.NOTE_EXIT != 0 {
 			exitStatus := events[0].Data
@@ -103,8 +111,7 @@ func notifyOnProcExit(pid int, exitMon *ExitMonitor) error {
 			})
 		} else {
 			exitMon.SetExited(&ExitMonitorProcExitErr{
-				Source:        "kqueue",
-				OptMonitorErr: err,
+				Source: "kqueue",
 			})
 		}
 

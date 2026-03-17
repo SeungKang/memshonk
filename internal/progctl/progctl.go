@@ -222,6 +222,14 @@ func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 		acker:       events.NewAcker(),
 	})
 
+	go func() {
+		<-unexpectedExitMon.Done()
+
+		if !errors.Is(unexpectedExitMon.Err(), ErrDetached) {
+			o.Detach(context.Background())
+		}
+	}()
+
 	return foundPID, nil
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"sync"
 
@@ -234,7 +233,7 @@ func (o *Shell) handleEvents(ctx context.Context) {
 			e.Acker().Ack()
 		case e := <-o.exitedEvents.RecvCh():
 			o.setPrompt(0)
-			log.Printf("process exited - %v", e.Reason)
+			_, _ = fmt.Fprintf(o.session.IO().Stderr, "process exited - %v\n", e.Reason)
 		}
 	}
 }

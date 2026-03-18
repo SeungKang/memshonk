@@ -36,6 +36,7 @@ type Command struct {
 	Fn          func(context.Context) (CommandResult, error)
 	CustomFn    func(context.Context, RunCommandConfig) (CommandResult, error)
 
+	OptLongDesc string
 	OptParent   *Command
 	OptPreRunFn func(context.Context) error
 
@@ -51,14 +52,21 @@ func (o *Command) Name() string {
 }
 
 func (o *Command) PrintUsage() {
-	o.FlagSet.internal.Output().Write([]byte(`SYNOPSIS
+	usage := `SYNOPSIS
 ` + o.synopsis("  ") + `
 
 DESCRIPTION
   ` + o.Description + `
 
-OPTIONS
-`))
+`
+
+	if o.OptLongDesc != "" {
+		usage += o.OptLongDesc + "\n"
+	}
+
+	usage += "OPTIONS\n"
+
+	o.FlagSet.internal.Output().Write([]byte(usage))
 
 	_ = LongArgsUsage(o.FlagSet, 80)
 }

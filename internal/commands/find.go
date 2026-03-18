@@ -77,7 +77,6 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	var err error
 	stringList := strings.Join(o.pattern, " ")
 
-	// TODO: Document encoding formats
 	encodingFormat := o.encodingFormat
 	switch encodingFormat {
 	case stringFindEncoding, utf8FindEncoding:

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
@@ -28,6 +29,12 @@ const (
 	utf16FindEncoding     = "utf16"
 	wstringbeFindEncoding = "wstringbe"
 	utf16beFindEncoding   = "utf16be"
+	float32FindEncoding   = "float32"
+	float32leFindEncoding = "float32le"
+	float32beFindEncoding = "float32be"
+	float64FindEncoding   = "float64"
+	float64leFindEncoding = "float64le"
+	float64beFindEncoding = "float64be"
 	patternFindEncoding   = "pattern"
 )
 
@@ -40,14 +47,20 @@ func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
 	root := fx.NewCommand(FindCommandName, "find data in a process' memory", cmd.run)
 
 	root.OptLongDesc = `ENCODING TYPES
-  ` + utf8FindEncoding + `      - Little endian UTF-8 string
+  ` + utf8FindEncoding + `      - UTF-8 string
   ` + stringFindEncoding + `    - Alias to ` + utf8FindEncoding + `
-  ` + utf16leFindEncoding + `   - UTF-16 little endian string
+  ` + utf16leFindEncoding + `   - UTF-16 string in little endian byte order
   ` + utf16FindEncoding + `     - Alias to ` + utf16leFindEncoding + `
   ` + wstringleFindEncoding + ` - Alias to ` + utf16leFindEncoding + `
   ` + wstringFindEncoding + `   - Alias to ` + utf16leFindEncoding + `
-  ` + utf16beFindEncoding + `   - UTF-16 big endian string
+  ` + utf16beFindEncoding + `   - UTF-16 string in big endian byte order
   ` + wstringbeFindEncoding + ` - Alias to ` + utf16beFindEncoding + `
+  ` + float32leFindEncoding + ` - A 32-bit float in little endian byte order
+  ` + float32FindEncoding + `   - Alias to ` + float32leFindEncoding + `
+  ` + float32beFindEncoding + ` - A 32-bit float in big endian byte order
+  ` + float64leFindEncoding + ` - A 64-bit float in little endian byte order
+  ` + float64FindEncoding + `   - Alias to ` + float64leFindEncoding + `
+  ` + float64beFindEncoding + ` - A 64-bit float in big endian byte order
   ` + patternFindEncoding + `   - Pattern string (refer to "help pattern" for details)
 `
 
@@ -85,6 +98,56 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.LittleEndian)
 	case wstringbeFindEncoding, utf16beFindEncoding:
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.BigEndian)
+	case float32FindEncoding, float32leFindEncoding, float32beFindEncoding:
+		var endian binary.ByteOrder = binary.LittleEndian
+
+		if encodingFormat == float32beFindEncoding {
+			endian = binary.BigEndian
+		}
+
+		var buf bytes.Buffer
+
+		for _, str := range o.pattern {
+			f, err := strconv.ParseFloat(str, 32)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse 32-bit float: %q - %w",
+					str, err)
+			}
+
+			final := float32(f)
+
+			err = binary.Write(&buf, endian, final)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert 32-bit float %v to binary - %w",
+					f, err)
+			}
+		}
+
+		parsedPattern = memory.PatternForRawBytes(buf.Bytes())
+	case float64FindEncoding, float64leFindEncoding, float64beFindEncoding:
+		var endian binary.ByteOrder = binary.LittleEndian
+
+		if encodingFormat == float64beFindEncoding {
+			endian = binary.BigEndian
+		}
+
+		var buf bytes.Buffer
+
+		for _, str := range o.pattern {
+			f, err := strconv.ParseFloat(str, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse 64-bit float: %q - %w",
+					str, err)
+			}
+
+			err = binary.Write(&buf, endian, f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert 64-bit float %v to binary - %w",
+					f, err)
+			}
+		}
+
+		parsedPattern = memory.PatternForRawBytes(buf.Bytes())
 	case patternFindEncoding:
 		parsedPattern, err = memory.ParsePattern(stringList)
 	default:

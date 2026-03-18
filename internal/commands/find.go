@@ -18,22 +18,47 @@ const (
 	FindCommandName = "find"
 )
 
+// Various find command search encoding formats.
+const (
+	stringFindEncoding    = "string"
+	utf8FindEncoding      = "utf8"
+	wstringleFindEncoding = "wstringle"
+	utf16leFindEncoding   = "utf16le"
+	wstringFindEncoding   = "wstring"
+	utf16FindEncoding     = "utf16"
+	wstringbeFindEncoding = "wstringbe"
+	utf16beFindEncoding   = "utf16be"
+	patternFindEncoding   = "pattern"
+)
+
 func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
 	cmd := &FindCommand{
 		session: config.Session,
 		stderr:  config.Stderr,
 	}
 
-	root := fx.NewCommand(FindCommandName, "find a pattern in memory", cmd.run)
+	root := fx.NewCommand(FindCommandName, "find data in a process' memory", cmd.run)
+
+	root.OptLongDesc = `ENCODING TYPES
+  ` + utf8FindEncoding + `      - Little endian UTF-8 string
+  ` + stringFindEncoding + `    - Alias to ` + utf8FindEncoding + `
+  ` + utf16leFindEncoding + `   - UTF-16 little endian string
+  ` + utf16FindEncoding + `     - Alias to ` + utf16leFindEncoding + `
+  ` + wstringleFindEncoding + ` - Alias to ` + utf16leFindEncoding + `
+  ` + wstringFindEncoding + `   - Alias to ` + utf16leFindEncoding + `
+  ` + utf16beFindEncoding + `   - UTF-16 big endian string
+  ` + wstringbeFindEncoding + ` - Alias to ` + utf16beFindEncoding + `
+  ` + patternFindEncoding + `   - Pattern string (refer to "help pattern" for details)
+`
 
 	root.FlagSet.StringFlag(&cmd.encodingFormat, "pattern", fx.ArgConfig{
 		Name:        "encoding",
-		Description: "Optional: Specify encoding format of pattern",
+		Description: "Optional: Specify encoding format of the search string (refer to help page for all possible values)",
 	})
 
 	root.FlagSet.StringSliceNf(&cmd.pattern, fx.ArgConfig{
-		Name:        "pattern",
-		Description: "Byte pattern to search for",
+		Name:        "search-value",
+		Description: "Value to search for",
 		Required:    true,
 	})
 
@@ -55,13 +80,13 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	// TODO: Document encoding formats
 	encodingFormat := o.encodingFormat
 	switch encodingFormat {
-	case "string", "utf8":
+	case stringFindEncoding, utf8FindEncoding:
 		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
-	case "wstringle", "utf16le", "wstring", "utf16":
+	case wstringleFindEncoding, utf16leFindEncoding, wstringFindEncoding, utf16FindEncoding:
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.LittleEndian)
-	case "wstringbe", "utf16be":
+	case wstringbeFindEncoding, utf16beFindEncoding:
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.BigEndian)
-	case "pattern":
+	case patternFindEncoding:
 		parsedPattern, err = memory.ParsePattern(stringList)
 	default:
 		return nil, fmt.Errorf("unknown encoding format: %q", encodingFormat)

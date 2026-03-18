@@ -18,40 +18,104 @@ func NewHelpCommand(config apicompat.NewCommandConfig) *fx.Command {
 		session: config.Session,
 	}
 
-	root := fx.NewCommand(HelpCommandName, "list available commands", cmd.help)
+	root := fx.NewCommand(HelpCommandName, "list available commands and help topics", cmd.run)
 
-	root.FlagSet.StringNf(&cmd.optCommand, fx.ArgConfig{
-		Name:        "command",
-		Description: "optionally display help for a specific command",
+	root.FlagSet.StringNf(&cmd.optTopic, fx.ArgConfig{
+		Name:        "command-or-topic",
+		Description: "Optionally display help for a specific command or topic",
 	})
 
 	return root
 }
 
 type HelpCommand struct {
-	session    apicompat.Session
-	optCommand string
+	session  apicompat.Session
+	optTopic string
 }
 
-func (o *HelpCommand) help(_ context.Context) (fx.CommandResult, error) {
+func (o *HelpCommand) run(_ context.Context) (fx.CommandResult, error) {
 	var sb strings.Builder
 
-	if o.optCommand == "" {
+	if o.optTopic == "" {
+		// Note: It is important that we render the
+		// command list in this method instead of
+		// making it part of the command's usage
+		// because the PrintUsage will trigger
+		// infinite recursive calls to the PrintUsage
+		// method... and yeah, no bueno.
+		sb.WriteString(`OVERVIEW
+  memshonk is like Wireshark, but for process memory. It provides
+  an interactive shell that supports POSIX shell syntax, pipes,
+  job control, and execution of external programs and internal
+  memshonk commands.
+
+TOPICS
+  pattern - Pattern string format used in the "find" command and
+            potentially other commands
+
+COMMANDS
+`)
+
 		cmds := o.session.SharedState().Commands.AsSlice(o.session)
 
-		sb.WriteString("memshonk commands:\n")
+		longest := 0
 
 		for _, cmd := range cmds {
-			fmt.Fprintf(&sb, "  %-15s %s\n", cmd.Name(), cmd.Description)
+			cmdNameLen := len(cmd.Name())
+
+			if cmdNameLen > longest {
+				longest = cmdNameLen
+			}
 		}
 
-		sb.WriteString("\nshell commands and external programs are supported as well")
+		for i, cmd := range cmds {
+			name := cmd.Name()
+			nameLen := len(name)
+
+			var sep string
+
+			switch {
+			case nameLen == longest:
+				sep = " - "
+			case nameLen > longest:
+				sep = strings.Repeat(" ", nameLen-longest) + " - "
+			case longest > nameLen:
+				sep = strings.Repeat(" ", longest-nameLen) + " - "
+			}
+
+			sb.WriteString("  " + name + sep + cmd.Description)
+
+			if len(cmds) > 1 && i != len(cmds)-1 {
+				sb.WriteByte('\n')
+			}
+		}
 
 		return fx.NewHumanCommandResult(sb.String()), nil
-	} else {
-		cmdFn, found := o.session.SharedState().Commands.Lookup(o.optCommand)
+	}
+
+	switch o.optTopic {
+	case "pattern":
+		return fx.NewHumanCommandResult(`PATTERN STRINGS
+  memshonk supports a pattern string format for searching for byte sequences.
+  This format is heavily inspired by video game modding tools which employ
+  a similar pattern format.
+
+  Users can specify a pattern as a hexadecimal string optionall separated
+  by space charcaters. For example, to match four "A" characters, the
+  string would be:
+    41 41 41 41
+
+  ... or:
+    41414141
+
+  Wildcard values can be specified using "??". For example, to match one
+  "A" followed by two bytes of any value and then a "B" the string would
+  look like this:
+    41 ?? ?? 42`), nil
+	default:
+		cmdFn, found := o.session.SharedState().Commands.Lookup(o.optTopic)
 		if !found {
-			return nil, fmt.Errorf("command %q not found", o.optCommand)
+			return nil, fmt.Errorf("unknown help topic or command: %q", o.optTopic)
 		}
 
 		cmd := cmdFn(apicompat.NewCommandConfig{Session: o.session})

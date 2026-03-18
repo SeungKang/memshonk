@@ -44,11 +44,11 @@ func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *Buf
 }
 
 func ParsePatternFromUtf8(s string) (ParsedPattern, error) {
-	return patternFromRawBytes([]byte(s)), nil
+	return PatternForRawBytes([]byte(s)), nil
 }
 
 func ParsePatternFromUtf16(s string, endianness binary.ByteOrder) (ParsedPattern, error) {
-	return patternFromRawBytes(stringToUTF16Bytes(s, endianness)), nil
+	return PatternForRawBytes(stringToUTF16Bytes(s, endianness)), nil
 }
 
 func stringToUTF16Bytes(s string, endianness binary.ByteOrder) []byte {
@@ -119,7 +119,7 @@ func splitByStrLen(s string, chunkSize int) []string {
 	return chunks
 }
 
-func patternFromRawBytes(b []byte) ParsedPattern {
+func PatternForRawBytes(b []byte) ParsedPattern {
 	parts := make([]PatternByte, len(b))
 
 	for i := range b {

@@ -27,6 +27,8 @@ type attachedProcess struct {
 }
 
 func (o *attachedProcess) Close(ctx context.Context) error {
+	o.config.exitMon.SetDetached()
+
 	_ = o.watchers.Close()
 
 	err := o.process.Close()

@@ -96,22 +96,22 @@ func (o *Ctl) Plugin(pluginName string) (plugins.Plugin, error) {
 	return plugin, nil
 }
 
-func (o *Ctl) Reload(ctx context.Context, name string) error {
+func (o *Ctl) Reload(ctx context.Context, args plugins.ReloadPluginArgs) error {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
-	plugin, isLoaded := o.isLoaded(name)
+	plugin, isLoaded := o.isLoaded(args.Name)
 	if !isLoaded {
 		return plugins.ErrPluginNotLoaded
 	}
 
-	err := o.unload(name)
+	err := o.unload(args.Name)
 	if err != nil {
 		return err
 	}
 
 	if len(plugin.config.ExecOnReload) > 0 {
-		err = execReload(ctx, plugin.config)
+		err = execReload(ctx, args, plugin.config)
 		if err != nil {
 			_, loadErr := o.load(plugin.config)
 			if loadErr == nil {

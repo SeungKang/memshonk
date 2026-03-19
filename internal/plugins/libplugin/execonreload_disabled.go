@@ -8,6 +8,6 @@ import (
 	"github.com/SeungKang/memshonk/internal/plugins"
 )
 
-func execReload(ctx context.Context, config plugins.PluginConfig) error {
+func execReload(context.Context, plugins.ReloadPluginArgs, plugins.PluginConfig) error {
 	return plugins.ErrExecOnReloadDisabled
 }

@@ -3,6 +3,7 @@ package plugins
 import (
 	"context"
 	"errors"
+	"io"
 )
 
 var (
@@ -21,7 +22,7 @@ type Ctl interface {
 
 	Plugin(name string) (Plugin, error)
 
-	Reload(ctx context.Context, name string) error
+	Reload(ctx context.Context, args ReloadPluginArgs) error
 
 	Unload(name string) error
 
@@ -46,6 +47,14 @@ type Plugin interface {
 	IterCommands(func(Command) error) error
 
 	PrettyString(indent string) string
+}
+
+type ReloadPluginArgs struct {
+	Name string
+
+	Stdout io.Writer
+
+	Stderr io.Writer
 }
 
 type Parser interface {

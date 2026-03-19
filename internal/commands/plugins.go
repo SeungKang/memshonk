@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"io"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/fx"
@@ -17,6 +18,8 @@ func NewPluginsCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	pluginsCmd := PluginsCommand{
 		Session: config.Session,
+		Stderr:  config.Stderr,
+		Stdout:  config.Stdout,
 		Ctl:     pluginsCtl,
 	}
 
@@ -57,6 +60,8 @@ func NewPluginsCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 type PluginsCommand struct {
 	Session              apicompat.Session
+	Stderr               io.Writer
+	Stdout               io.Writer
 	PluginNameOrFilePath string
 	Ctl                  plugins.Ctl
 }
@@ -90,7 +95,11 @@ func (o *PluginsCommand) load(_ context.Context) (fx.CommandResult, error) {
 func (o *PluginsCommand) reload(ctx context.Context) (fx.CommandResult, error) {
 	o.Session.SharedState().Commands.Unregister(o.PluginNameOrFilePath)
 
-	err := o.Ctl.Reload(ctx, o.PluginNameOrFilePath)
+	err := o.Ctl.Reload(ctx, plugins.ReloadPluginArgs{
+		Name:   o.PluginNameOrFilePath,
+		Stderr: o.Stderr,
+		Stdout: o.Stdout,
+	})
 	if err != nil {
 		return nil, err
 	}

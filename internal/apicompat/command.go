@@ -223,7 +223,7 @@ func (o *CommandHandler) Run(ctx context.Context, config RunCommandConfig) *Comm
 	wasHandled, err := o.runInternalCommand(ctx, config)
 	if err != nil {
 		if !errors.Is(err, flag.ErrHelp) {
-			fmt.Fprintf(config.Stderr, "%s failed - %s\n", config.Argv[0], err)
+			fmt.Fprintln(config.Stderr, err.Error())
 		}
 
 		return err
@@ -237,7 +237,7 @@ func (o *CommandHandler) Run(ctx context.Context, config RunCommandConfig) *Comm
 	if err != nil {
 		_, hasExitStatus := err.HasExitStatus()
 		if !hasExitStatus {
-			fmt.Fprintf(config.Stderr, "%s failed - %s\n", config.Argv[0], err)
+			fmt.Fprintln(config.Stderr, err.Error())
 		}
 
 		return err

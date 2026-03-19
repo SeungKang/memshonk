@@ -83,3 +83,7 @@
 
 - Create project file based on current settings (i.e., serialize current
   project.Project object to ini)
+
+## bugs
+
+- hanging when running "winpty go run -tags plugins_execonreload main.go -p examples/mass-effect-3.txt" stuck at "connecting to daemon..."

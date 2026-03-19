@@ -475,7 +475,7 @@ func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, 
 			return err
 		}
 
-		procReader.OffsetBy(2)
+		procReader.OffsetBy(4)
 
 		delim := byte(' ')
 
@@ -533,7 +533,7 @@ func (o *ReadCommand) doFloat64(ctx context.Context, procReader *processReader, 
 			return err
 		}
 
-		procReader.OffsetBy(2)
+		procReader.OffsetBy(8)
 
 		delim := byte(' ')
 

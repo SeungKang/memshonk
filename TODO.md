@@ -31,10 +31,6 @@
 - helper function for reading data from process using a pointer to a `Vec<u8>`
 - investigate rust macro to generate ffi functions
 
-## vmmap
-
-- fix the permissions are not showing up correctly on windows
-
 ## progctl
 
 - Need to implement Suspend and Resume methods for WindowsProcess

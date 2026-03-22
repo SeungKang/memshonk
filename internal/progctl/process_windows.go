@@ -309,9 +309,9 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 		region.State = memory.MemFree
 	}
 
-	info.AllocationProtect &= ^(kernel32.PageGuard | kernel32.PageNoCache)
+	info.Protect &= ^(kernel32.PageGuard | kernel32.PageNoCache)
 
-	switch info.AllocationProtect {
+	switch info.Protect {
 	case kernel32.PageExecute:
 		region.Executable = true
 	case kernel32.PageExecuteRead:
@@ -322,7 +322,6 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 		region.Readable = true
 		region.Writeable = true
 	case kernel32.PageExecuteWriteCopy:
-		region.Readable = true
 		region.Executable = true
 		region.Writeable = true
 		region.Copyable = true
@@ -334,7 +333,6 @@ func memBasicInfoToRegion(info kernel32.MEMORY_BASIC_INFORMATION) memory.Region 
 		region.Readable = true
 		region.Writeable = true
 	case kernel32.PageWriteCopy:
-		region.Readable = true
 		region.Writeable = true
 		region.Copyable = true
 	}

@@ -43,11 +43,19 @@ func (o *FlagSet) Actual() *flag.FlagSet {
 
 func (o *FlagSet) VisitAll(fn func(ArgInfo)) {
 	o.internal.VisitAll(func(f *flag.Flag) {
+		var optShortName string
+
+		short := o.internal.Lookup(f.Name[:1])
+		if short != nil {
+			optShortName = short.Name
+		}
+
 		fn(ArgInfo{
 			Config: ArgConfig{
-				Name:        f.Name,
-				Description: f.Usage,
-				Required:    o.required[f.Name],
+				Name:         f.Name,
+				Description:  f.Usage,
+				Required:     o.required[f.Name],
+				OptShortName: optShortName,
 			},
 			IsFlag:  true,
 			OptFlag: f,
@@ -203,10 +211,18 @@ func LongArgsUsage(set *FlagSet, maxLineLength uint64) error {
 			}
 		}
 
-		err := argString(argHeading, f, 2, writer)
+		usageInfo, err := writeArgAndDatatypeLine(argHeading, f, 2, writer)
 		if err != nil {
 			finalErr = err
 			return
+		}
+
+		var usage string
+
+		if usageInfo.RemoveBackticks {
+			usage = strings.ReplaceAll(f.Usage, "`", "")
+		} else {
+			usage = f.Usage
 		}
 
 		_, err = writer.Write([]byte{'\n'})
@@ -216,7 +232,7 @@ func LongArgsUsage(set *FlagSet, maxLineLength uint64) error {
 		}
 
 		err = writeStringWithIndent(writeStringWithIndentArgs{
-			str:    f.Usage,
+			str:    usage,
 			indent: 6,
 			max:    int(maxLineLength),
 			w:      writer,
@@ -232,84 +248,49 @@ func LongArgsUsage(set *FlagSet, maxLineLength uint64) error {
 	return finalErr
 }
 
-func argString(args string, f *flag.Flag, indent int, w io.Writer) error {
+func writeArgAndDatatypeLine(argsWithDashes string, f *flag.Flag, indent int, w io.Writer) (flagUsageInfo, error) {
 	_, err := w.Write(bytes.Repeat([]byte{' '}, indent))
 	if err != nil {
-		return err
+		return flagUsageInfo{}, err
 	}
 
-	_, err = w.Write([]byte(args))
+	_, err = w.Write([]byte(argsWithDashes))
 	if err != nil {
-		return err
+		return flagUsageInfo{}, err
 	}
 
-	isBool := false
-	isStr := false
-	var got interface{}
+	usageInfo := getFlagUsageInfo(f)
 
-	if getter, isGetter := f.Value.(flag.Getter); isGetter {
-		got = getter.Get()
-		switch got.(type) {
-		case bool:
-			isBool = true
-		case string:
-			isStr = true
+	if usageInfo.DatatypeStr != "" {
+		if usageInfo.DoNotMarkup {
+			_, err = w.Write([]byte(usageInfo.DatatypeStr))
+		} else {
+			_, err = fmt.Fprintf(w, " <%s>", usageInfo.DatatypeStr)
 		}
-	}
 
-	switch v := f.Value.(type) {
-	case FullTypeHinter:
-		_, err = w.Write([]byte(v.FullTypeHint()))
 		if err != nil {
-			return err
+			return flagUsageInfo{}, err
 		}
-	case TypeHinter:
-		_, err = w.Write([]byte(fmt.Sprintf(" <%T>", v.TypeHint())))
+
+		defValueStr := " (default: "
+		if usageInfo.QuoteDefaultValue {
+			defValueStr += `"` + usageInfo.DefaultValueStr + `"`
+		} else {
+			defValueStr += usageInfo.DefaultValueStr
+		}
+		defValueStr += ")"
+
+		_, err := w.Write([]byte(defValueStr))
 		if err != nil {
-			return err
-		}
-	default:
-		if !isBool && got != nil {
-			_, err = w.Write([]byte(fmt.Sprintf(" <%T>", got)))
-			if err != nil {
-				return err
-			}
+			return flagUsageInfo{}, err
 		}
 	}
 
-	if !isBool {
-		err = argDefaultValueStr(f, isStr, w)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return usageInfo, nil
 }
 
-func argDefaultValueStr(f *flag.Flag, isStrType bool, w io.Writer) error {
-	var defValue string
-
-	hinter, ok := f.Value.(DefaultValueHinter)
-	switch {
-	case ok:
-		defValue = hinter.DefaultValueHint()
-	case f.DefValue != "":
-		defValue = f.DefValue
-	default:
-		return nil
-	}
-
-	fmtStr := " (default: %"
-	if isStrType {
-		fmtStr += "q"
-	} else {
-		fmtStr += "s"
-	}
-	fmtStr += ")"
-
-	_, err := w.Write([]byte(fmt.Sprintf(fmtStr, defValue)))
-	return err
+type argWriterInfo struct {
+	RemoveBackticks bool
 }
 
 type TypeHinter interface {
@@ -387,7 +368,38 @@ func walkBackUntilWords(str string) int {
 	return len(str)
 }
 
-func flagDataType(f *flag.Flag) string {
+func getFlagUsageInfo(f *flag.Flag) flagUsageInfo {
+	var info flagUsageInfo
+
+	//
+	// Begin flag default value information.
+	//
+
+	var actualDefaultValue interface{}
+
+	if getter, isGetter := f.Value.(flag.Getter); isGetter {
+		actualDefaultValue = getter.Get()
+
+		switch actualDefaultValue.(type) {
+		case bool:
+			return info
+		case string:
+			info.QuoteDefaultValue = true
+		}
+	}
+
+	hinter, ok := f.Value.(DefaultValueHinter)
+	switch {
+	case ok:
+		info.DefaultValueStr = hinter.DefaultValueHint()
+	case f.DefValue != "":
+		info.DefaultValueStr = f.DefValue
+	}
+
+	//
+	// Begin flag data type information.
+	//
+
 	backtickStart := strings.Index(f.Usage, "`")
 
 	if backtickStart > -1 {
@@ -405,21 +417,34 @@ func flagDataType(f *flag.Flag) string {
 			// end += 5 == 8
 			end += backtickStart + 1
 
-			return f.Usage[backtickStart:end]
+			info.DatatypeStr = f.Usage[backtickStart+1 : end]
+			info.RemoveBackticks = true
+
+			return info
 		}
 	}
 
-	if getter, isGetter := f.Value.(flag.Getter); isGetter {
-		var got interface{}
-
-		got = getter.Get()
-		switch got.(type) {
-		case bool:
-			return ""
-		default:
-			return fmt.Sprintf("%T", got)
+	switch flagValue := f.Value.(type) {
+	case FullTypeHinter:
+		info.DatatypeStr = flagValue.FullTypeHint()
+		info.DoNotMarkup = true
+	case TypeHinter:
+		info.DatatypeStr = flagValue.TypeHint()
+	default:
+		if actualDefaultValue != nil {
+			info.DatatypeStr = fmt.Sprintf("%T", actualDefaultValue)
+		} else {
+			info.DatatypeStr = fmt.Sprintf("%T", flagValue)
 		}
 	}
 
-	return ""
+	return info
+}
+
+type flagUsageInfo struct {
+	DatatypeStr       string
+	DefaultValueStr   string
+	QuoteDefaultValue bool
+	DoNotMarkup       bool
+	RemoveBackticks   bool
 }

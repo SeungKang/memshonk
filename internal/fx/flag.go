@@ -11,6 +11,8 @@ type ArgConfig struct {
 	Name        string
 	Description string
 	Required    bool
+
+	OptShortName string
 }
 
 // BoolFlag defines a bool flag with the specified default value and config.

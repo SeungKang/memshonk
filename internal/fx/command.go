@@ -99,12 +99,22 @@ func (o *Command) synopsis(indent string) string {
 		if info.IsFlag {
 			hasOptions = true
 
-			if info.Config.Required && len(info.Config.Name) == 1 {
+			if info.Config.Required {
 				if flags != "" {
 					flags += " "
 				}
 
-				flags += "-" + info.Config.Name + " " + flagDataType(info.OptFlag)
+				dashes := "--"
+				name := info.Config.Name
+
+				if info.Config.OptShortName != "" {
+					dashes = "-"
+					name = info.Config.OptShortName
+				}
+
+				usageInfo := getFlagUsageInfo(info.OptFlag)
+
+				flags += dashes + name + " " + usageInfo.DatatypeStr
 			}
 		} else {
 			if nonFlags != "" {

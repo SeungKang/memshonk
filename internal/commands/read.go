@@ -27,11 +27,11 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 		session: config.Session,
 	}
 
-	root := fx.NewCommand(ReadCommandName, "read data from an address", cmd.run)
+	root := fx.NewCommand(ReadCommandName, "read data from process memory", cmd.run)
 
 	root.FlagSet.StringFlag(&cmd.dataType, rawDataType, fx.ArgConfig{
 		Name:        "datatype",
-		Description: "The data type to read (refer to \"help datatypes\")",
+		Description: "The `datatype` to read (refer to \"help datatypes\")",
 	})
 
 	root.FlagSet.Uint64Flag(&cmd.sizeBytes, 0, fx.ArgConfig{
@@ -46,12 +46,12 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.outputFormat, "", fx.ArgConfig{
 		Name:        "output-format",
-		Description: "The data type to read (refer to \"help formats\")",
+		Description: "The output `format` of the data (refer to \"help formats\")",
 	})
 
-	root.FlagSet.StringNf(&cmd.addrStr, fx.ArgConfig{
+	root.FlagSet.StringFlag(&cmd.addrStr, "", fx.ArgConfig{
 		Name:        "addr",
-		Description: "address to read from",
+		Description: "`address` to read from",
 		Required:    true,
 	})
 
@@ -163,14 +163,14 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 		return readNumBytesRequiredErr(o.dataType)
 	}
 
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	switch o.dataType {
+	case stringbeDataType, utf8beDataType:
+		endian = binary.BigEndian
+	}
+
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		switch o.dataType {
-		case stringbeDataType, utf8beDataType:
-			endian = binary.BigEndian
-		}
-
 		var v []byte
 
 		err := binary.Read(procReader, endian, &v)
@@ -222,18 +222,18 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 		return readNumBytesRequiredErr(o.dataType)
 	}
 
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	switch o.dataType {
+	case utf16beDataType, wstringbeDataType:
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		switch o.dataType {
-		case utf16beDataType, wstringbeDataType:
-			endian = binary.BigEndian
-		}
-
 		var v []uint16
 
 		err := binary.Read(procReader, endian, &v)
@@ -283,17 +283,17 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 }
 
 func (o *ReadCommand) doUnit16(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	if o.dataType == uint16beDataType {
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		if o.dataType == uint16beDataType {
-			endian = binary.BigEndian
-		}
-
 		var v uint16
 
 		err := binary.Read(procReader, endian, &v)
@@ -341,17 +341,17 @@ func (o *ReadCommand) doUnit16(ctx context.Context, procReader *processReader, i
 }
 
 func (o *ReadCommand) doUint32(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	if o.dataType == uint16beDataType {
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		if o.dataType == uint16beDataType {
-			endian = binary.BigEndian
-		}
-
 		var v uint32
 
 		err := binary.Read(procReader, endian, &v)
@@ -399,17 +399,17 @@ func (o *ReadCommand) doUint32(ctx context.Context, procReader *processReader, i
 }
 
 func (o *ReadCommand) doUint64(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	if o.dataType == uint16beDataType {
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		if o.dataType == uint16beDataType {
-			endian = binary.BigEndian
-		}
-
 		var v uint64
 
 		err := binary.Read(procReader, endian, &v)
@@ -457,17 +457,17 @@ func (o *ReadCommand) doUint64(ctx context.Context, procReader *processReader, i
 }
 
 func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	if o.dataType == uint16beDataType {
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		if o.dataType == uint16beDataType {
-			endian = binary.BigEndian
-		}
-
 		var v float32
 
 		err := binary.Read(procReader, endian, &v)
@@ -515,17 +515,17 @@ func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, 
 }
 
 func (o *ReadCommand) doFloat64(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	if o.dataType == uint16beDataType {
+		endian = binary.BigEndian
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var endian binary.ByteOrder = binary.LittleEndian
-
-		if o.dataType == uint16beDataType {
-			endian = binary.BigEndian
-		}
-
 		var v float64
 
 		err := binary.Read(procReader, endian, &v)
@@ -602,10 +602,10 @@ func (o *processReader) Read(b []byte) (int, error) {
 	var err error
 	size := uint64(len(b))
 
-	if o.lastReadAddr == 0 {
-		data, actualAddr, err = o.process.ReadFromLookup(o.ctx, o.addr, size)
-	} else {
+	if o.useLastReadAddr {
 		data, actualAddr, err = o.process.ReadFromAddr(o.ctx, memory.AbsoluteAddrPointer(o.lastReadAddr), size)
+	} else {
+		data, actualAddr, err = o.process.ReadFromLookup(o.ctx, o.addr, size)
 	}
 
 	if err != nil {

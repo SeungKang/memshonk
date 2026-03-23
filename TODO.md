@@ -83,3 +83,4 @@
 ## bugs
 
 - hanging when running "winpty go run -tags plugins_execonreload main.go -p examples/mass-effect-3.txt" stuck at "connecting to daemon..."
+- Handling of terminal cursor when it wraps on to the next line (there needs to be ~half the terminal rows filled for this to happen)

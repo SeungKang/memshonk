@@ -592,8 +592,8 @@ type processReader struct {
 
 	saveReadsTo io.Writer
 
-	useLastReadAddr bool
-	lastReadAddr    uintptr
+	nextReadAddr uintptr
+	lastReadAddr uintptr
 }
 
 func (o *processReader) Read(b []byte) (int, error) {
@@ -602,7 +602,7 @@ func (o *processReader) Read(b []byte) (int, error) {
 	var err error
 	size := uint64(len(b))
 
-	if o.useLastReadAddr {
+	if o.nextReadAddr > 0 {
 		data, actualAddr, err = o.process.ReadFromAddr(o.ctx, memory.AbsoluteAddrPointer(o.lastReadAddr), size)
 	} else {
 		data, actualAddr, err = o.process.ReadFromLookup(o.ctx, o.addr, size)
@@ -631,11 +631,7 @@ func (o *processReader) SaveReadsTo(w io.Writer) {
 }
 
 func (o *processReader) OffsetBy(i int64) {
-	if !o.useLastReadAddr {
-		o.useLastReadAddr = true
-	}
-
-	o.lastReadAddr += uintptr(i)
+	o.nextReadAddr += uintptr(i)
 }
 
 func (o *processReader) LastReadAddr() uintptr {

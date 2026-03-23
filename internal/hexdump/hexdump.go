@@ -120,10 +120,10 @@ func dumpRow(args dumpRowArgs) error {
 
 	// offset section
 	if args.totalLen > uint64(args.dataCap) {
-		s = fmt.Sprintf("\n%0"+args.padOffCol+"x   ",
+		s = fmt.Sprintf("\n0x%0"+args.padOffCol+"x   ",
 			(args.totalLen-uint64(dataLen))+args.adjustOff)
 	} else {
-		s = fmt.Sprintf("%0"+args.padOffCol+"x   ",
+		s = fmt.Sprintf("0x%0"+args.padOffCol+"x   ",
 			args.adjustOff)
 	}
 

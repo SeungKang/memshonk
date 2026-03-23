@@ -20,10 +20,13 @@ type ArgConfig struct {
 // A short alias using the first character is added if available.
 func (o *FlagSet) BoolFlag(p *bool, defValue bool, cfg ArgConfig) {
 	o.internal.BoolVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.BoolVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.BoolVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // IntFlag defines an int flag with the specified default value and config.
@@ -31,10 +34,13 @@ func (o *FlagSet) BoolFlag(p *bool, defValue bool, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) IntFlag(p *int, defValue int, cfg ArgConfig) {
 	o.internal.IntVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.IntVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.IntVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // Int64Flag defines an int64 flag with the specified default value and config.
@@ -42,10 +48,13 @@ func (o *FlagSet) IntFlag(p *int, defValue int, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) Int64Flag(p *int64, defValue int64, cfg ArgConfig) {
 	o.internal.Int64Var(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Int64Var(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Int64Var(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // UintFlag defines a uint flag with the specified default value and config.
@@ -53,10 +62,13 @@ func (o *FlagSet) Int64Flag(p *int64, defValue int64, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) UintFlag(p *uint, defValue uint, cfg ArgConfig) {
 	o.internal.UintVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.UintVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.UintVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // Uint64Flag defines a uint64 flag with the specified default value and config.
@@ -64,10 +76,13 @@ func (o *FlagSet) UintFlag(p *uint, defValue uint, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) Uint64Flag(p *uint64, defValue uint64, cfg ArgConfig) {
 	o.internal.Uint64Var(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Uint64Var(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Uint64Var(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // StringFlag defines a string flag with the specified default value and config.
@@ -75,10 +90,13 @@ func (o *FlagSet) Uint64Flag(p *uint64, defValue uint64, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) StringFlag(p *string, defValue string, cfg ArgConfig) {
 	o.internal.StringVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.StringVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.StringVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // Float64Flag defines a float64 flag with the specified default value
@@ -87,10 +105,13 @@ func (o *FlagSet) StringFlag(p *string, defValue string, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) Float64Flag(p *float64, defValue float64, cfg ArgConfig) {
 	o.internal.Float64Var(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Float64Var(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Float64Var(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // DurationFlag defines a time.Duration flag with the specified default
@@ -99,10 +120,13 @@ func (o *FlagSet) Float64Flag(p *float64, defValue float64, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) DurationFlag(p *time.Duration, defValue time.Duration, cfg ArgConfig) {
 	o.internal.DurationVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.DurationVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.DurationVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // TextFlag defines a flag with the specified default value and config.
@@ -113,10 +137,13 @@ func (o *FlagSet) DurationFlag(p *time.Duration, defValue time.Duration, cfg Arg
 // A short alias using the first character is added if available.
 func (o *FlagSet) TextFlag(p encoding.TextUnmarshaler, defValue encoding.TextMarshaler, cfg ArgConfig) {
 	o.internal.TextVar(p, cfg.Name, defValue, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.TextVar(p, short, defValue, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.TextVar(p, short, defValue, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // FuncFlag defines a flag with the specified config.
@@ -126,10 +153,13 @@ func (o *FlagSet) TextFlag(p encoding.TextUnmarshaler, defValue encoding.TextMar
 // A short alias using the first character is added if available.
 func (o *FlagSet) FuncFlag(fn func(string) error, cfg ArgConfig) {
 	o.internal.Func(cfg.Name, cfg.Description, fn)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Func(short, cfg.Description, fn)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Func(short, cfg.Description, fn)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // BoolFuncFlag defines a flag with the specified config without requiring
@@ -140,10 +170,13 @@ func (o *FlagSet) FuncFlag(fn func(string) error, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) BoolFuncFlag(fn func(string) error, cfg ArgConfig) {
 	o.internal.BoolFunc(cfg.Name, cfg.Description, fn)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.BoolFunc(short, cfg.Description, fn)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.BoolFunc(short, cfg.Description, fn)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // VarFlag defines a flag with the specified value and config.
@@ -153,8 +186,11 @@ func (o *FlagSet) BoolFuncFlag(fn func(string) error, cfg ArgConfig) {
 // A short alias using the first character is added if available.
 func (o *FlagSet) VarFlag(defValue flag.Value, cfg ArgConfig) {
 	o.internal.Var(defValue, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(defValue, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(defValue, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }

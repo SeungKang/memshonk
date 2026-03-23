@@ -31,9 +31,10 @@ func Wrap(fset *flag.FlagSet) *FlagSet {
 // When a flag with a multi-character name is added, a short alias using
 // the first character is automatically registered if not already taken.
 type FlagSet struct {
-	internal *flag.FlagSet
-	required map[string]bool
-	nonflags []nonflagDef
+	internal      *flag.FlagSet
+	flags         map[string]*ArgConfig
+	requiredFlags map[string][]*flag.Flag
+	nonflags      []nonflagDef
 }
 
 // Actual returns the underlying flag.FlagSet.
@@ -43,20 +44,14 @@ func (o *FlagSet) Actual() *flag.FlagSet {
 
 func (o *FlagSet) VisitAll(fn func(ArgInfo)) {
 	o.internal.VisitAll(func(f *flag.Flag) {
-		var optShortName string
+		config := o.flags[f.Name]
 
-		short := o.internal.Lookup(f.Name[:1])
-		if short != nil {
-			optShortName = short.Name
+		if config == nil {
+			return
 		}
 
 		fn(ArgInfo{
-			Config: ArgConfig{
-				Name:         f.Name,
-				Description:  f.Usage,
-				Required:     o.required[f.Name],
-				OptShortName: optShortName,
-			},
+			Config:  *config,
 			IsFlag:  true,
 			OptFlag: f,
 		})
@@ -84,22 +79,42 @@ func (o *FlagSet) Parse(arguments []string) error {
 		return err
 	}
 
-	// Build a set of flags that were actually set
-	set := make(map[string]bool)
+	// Build a provided of flags that were actually provided
+	provided := make(map[string]bool)
 	o.internal.Visit(func(f *flag.Flag) {
-		set[f.Name] = true
+		provided[f.Name] = true
 	})
 
 	// Check that all required flags were provided
-	for name := range o.required {
-		if !set[name] {
-			return fmt.Errorf("required flag not provided: -%s", name)
+nextRequiredFlag:
+	for _, candidates := range o.requiredFlags {
+		for _, candidate := range candidates {
+			if provided[candidate.Name] {
+				continue nextRequiredFlag
+			}
 		}
+
+		var flagsStr string
+
+		for i, candidate := range candidates {
+			if len(candidate.Name) == 1 {
+				flagsStr += "-" + candidate.Name
+			} else {
+				flagsStr += "--" + candidate.Name
+			}
+
+			if len(candidates) > 1 && i != len(candidates)-1 {
+				flagsStr += " or "
+			}
+		}
+
+		return fmt.Errorf("required flag(s) not provided: %s", flagsStr)
 	}
 
 	// Process positional arguments
 	args := o.internal.Args()
 	argIdx := 0
+
 	for _, nf := range o.nonflags {
 		if nf.isSlice {
 			// Slice consumes all remaining arguments
@@ -112,6 +127,7 @@ func (o *FlagSet) Parse(arguments []string) error {
 				}
 				argIdx++
 			}
+
 			if nf.config.Required && argIdx == startIdx {
 				return fmt.Errorf("required argument not provided: %s",
 					nf.config.Name)
@@ -122,13 +138,16 @@ func (o *FlagSet) Parse(arguments []string) error {
 					return fmt.Errorf("required argument not provided: %s",
 						nf.config.Name)
 				}
+
 				continue
 			}
+
 			err = nf.setter(args[argIdx])
 			if err != nil {
 				return fmt.Errorf("invalid value %q for %s: %w",
 					args[argIdx], nf.config.Name, err)
 			}
+
 			argIdx++
 		}
 	}
@@ -136,25 +155,49 @@ func (o *FlagSet) Parse(arguments []string) error {
 	return nil
 }
 
-// addShort adds a short alias for a flag if the name is multi-character
-// and the short form is not already registered.
-func (o *FlagSet) addShort(name string, adder func(short string)) {
-	if len(name) > 1 {
-		short := name[:1]
-		if o.internal.Lookup(short) == nil {
-			adder(short)
-		}
-	}
+type registerFlagConfig struct {
+	argConfig     ArgConfig
+	optAddShortFn func(shortName string)
 }
 
-// trackRequired adds the flag name to the required list if cfg.Required is true.
-func (o *FlagSet) trackRequired(cfg ArgConfig) {
-	if cfg.Required {
-		if o.required == nil {
-			o.required = make(map[string]bool)
+func (o *FlagSet) registerFlag(config registerFlagConfig) {
+	if o.flags == nil {
+		o.flags = make(map[string]*ArgConfig)
+	}
+
+	o.flags[config.argConfig.Name] = &config.argConfig
+
+	var short *flag.Flag
+
+	if config.optAddShortFn != nil && len(config.argConfig.Name) > 1 {
+		shortName := config.argConfig.Name[:1]
+
+		short = o.internal.Lookup(shortName)
+
+		if short == nil {
+			config.argConfig.OptShortName = shortName
+
+			config.optAddShortFn(shortName)
+
+			short = o.internal.Lookup(shortName)
+		}
+	}
+
+	if config.argConfig.Required {
+		if o.requiredFlags == nil {
+			o.requiredFlags = make(map[string][]*flag.Flag)
 		}
 
-		o.required[cfg.Name] = true
+		long := o.internal.Lookup(config.argConfig.Name)
+
+		var flagCandidates []*flag.Flag
+		if short == nil {
+			flagCandidates = []*flag.Flag{long}
+		} else {
+			flagCandidates = []*flag.Flag{long, short}
+		}
+
+		o.requiredFlags[config.argConfig.Name] = flagCandidates
 	}
 }
 

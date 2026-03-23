@@ -180,10 +180,13 @@ func (o *durationSliceValue) Set(s string) error {
 func (o *FlagSet) IntSliceFlag(p *[]int, cfg ArgConfig) {
 	v := &intSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
 }
 
 // Int64SliceFlag defines a repeatable int64 flag with the specified
@@ -193,10 +196,14 @@ func (o *FlagSet) IntSliceFlag(p *[]int, cfg ArgConfig) {
 func (o *FlagSet) Int64SliceFlag(p *[]int64, cfg ArgConfig) {
 	v := &int64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }
 
 // UintSliceFlag defines a repeatable uint flag with the specified config.
@@ -206,10 +213,14 @@ func (o *FlagSet) Int64SliceFlag(p *[]int64, cfg ArgConfig) {
 func (o *FlagSet) UintSliceFlag(p *[]uint, cfg ArgConfig) {
 	v := &uintSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }
 
 // Uint64SliceFlag defines a repeatable uint64 flag with the specified
@@ -219,10 +230,14 @@ func (o *FlagSet) UintSliceFlag(p *[]uint, cfg ArgConfig) {
 func (o *FlagSet) Uint64SliceFlag(p *[]uint64, cfg ArgConfig) {
 	v := &uint64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }
 
 // StringSliceFlag defines a repeatable string flag with the specified
@@ -232,10 +247,14 @@ func (o *FlagSet) Uint64SliceFlag(p *[]uint64, cfg ArgConfig) {
 func (o *FlagSet) StringSliceFlag(p *[]string, cfg ArgConfig) {
 	v := &stringSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }
 
 // Float64SliceFlag defines a repeatable float64 flag with the specified
@@ -245,10 +264,14 @@ func (o *FlagSet) StringSliceFlag(p *[]string, cfg ArgConfig) {
 func (o *FlagSet) Float64SliceFlag(p *[]float64, cfg ArgConfig) {
 	v := &float64SliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }
 
 // DurationSliceFlag defines a repeatable time.Duration flag with the
@@ -258,8 +281,12 @@ func (o *FlagSet) Float64SliceFlag(p *[]float64, cfg ArgConfig) {
 func (o *FlagSet) DurationSliceFlag(p *[]time.Duration, cfg ArgConfig) {
 	v := &durationSliceValue{p: p}
 	o.internal.Var(v, cfg.Name, cfg.Description)
-	o.addShort(cfg.Name, func(short string) {
-		o.internal.Var(v, short, cfg.Description)
+
+	o.registerFlag(registerFlagConfig{
+		argConfig: cfg,
+		optAddShortFn: func(short string) {
+			o.internal.Var(v, short, cfg.Description)
+		},
 	})
-	o.trackRequired(cfg)
+
 }

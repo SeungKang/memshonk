@@ -112,9 +112,9 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 	}
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		b := make([]byte, o.sizeBytes)
+		v := make([]byte, o.sizeBytes)
 
-		_, err := procReader.Read(b)
+		_, err := procReader.Read(v)
 		if err != nil {
 			return err
 		}
@@ -125,12 +125,12 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 
 		switch o.outputFormat {
 		case rawEncoding:
-			sb.Write(b)
+			sb.Write(v)
 		case hexdumpEncoding, "":
 			delim = '\n'
 
 			err = hexdump.Dump(ctx, hexdump.Config{
-				Src:            bytes.NewReader(b),
+				Src:            bytes.NewReader(v),
 				Dst:            sb,
 				Colors:         hexdump.NewColors(),
 				OptStartOffset: uint64(procReader.LastReadAddr()),
@@ -140,11 +140,11 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 				return fmt.Errorf("failed to hexdump data - %w", err)
 			}
 		case binaryEncoding:
-			for i := range b {
-				sb.WriteString(fmt.Sprintf(fmt.Sprintf("%08b", b[i])))
+			for i := range v {
+				sb.WriteString(fmt.Sprintf(fmt.Sprintf("%08b", v[i])))
 			}
 		case hexEncoding:
-			sb.Write([]byte(hex.EncodeToString(b)))
+			sb.Write([]byte(hex.EncodeToString(v)))
 		default:
 			return fmt.Errorf("unsupported output format for raw: %q",
 				o.outputFormat)
@@ -171,7 +171,7 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 	}
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var v []byte
+		v := make([]byte, o.sizeBytes)
 
 		err := binary.Read(procReader, endian, &v)
 		if err != nil {
@@ -234,7 +234,7 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 	procReader.SaveReadsTo(&buf)
 
 	for i := uint64(0); i < o.numInstances; i++ {
-		var v []uint16
+		v := make([]uint16, o.sizeBytes)
 
 		err := binary.Read(procReader, endian, &v)
 		if err != nil {

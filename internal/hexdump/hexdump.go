@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -17,17 +17,17 @@ const (
 )
 
 type Config struct {
-	Src    io.Reader
-	Dst    io.Writer
-	Colors Colors
+	Src io.Reader
+	Dst io.Writer
 
+	OptStyle       Style
 	OptTitle       string
 	OptRowLen      uint16
 	OptStartOffset uint64
 	OptOffsetBits  uint8
 }
 
-func (o Config) OutputLen(totalInputBytes uint64) (int, int, error) {
+func (o Config) OutputLen(totalInputBytes uint64) (totalBytes int, numNewLines int, _ error) {
 	if o.OptRowLen == 0 {
 		o.OptRowLen = defMaxRowLen
 	}
@@ -63,14 +63,24 @@ func Dump(ctx context.Context, config Config) error {
 		offsetPadStr = strconv.FormatUint(uint64(config.OptOffsetBits/4), 10)
 	}
 
+	if config.OptStyle == nil {
+		config.OptStyle = DefaultStyle{
+			Colors: NewByteColors(),
+		}
+	}
+
 	data := make([]byte, maxRowLen)
 
-	rowArgs := dumpRowArgs{
+	optColors, _ := config.OptStyle.HasColors()
+
+	rowArgs := &dumpRowArgs{
 		writer:    bufW,
 		dataCap:   cap(data),
-		colors:    config.Colors,
 		padOffCol: offsetPadStr,
 		adjustOff: config.OptStartOffset,
+		style:     config.OptStyle,
+		optColors: optColors,
+		sectionSp: config.OptStyle.SectionSpacing(),
 	}
 
 	if config.OptTitle != "" {
@@ -105,43 +115,44 @@ func Dump(ctx context.Context, config Config) error {
 
 type dumpRowArgs struct {
 	writer    io.Writer
-	colors    Colors
 	totalLen  uint64
 	data      []byte
 	dataCap   int
 	padOffCol string
 	adjustOff uint64
+	style     Style
+	optColors Colors
+	hexSecEnd int
+	sectionSp string
 }
 
-func dumpRow(args dumpRowArgs) error {
+func dumpRow(args *dumpRowArgs) error {
 	var s string
 
 	dataLen := len(args.data)
 
 	// offset section
 	if args.totalLen > uint64(args.dataCap) {
-		s = fmt.Sprintf("\n0x%0"+args.padOffCol+"x   ",
+		s = fmt.Sprintf("\n0x%0"+args.padOffCol+"x"+args.sectionSp,
 			(args.totalLen-uint64(dataLen))+args.adjustOff)
 	} else {
-		s = fmt.Sprintf("0x%0"+args.padOffCol+"x   ",
+		s = fmt.Sprintf("0x%0"+args.padOffCol+"x"+args.sectionSp,
 			args.adjustOff)
 	}
 
 	// hex characters section
-	for i := 0; i < args.dataCap; i++ {
-		if i < dataLen {
-			s += args.colors.HexChar(args.data[i]) + " "
-		} else {
-			s += "   "
-		}
-
-		// this puts an extra space between the chunks in the hex column
-		if (i+1)%4 == 0 {
-			s += " "
-		}
+	hexSection, count := args.style.HexSection(args.data, dataLen, 64)
+	if args.hexSecEnd == 0 {
+		args.hexSecEnd = count
 	}
 
-	s += " |"
+	if count < args.hexSecEnd {
+		hexSection += strings.Repeat(" ", args.hexSecEnd-count)
+	}
+
+	s += hexSection
+
+	s += "|"
 
 	// human-readable section
 	for i := 0; i < args.dataCap; i++ {
@@ -153,7 +164,11 @@ func dumpRow(args dumpRowArgs) error {
 				b = args.data[i]
 			}
 
-			s += args.colors.Value(string(b), args.data[i])
+			if args.optColors == nil {
+				s += string(b)
+			} else {
+				s += args.optColors.Value(string(b), args.data[i])
+			}
 		} else {
 			s += " "
 		}
@@ -164,49 +179,4 @@ func dumpRow(args dumpRowArgs) error {
 	_, err := fmt.Fprint(args.writer, s)
 
 	return err
-}
-
-func NewColors() Colors {
-	var colors [256]string
-
-	const WHITE_B = "\033[1;37m"
-
-	for i := 0; i < 256; i++ {
-		var fg, bg string
-
-		// colors that are very hard to read on a dark background
-		barelyVisible := i == 0 || (i >= 16 && i <= 20) || (i >= 232 && i <= 242)
-
-		if barelyVisible {
-			fg = WHITE_B + "\033[38;5;" + "255" + "m"
-			bg = "\033[48;5;" + strconv.Itoa(int(i)) + "m"
-
-		} else {
-			fg = WHITE_B + "\033[38;5;" + strconv.Itoa(int(i)) + "m"
-			bg = ""
-		}
-
-		colors[i] = bg + fg
-	}
-
-	return Colors{
-		colors: colors,
-	}
-}
-
-type Colors struct {
-	colors [256]string
-}
-
-func (o Colors) Value(s string, b byte) string {
-	// if b == 25 {
-	// 	fmt.Println("\n\nSHIT", strings.ReplaceAll(colors[b], "\\", ">"), s)
-	// }
-	return o.colors[b] + s + "\033[0m"
-}
-
-func (o Colors) HexChar(b byte) string {
-	//return fmt.Sprintf("%s%02x%s", colors[b], b, "\033[0m")
-
-	return o.colors[b] + hex.EncodeToString([]byte{b}) + "\033[0m"
 }

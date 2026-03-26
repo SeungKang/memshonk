@@ -108,7 +108,7 @@ func (o *WatchCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	hexdumpConfig := hexdump.Config{
 		Src:           &src,
 		Dst:           &dst,
-		Colors:        hexdump.NewColors(),
+		OptStyle:      hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
 		OptTitle:      "placeholder",
 		OptOffsetBits: exeInfo.Bits,
 	}

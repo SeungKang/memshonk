@@ -258,6 +258,8 @@ func beClient(state mainState) error {
 
 	<-client.Done()
 
+	fmt.Print("\r\n")
+
 	return client.Err()
 }
 

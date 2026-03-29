@@ -2,6 +2,7 @@ package apicompat
 
 import (
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/flagsctl"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/progctl"
 	"github.com/SeungKang/memshonk/internal/project"
@@ -19,6 +20,8 @@ type SharedState struct {
 	Project *project.Project
 
 	Progctl *progctl.Ctl
+
+	Flags *flagsctl.Ctl
 
 	Commands *CommandRegistry
 

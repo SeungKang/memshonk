@@ -18,6 +18,7 @@ import (
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/commands"
 	"github.com/SeungKang/memshonk/internal/events"
+	"github.com/SeungKang/memshonk/internal/flagsctl"
 	"github.com/SeungKang/memshonk/internal/globalconfig"
 	"github.com/SeungKang/memshonk/internal/plugins"
 	"github.com/SeungKang/memshonk/internal/plugins/pluginscompat"
@@ -387,6 +388,7 @@ func beDaemon(state mainState) error {
 		Project:  state.project,
 		Commands: setupCommands(),
 		Plugins:  optPluginsCtl,
+		Flags:    flagsctl.New(),
 	}
 
 	server, err := sessiond.NewServer(ctx, sessiond.ServerConfig{

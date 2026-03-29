@@ -41,7 +41,7 @@ func (o *DaemonCommand) kill(_ context.Context) (fx.CommandResult, error) {
 			len(sessions)-1)
 	}
 
-	_ = o.config.Session.SharedState().Sessions.Close()
+	go o.config.Session.SharedState().Sessions.Close()
 
 	return nil, nil
 }

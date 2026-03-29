@@ -259,11 +259,15 @@ func (o *CommandHandler) runInternalCommand(ctx context.Context, config RunComma
 		Stderr:  config.Stderr,
 	})
 
-	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{})
+	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{
+		Namespace: "memshonk",
+		Argv:      config.Argv,
+	})
 	if err != nil {
-		return false, NewCommandHandlerError(0, fmt.Errorf("failed to register internal command job - %w", err))
+		return false, NewCommandHandlerError(0, fmt.Errorf("failed to register internal command job - %w",
+			err))
 	}
-	defer job.Finished()
+	defer job.SetFinished()
 
 	usageWriter := config.Stderr
 
@@ -295,11 +299,14 @@ func (o *CommandHandler) runInternalCommand(ctx context.Context, config RunComma
 }
 
 func (o *CommandHandler) execProgram(ctx context.Context, config RunCommandConfig) *CommandHandlerError {
-	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{})
+	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{
+		Namespace: "program",
+		Argv:      config.Argv,
+	})
 	if err != nil {
 		return NewCommandHandlerError(0, fmt.Errorf("failed to register external program job - %w", err))
 	}
-	defer job.Finished()
+	defer job.SetFinished()
 
 	program := exec.CommandContext(ctx, config.Argv[0], config.Argv[1:]...)
 
@@ -315,6 +322,8 @@ func (o *CommandHandler) execProgram(ctx context.Context, config RunCommandConfi
 		return NewCommandHandlerError(0, fmt.Errorf("failed to exec new process - %w",
 			err))
 	}
+
+	job.SetPID(program.Process.Pid)
 
 	var exitErr *exec.ExitError
 

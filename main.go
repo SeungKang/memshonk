@@ -38,7 +38,7 @@ const (
 
 	usage = `SYNOPSIS
   ` + appName + ` -` + helpArg + `
-  ` + appName + ` [options]` + ` EXECUTABLE-PATH
+  ` + appName + ` [options] -` + exePathArg + ` EXECUTABLE-FILE-PATH
   ` + appName + ` [options] -` + projectPathArg + ` PROJECT-FILE-PATH
 
 DESCRIPTION
@@ -48,6 +48,7 @@ OPTIONS
 
 	helpArg        = "h"
 	projectPathArg = "p"
+	exePathArg     = "e"
 	sessionIDArg   = "S"
 )
 
@@ -80,13 +81,19 @@ func mainWithError() error {
 		&state.optProjectFilePath,
 		projectPathArg,
 		"",
-		"Use a project file instead of an empty project based on a program path")
+		"Load a project file by its `path`")
+
+	flag.StringVar(
+		&state.optExePath,
+		exePathArg,
+		"",
+		"Load the specified executable by its `path` and use an empty project ")
 
 	flag.StringVar(
 		&state.optSessionID,
 		sessionIDArg,
 		"",
-		"Use a custom session ID")
+		"Use a custom session `id`")
 
 	flag.CommandLine.Parse(args)
 
@@ -107,16 +114,18 @@ func mainWithError() error {
 		return nil
 	}
 
-	state.optExePath = flag.Arg(0)
+	if flag.NArg() > 0 {
+		return fmt.Errorf("unrecognized non-flag arguments were provided - verify that you provided the correct command-line arguments")
+	}
 
 	if state.optExePath == "" && state.optProjectFilePath == "" {
-		return fmt.Errorf("please specify either a project path (-%s) or a program file path (as the last non-flag argument)",
-			projectPathArg)
+		return fmt.Errorf("please specify either a project path (-%s) or a program file path (-%s)",
+			projectPathArg, exePathArg)
 	}
 
 	if state.optExePath != "" && state.optProjectFilePath != "" {
-		return fmt.Errorf("both a project path (-%s) and a program file path cannot be specified together",
-			projectPathArg)
+		return fmt.Errorf("both a project path (-%s) and an executable file path (-%s) cannot be specified together",
+			projectPathArg, exePathArg)
 	}
 
 	state.globalVars = &shvars.Variables{}

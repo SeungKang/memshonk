@@ -452,6 +452,7 @@ func setupCommands() *apicompat.CommandRegistry {
 	reg.Register(commands.DaemonCommandName, commands.NewDaemonCommand)
 	reg.Register(commands.DetachCommandName, commands.NewDetachCommand)
 	reg.Register(commands.FindCommandName, commands.NewFindCommand)
+	reg.Register(commands.JobsCommandName, commands.NewJobsCommand)
 	reg.Register(commands.PluginsCommandName, commands.NewPluginsCommand)
 	reg.Register(commands.ReadCommandName, commands.NewReadCommand)
 	reg.Register(commands.SessionCommandName, commands.NewSessionCommand)

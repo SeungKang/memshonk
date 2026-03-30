@@ -1,16 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -269,20 +268,6 @@ func execDaemon(setupCtx context.Context) error {
 		return err
 	}
 
-	tmpDirPath, err := os.MkdirTemp("", "memshonk-")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary directory for daemon setup - %w", err)
-	}
-	defer os.RemoveAll(tmpDirPath)
-
-	initSocketPath := filepath.Join(tmpDirPath, "init.sock")
-
-	initSocket, err := net.Listen("unix", initSocketPath)
-	if err != nil {
-		return fmt.Errorf("failed to create init daemon socket - %w", err)
-	}
-	defer initSocket.Close()
-
 	args := make([]string, len(os.Args)+1)
 	args[0] = "daemon"
 	args[1] = "--"
@@ -290,25 +275,16 @@ func execDaemon(setupCtx context.Context) error {
 
 	daemon := exec.Command(exePath, args...)
 
+	daemon.Stdin = os.Stdin
+
 	daemon.SysProcAttr = sessiond.DaemonSysProcAttr()
 
-	// TODO: grumble needs these to be set to fds connected to a terminal.
-	// Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
-	daemon.Stdin = os.Stdin
-	daemon.Stdout = os.Stdout
-	daemon.Stderr = os.Stderr
-
-	// TODO: Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
-	daemon.Env = os.Environ()
-	daemon.Env = append(daemon.Env, "MEMSHONK_INIT_SOCKET_HACK="+initSocketPath)
-
-	// TODO: Uncomment once MEMSHONK_INIT_SOCKET_HACK is removed.
-	//stdout, err := daemon.StdoutPipe()
-	//if err != nil {
-	//	return fmt.Errorf("failed to create pipe for daemon's stdout - %w",
-	//		err)
-	//}
-	//defer stdout.Close()
+	stdout, err := daemon.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create pipe for daemon's stdout - %w",
+			err)
+	}
+	defer stdout.Close()
 
 	err = daemon.Start()
 	if err != nil {
@@ -320,43 +296,32 @@ func execDaemon(setupCtx context.Context) error {
 	waitErr := make(chan error, 1)
 
 	go func() {
-		conn, err := initSocket.Accept()
-		if err != nil {
-			waitErr <- err
-		} else {
-			conn.Close()
-			close(ready)
+		scanner := bufio.NewScanner(stdout)
+
+		readFromStdout := scanner.Scan()
+
+		if !readFromStdout {
+			var err error
+			if scanner.Err() != nil {
+				err = scanner.Err()
+			} else {
+				err = errors.New("stdout scanner failed without error")
+			}
+
+			waitErr <- fmt.Errorf("failed to read from daemon's stdout - %w", err)
+
+			return
 		}
+
+		if scanner.Text() != "ready" {
+			waitErr <- fmt.Errorf("got unexpected ready string: %q",
+				scanner.Text())
+
+			return
+		}
+
+		close(ready)
 	}()
-
-	// TODO: Uncomment once MEMSHONK_INIT_SOCKET_HACK is removed.
-	// go func() {
-	// 	scanner := bufio.NewScanner(stdout)
-
-	// 	readFromStdout := scanner.Scan()
-
-	// 	if !readFromStdout {
-	// 		var err error
-	// 		if scanner.Err() != nil {
-	// 			err = scanner.Err()
-	// 		} else {
-	// 			err = errors.New("stdout scanner failed without error")
-	// 		}
-
-	// 		waitErr <- fmt.Errorf("failed to read from daemon's stdout - %w", err)
-
-	// 		return
-	// 	}
-
-	// 	if scanner.Text() != "ready" {
-	// 		waitErr <- fmt.Errorf("got unexpected ready string: %q",
-	// 			scanner.Text())
-
-	// 		return
-	// 	}
-
-	// 	close(ready)
-	// }()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
@@ -413,7 +378,6 @@ func beDaemon(state mainState) error {
 	}
 	defer server.Close()
 
-	// TODO: Should loading plugins happen before setting up the session server?
 	if optPluginsCtl != nil {
 		for _, pluginConfig := range state.project.Plugins().Libraries {
 			plugin, err := optPluginsCtl.Load(pluginConfig)
@@ -428,24 +392,10 @@ func beDaemon(state mainState) error {
 
 	log.SetFlags(log.LstdFlags)
 
-	// _, err = os.Stdout.WriteString("ready\n")
-	// if err != nil {
-	// 	return err
-	// }
-
-	// TODO: Remove once MEMSHONK_INIT_SOCKET_HACK is removed.
-	initSocketPath := os.Getenv("MEMSHONK_INIT_SOCKET_HACK")
-	if initSocketPath == "" {
-		return errors.New("MEMSHONK_INIT_SOCKET_HACK is not set")
-	}
-
-	dialer := net.Dialer{}
-
-	tmp, err := dialer.DialContext(ctx, "unix", initSocketPath)
+	_, err = os.Stdout.WriteString("ready\n")
 	if err != nil {
-		return fmt.Errorf("failed to connect to init socket - %w", err)
+		return err
 	}
-	tmp.Close()
 
 	select {
 	case <-ctx.Done():

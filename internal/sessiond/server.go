@@ -349,21 +349,6 @@ func (o *Server) RemoveSession(id string) {
 
 	wrapper, hasIt := o.sessions[id]
 	if hasIt {
-		if wrapper.clientConn != nil {
-			timeout := time.After(time.Second)
-
-			wrapper.clientConn.apiConn.SetDeadline(
-				time.Now().Add(time.Second))
-
-			wrapper.clientConn.apiConn.Write(
-				cstlv.MinimalBytes(0, 0, sessionExitedClientMessage))
-
-			select {
-			case <-timeout:
-			case <-wrapper.clientConn.session.Done():
-			}
-		}
-
 		_ = wrapper.session.Close()
 
 		delete(o.sessions, id)

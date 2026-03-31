@@ -2,11 +2,12 @@ package sessiond
 
 import (
 	"context"
-	"io"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
+	"github.com/SeungKang/memshonk/internal/cstlv"
 	"github.com/SeungKang/memshonk/internal/jobsctl"
 
 	"github.com/SeungKang/memshonk/internal/vendored/goterm"
@@ -29,7 +30,7 @@ type Session struct {
 	ctx       context.Context
 	once      sync.Once
 	cancelFn  func()
-	apiConn   io.Closer
+	apiConn   net.Conn
 
 	cancelCmdMu  sync.Mutex
 	cancelCmdCtx context.CancelFunc
@@ -58,6 +59,11 @@ func (o *Session) Close() error {
 		if o.shell != nil {
 			_ = o.shell.Close()
 		}
+
+		o.apiConn.SetDeadline(time.Now().Add(time.Second))
+
+		o.apiConn.Write(
+			cstlv.MinimalBytes(0, 0, sessionExitedClientMessage))
 
 		err = o.apiConn.Close()
 	})

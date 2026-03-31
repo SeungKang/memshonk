@@ -144,19 +144,16 @@ func (o *Shell) Run(ctx context.Context) error {
 			return err
 		}
 
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		// Handle built-in shell commands
-		switch o.handleBuiltinShellCommand(line) {
-		case builtinHandled:
-			continue
-		case builtinExit:
+		if strings.TrimSpace(line) == "exit" {
+			// TODO: This is a hack to work around
+			// the sh library always setting the
+			// shell as exited even if the "exit"
+			// builtin is never called.
+			//
+			// You are supposed to check the value
+			// returned by the Runner.Exited method,
+			// but it seems to always be "true".
 			return nil
-		case builtinNotOne:
-			// Keep going.
 		}
 
 		// Create a context.Context for only *this* shell
@@ -170,30 +167,6 @@ func (o *Shell) Run(ctx context.Context) error {
 
 		// Execute through interpreter
 		_ = o.interp.Execute(cmdCtx, line)
-	}
-}
-
-type handleBuiltinShellCommandResult uint8
-
-const (
-	builtinHandled handleBuiltinShellCommandResult = iota
-	builtinExit
-	builtinNotOne
-)
-
-// handleBuiltinShellCommand handles special shell commands like help, exit.
-// Returns true if the command was handled.
-func (o *Shell) handleBuiltinShellCommand(line string) handleBuiltinShellCommandResult {
-	words := strings.Fields(line)
-	if len(words) == 0 {
-		return builtinNotOne
-	}
-
-	switch words[0] {
-	case "exit", "quit":
-		return builtinExit
-	default:
-		return builtinNotOne
 	}
 }
 

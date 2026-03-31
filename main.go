@@ -258,8 +258,6 @@ func beClient(state mainState) error {
 
 	<-client.Done()
 
-	fmt.Print("\r\n")
-
 	return client.Err()
 }
 
@@ -465,6 +463,7 @@ func setupCommands() *apicompat.CommandRegistry {
 	reg.Register(commands.FindCommandName, commands.NewFindCommand)
 	reg.Register(commands.JobsCommandName, commands.NewJobsCommand)
 	reg.Register(commands.PluginsCommandName, commands.NewPluginsCommand)
+	reg.Register(commands.QuitCommandName, commands.NewQuitCommand)
 	reg.Register(commands.ReadCommandName, commands.NewReadCommand)
 	reg.Register(commands.SessionCommandName, commands.NewSessionCommand)
 	reg.Register(commands.ShonksetCommandName, commands.NewShonksetCommand)

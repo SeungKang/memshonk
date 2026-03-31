@@ -12,6 +12,9 @@ import (
 // Session represents a client connection and the various parts of
 // the application that it has access to.
 type Session interface {
+	// Close ends the current session.
+	Close() error
+
 	// SharedState is the application's shared state that is
 	// made available to clients.
 	SharedState() SharedState

@@ -345,6 +345,13 @@ func (o *Ctl) readFromAddr(ctx context.Context, from memory.Pointer, sizeBytes u
 		return nil, 0, ErrNotAttached
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, 0, ctx.Err()
+	default:
+		// Keep going.
+	}
+
 	addr, err := o.resolvePointer(ctx, from)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to resolve pointer - %w", err)
@@ -377,6 +384,13 @@ func (o *Ctl) WriteToAddr(ctx context.Context, to memory.Pointer, data []byte) (
 func (o *Ctl) writeToAddr(ctx context.Context, to memory.Pointer, data []byte) (uintptr, error) {
 	if o.current == nil {
 		return 0, ErrNotAttached
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	default:
+		// Keep going.
 	}
 
 	addr, err := o.resolvePointer(ctx, to)

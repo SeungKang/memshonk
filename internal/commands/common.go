@@ -25,6 +25,10 @@ const (
 	utf8leDataType   = "utf8le"
 	utf8beDataType   = "utf8be"
 
+	cstringDataType   = "cstring"
+	cstringleDataType = "cstringle"
+	cstringbeDataType = "cstringbe"
+
 	utf16DataType     = "utf16"
 	utf16leDataType   = "utf16le"
 	wstringleDataType = "wstringle"

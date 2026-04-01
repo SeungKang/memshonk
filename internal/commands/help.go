@@ -120,6 +120,9 @@ COMMANDS
   ` + wstringDataType + `   - Alias to ` + utf16leDataType + `
   ` + utf16beDataType + `   - UTF-16 string in big endian byte order
   ` + wstringbeDataType + ` - Alias to ` + utf16beDataType + `
+  ` + cstringleDataType + ` - Null-terminated string in little endian byte order
+  ` + cstringDataType + `   - Alias to ` + cstringleDataType + `
+  ` + cstringbeDataType + ` - Null-terminated string in big endian byte order
   ` + float32leDataType + ` - A 32-bit float in little endian byte order
   ` + float32DataType + `   - Alias to ` + float32leDataType + `
   ` + float32beDataType + ` - A 32-bit float in big endian byte order

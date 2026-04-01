@@ -56,12 +56,17 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	switch o.datatype {
 	case stringDataType, stringleDataType, utf8DataType, utf8leDataType:
 		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
-	case stringbeDataType, utf8beDataType:
+	case stringbeDataType, utf8beDataType, cstringbeDataType:
 		return nil, fmt.Errorf("TODO: %q needs to be implemented", o.datatype)
 	case wstringleDataType, utf16leDataType, wstringDataType, utf16DataType:
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.LittleEndian)
 	case wstringbeDataType, utf16beDataType:
 		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.BigEndian)
+	case cstringDataType, cstringleDataType:
+		// This is kind of half-ass, but whatever.
+		stringList += "\x00"
+
+		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
 	case uint16DataType, uint16leDataType, uint16beDataType:
 		var endian binary.ByteOrder = binary.LittleEndian
 
@@ -88,7 +93,6 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		}
 
 		parsedPattern = memory.PatternForRawBytes(buf.Bytes())
-
 	case uint32DataType, uint32leDataType, uint32beDataType:
 		var endian binary.ByteOrder = binary.LittleEndian
 
@@ -192,7 +196,7 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	case patternDataType:
 		parsedPattern, err = memory.ParsePattern(stringList)
 	default:
-		return nil, fmt.Errorf("unknown encoding format: %q", o.datatype)
+		return nil, fmt.Errorf("unknown data type: %q", o.datatype)
 	}
 	if err != nil {
 		return nil, err

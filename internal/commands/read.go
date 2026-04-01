@@ -25,6 +25,7 @@ const (
 func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 	cmd := &ReadCommand{
 		session: config.Session,
+		delim:   ' ',
 	}
 
 	root := fx.NewCommand(ReadCommandName, "read data from process memory", cmd.run)
@@ -65,6 +66,7 @@ type ReadCommand struct {
 	sizeBytes    uint64
 	numInstances uint64
 	addrStr      string
+	delim        byte
 }
 
 func (o *ReadCommand) run(ctx context.Context) (fx.CommandResult, error) {
@@ -84,6 +86,8 @@ func (o *ReadCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		err = o.doUtf8String(ctx, procReader, info, &sb)
 	case utf16DataType, utf16leDataType, utf16beDataType, wstringDataType, wstringleDataType, wstringbeDataType:
 		err = o.doUtf16String(ctx, procReader, info, &sb)
+	case cstringDataType, cstringleDataType, cstringbeDataType:
+		err = o.doCstring(ctx, procReader, info, &sb)
 	case float32DataType, float32leDataType, float32beDataType:
 		err = o.doFloat32(ctx, procReader, info, &sb)
 	case float64DataType, float64leDataType, float64beDataType:
@@ -106,9 +110,24 @@ func (o *ReadCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	return fx.NewHumanCommandResult(sb.String()), nil
 }
 
+func (o *ReadCommand) overrideOutputFormatAndDelim(outputFormat string) {
+	o.outputFormat = outputFormat
+
+	switch o.outputFormat {
+	case hexdumpEncoding:
+		o.delim = '\n'
+	default:
+		o.delim = ' '
+	}
+}
+
 func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
 	if o.sizeBytes == 0 {
 		return readNumBytesRequiredErr(o.dataType)
+	}
+
+	if o.outputFormat == "" {
+		o.overrideOutputFormatAndDelim(hexdumpEncoding)
 	}
 
 	for i := uint64(0); i < o.numInstances; i++ {
@@ -119,16 +138,10 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 			return err
 		}
 
-		procReader.OffsetBy(int64(o.sizeBytes))
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
 		case rawEncoding:
 			sb.Write(v)
-		case hexdumpEncoding, "":
-			delim = '\n'
-
+		case hexdumpEncoding:
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            bytes.NewReader(v),
 				Dst:            sb,
@@ -151,7 +164,7 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 		}
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -170,6 +183,10 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 		endian = binary.BigEndian
 	}
 
+	if o.outputFormat == "" {
+		o.overrideOutputFormatAndDelim(hexdumpEncoding)
+	}
+
 	for i := uint64(0); i < o.numInstances; i++ {
 		v := make([]byte, o.sizeBytes)
 
@@ -178,16 +195,10 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 			return err
 		}
 
-		procReader.OffsetBy(int64(o.sizeBytes))
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
 		case rawEncoding:
 			sb.Write(v)
-		case hexdumpEncoding, "":
-			delim = '\n'
-
+		case hexdumpEncoding:
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            bytes.NewReader(v),
 				Dst:            sb,
@@ -210,7 +221,7 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 		}
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -229,6 +240,10 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 		endian = binary.BigEndian
 	}
 
+	if o.outputFormat == "" {
+		o.overrideOutputFormatAndDelim(hexdumpEncoding)
+	}
+
 	var buf bytes.Buffer
 
 	procReader.SaveReadsTo(&buf)
@@ -243,16 +258,10 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 
 		str := utf16.Decode(v)
 
-		procReader.OffsetBy(int64(o.sizeBytes))
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
 		case rawEncoding:
 			sb.WriteString(string(str))
-		case hexdumpEncoding, "":
-			delim = '\n'
-
+		case hexdumpEncoding:
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -275,8 +284,94 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 		}
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
+	}
+
+	return nil
+}
+
+func (o *ReadCommand) doCstring(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder) error {
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	switch o.dataType {
+	case cstringbeDataType:
+		endian = binary.BigEndian
+	}
+
+	if o.outputFormat == "" {
+		o.overrideOutputFormatAndDelim(hexdumpEncoding)
+	}
+
+	var buf bytes.Buffer
+
+	for i := uint64(0); i < o.numInstances; i++ {
+		err := o.readOneCstring(ctx, procReader, info, sb, endian, &buf)
+		if err != nil {
+			return err
+		}
+
+		if o.numInstances > 1 && i != o.numInstances-1 {
+			sb.WriteByte(o.delim)
+		}
+
+		buf.Reset()
+	}
+
+	return nil
+}
+
+func (o *ReadCommand) readOneCstring(ctx context.Context, procReader *processReader, info progctl.ExeInfo, sb *strings.Builder, endian binary.ByteOrder, buf *bytes.Buffer) error {
+	b := make([]byte, 1)
+
+	for {
+		_, err := procReader.Read(b)
+		if err != nil {
+			return fmt.Errorf("failed to read byte %d - %w",
+				buf.Len()+1, err)
+		}
+
+		if b[0] == 0x00 {
+			break
+		}
+
+		buf.WriteByte(b[0])
+
+		if o.sizeBytes > 0 && uint64(buf.Len()) == o.sizeBytes {
+			break
+		}
+	}
+
+	v := make([]byte, buf.Len())
+
+	err := binary.Read(buf, endian, v)
+	if err != nil {
+		return err
+	}
+
+	switch o.outputFormat {
+	case rawEncoding:
+		sb.Write(v)
+	case hexdumpEncoding:
+		err = hexdump.Dump(ctx, hexdump.Config{
+			Src:            bytes.NewReader(v),
+			Dst:            sb,
+			Colors:         hexdump.NewColors(),
+			OptStartOffset: uint64(procReader.LastReadAddr()),
+			OptOffsetBits:  info.Bits,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to hexdump data - %w", err)
+		}
+	case binaryEncoding:
+		for i := range v {
+			sb.WriteString(fmt.Sprintf(fmt.Sprintf("%08b", v[i])))
+		}
+	case hexEncoding:
+		sb.Write([]byte(hex.EncodeToString(v)))
+	default:
+		return fmt.Errorf("unsupported output format for uint8: %q",
+			o.outputFormat)
 	}
 
 	return nil
@@ -301,14 +396,10 @@ func (o *ReadCommand) doUnit16(ctx context.Context, procReader *processReader, i
 			return err
 		}
 
-		procReader.OffsetBy(2)
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
+		case rawEncoding:
+			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
-			delim = '\n'
-
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -333,7 +424,7 @@ func (o *ReadCommand) doUnit16(ctx context.Context, procReader *processReader, i
 		buf.Reset()
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -359,14 +450,10 @@ func (o *ReadCommand) doUint32(ctx context.Context, procReader *processReader, i
 			return err
 		}
 
-		procReader.OffsetBy(4)
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
+		case rawEncoding:
+			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
-			delim = '\n'
-
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -391,7 +478,7 @@ func (o *ReadCommand) doUint32(ctx context.Context, procReader *processReader, i
 		buf.Reset()
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -417,14 +504,10 @@ func (o *ReadCommand) doUint64(ctx context.Context, procReader *processReader, i
 			return err
 		}
 
-		procReader.OffsetBy(8)
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
+		case rawEncoding:
+			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
-			delim = '\n'
-
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -449,7 +532,7 @@ func (o *ReadCommand) doUint64(ctx context.Context, procReader *processReader, i
 		buf.Reset()
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -475,14 +558,10 @@ func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, 
 			return err
 		}
 
-		procReader.OffsetBy(4)
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
+		case rawEncoding:
+			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
-			delim = '\n'
-
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -507,7 +586,7 @@ func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, 
 		buf.Reset()
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -533,14 +612,10 @@ func (o *ReadCommand) doFloat64(ctx context.Context, procReader *processReader, 
 			return err
 		}
 
-		procReader.OffsetBy(8)
-
-		delim := byte(' ')
-
 		switch o.outputFormat {
+		case rawEncoding:
+			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
-			delim = '\n'
-
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
@@ -565,7 +640,7 @@ func (o *ReadCommand) doFloat64(ctx context.Context, procReader *processReader, 
 		buf.Reset()
 
 		if o.numInstances > 1 && i != o.numInstances-1 {
-			sb.WriteByte(delim)
+			sb.WriteByte(o.delim)
 		}
 	}
 
@@ -603,9 +678,15 @@ func (o *processReader) Read(b []byte) (int, error) {
 	size := uint64(len(b))
 
 	if o.nextReadAddr > 0 {
-		data, actualAddr, err = o.process.ReadFromAddr(o.ctx, memory.AbsoluteAddrPointer(o.lastReadAddr), size)
+		data, actualAddr, err = o.process.ReadFromAddr(
+			o.ctx,
+			memory.AbsoluteAddrPointer(o.nextReadAddr),
+			size)
 	} else {
-		data, actualAddr, err = o.process.ReadFromLookup(o.ctx, o.addr, size)
+		data, actualAddr, err = o.process.ReadFromLookup(
+			o.ctx,
+			o.addr,
+			size)
 	}
 
 	if err != nil {
@@ -614,16 +695,18 @@ func (o *processReader) Read(b []byte) (int, error) {
 
 	o.lastReadAddr = actualAddr
 
-	i := copy(b, data)
+	numBytesRead := copy(b, data)
+
+	o.nextReadAddr = actualAddr + uintptr(numBytesRead)
 
 	if o.saveReadsTo != nil {
-		_, err := o.saveReadsTo.Write(b[0:i])
+		_, err := o.saveReadsTo.Write(b[0:numBytesRead])
 		if err != nil {
 			return 0, fmt.Errorf("failed to write data to save-reads-to writer - %w", err)
 		}
 	}
 
-	return i, nil
+	return numBytesRead, nil
 }
 
 func (o *processReader) SaveReadsTo(w io.Writer) {

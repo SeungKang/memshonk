@@ -77,6 +77,8 @@ func (o *WriteCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		err = o.doUtf8String(ctx, writer)
 	case utf16DataType, utf16leDataType, utf16beDataType, wstringDataType, wstringleDataType, wstringbeDataType:
 		err = o.doUtf16String(ctx, writer)
+	case cstringDataType, cstringleDataType, cstringbeDataType:
+		err = o.doCstring(ctx, writer)
 	case float32DataType, float32leDataType, float32beDataType:
 		err = o.doFloat32(ctx, writer)
 	case float64DataType, float64leDataType, float64beDataType:
@@ -92,7 +94,8 @@ func (o *WriteCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write %q - %w",
+			o.datatype, err)
 	}
 
 	return nil, nil
@@ -150,6 +153,24 @@ func (o *WriteCommand) doUtf16String(ctx context.Context, writer *processWriter)
 	}
 
 	return o.doWrite(u16ints, endian, writer)
+}
+
+func (o *WriteCommand) doCstring(ctx context.Context, writer *processWriter) error {
+	data, err := decodeDataStr(o.inputFormat, o.dataStr)
+	if err != nil {
+		return err
+	}
+
+	data = append(data, 0x00)
+
+	var endian binary.ByteOrder = binary.LittleEndian
+
+	switch o.datatype {
+	case stringbeDataType, utf8beDataType:
+		endian = binary.BigEndian
+	}
+
+	return o.doWrite(data, endian, writer)
 }
 
 func (o *WriteCommand) doUnit16(ctx context.Context, writer *processWriter) error {

@@ -36,6 +36,8 @@
 - Need to implement Suspend and Resume methods for WindowsProcess
 - Search for process using its path (we are currently limited to
   searching by its name)
+- Switch `Read*` methods to behave more like io.Reader (pass in
+  a []byte to read data into, rather than allocating a new one)
 
 ## memory
 

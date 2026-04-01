@@ -175,7 +175,14 @@ func mainWithError() error {
 		return beDaemon(state)
 	}
 
-	return beClient(state)
+	err = beClient(state)
+
+	// This newline prevents the shell prompt
+	// from ending up on the same line as the
+	// memshonk prompt.
+	fmt.Println()
+
+	return err
 }
 
 func varMayBeSecret(name string) bool {

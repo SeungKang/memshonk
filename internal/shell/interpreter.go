@@ -2,12 +2,9 @@ package shell
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
@@ -85,92 +82,9 @@ func (o *Interpreter) builtinHandler(ctx context.Context, argv []string) ([]stri
 		}
 
 		return argv, errHandledBuiltin
-	case "cd":
-		// Refer to the handleCd Go doc for context.
-		handlerCtx := interp.HandlerCtx(ctx)
-
-		_, err := o.handleCd(handlerCtx, argv[1:])
-		if err != nil {
-			handlerCtx.Stderr.Write([]byte("cd: " + err.Error() + "\n"))
-		}
-
-		// TODO: The sh library does not allow us to safely
-		// set the cwd, so idk... just let it run its "cd"
-		// code I guess :/
-
-		return argv, nil
 	default:
 		return argv, nil
 	}
-}
-
-// handleCd exists because the sh library's cd does not provide any
-// context as to why it failed.
-//
-// This function's code is based on code from:
-// mvdan.cc/sh/v3/interp/builtin.go
-func (o *Interpreter) handleCd(handlerCtx interp.HandlerContext, args []string) (string, error) {
-	var dirPath string
-
-	var out string
-
-	switch len(args) {
-	case 0:
-		dirPath = o.runner.Env.Get("HOME").Str
-	case 1:
-		dirPath = args[0]
-
-		// replicate the commonly implemented behavior of `cd -`
-		// ref: https://www.man7.org/linux/man-pages/man1/cd.1p.html#OPERANDS
-		if dirPath == "-" {
-			dirPath = o.runner.Env.Get("OLDPWD").Str
-
-			out = dirPath
-		}
-	default:
-		return "", fmt.Errorf("usage: cd [dir]")
-	}
-
-	dirPath = cmp.Or(dirPath, ".")
-	dirPath = absPath(handlerCtx.Dir, dirPath)
-
-	info, err := os.Stat(dirPath)
-	switch {
-	case err != nil:
-		return "", fmt.Errorf("failed to stat directory - %w",
-			err)
-	case !info.IsDir():
-		return "", fmt.Errorf("path is not a directory: %q",
-			dirPath)
-	}
-
-	err = hasPermissionToDir(dirPath)
-	if err != nil {
-		return "", fmt.Errorf("access denied to directory %q - %w",
-			dirPath, err)
-	}
-
-	// TODO: From here, we let the sh library re-run its "cd"
-	// code because there is no way for us to safely set the
-	// cwd from here.
-
-	//r.Dir = path
-	//r.setVarString("OLDPWD", r.envGet("PWD"))
-	//r.setVarString("PWD", path)
-
-	return out, nil
-}
-
-// Copied from:
-// mvdan.cc/sh/v3/interp/builtin.go
-func absPath(dir, path string) string {
-	if path == "" {
-		return ""
-	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(dir, path)
-	}
-	return filepath.Clean(path) // TODO: this clean is likely unnecessary
 }
 
 // Execute parses and executes a shell command line.

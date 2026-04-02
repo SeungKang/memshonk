@@ -74,10 +74,11 @@ type Interpreter struct {
 // builtinHandler overrides some broken builtins in the sh library.
 func (o *Interpreter) builtinHandler(ctx context.Context, argv []string) ([]string, error) {
 	switch argv[0] {
-	case "help":
-		// Unfortunately, the sh library added "help" as
-		// a builtin that always fails, so we need to
-		// override it here.
+	case "help", "jobs":
+		// Unfortunately, the sh library added "help" and "jobs"
+		// as builtins that always fail with an error stating:
+		// "unimplemented builtin". So we need to override them
+		// here.
 		err := o.internalExec(ctx, argv)
 		if err != nil {
 			return argv, err

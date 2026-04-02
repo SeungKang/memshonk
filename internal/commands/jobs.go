@@ -59,8 +59,8 @@ func (o *JobsCommand) ls(ctx context.Context) (fx.CommandResult, error) {
 			continue
 		}
 
-		// "memshonk.0123456"
-		sb.WriteString(fmt.Sprintf("%-16s", info.ID))
+		// "0123456"
+		sb.WriteString(fmt.Sprintf("%-6s | ", info.ID))
 
 		sb.WriteByte('"')
 		sb.WriteString(strings.Join(info.RegisterConfig.Argv, " "))
@@ -72,7 +72,7 @@ func (o *JobsCommand) ls(ctx context.Context) (fx.CommandResult, error) {
 			sb.WriteString(")")
 		}
 
-		sb.WriteString(" ")
+		sb.WriteString(" | ")
 		sb.WriteString(info.StartedAt.Format(time.Stamp))
 
 		if i > 0 && i != len(jobs)-1 {

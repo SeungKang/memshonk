@@ -4,13 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
-)
-
-const (
-	jobIdSep = "."
 )
 
 func New() *Ctl {
@@ -43,11 +38,6 @@ func (o *Ctl) List() []*Job {
 func (o *Ctl) Lookup(id string) (*Job, error) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
-
-	_, _, hasSep := strings.Cut(id, jobIdSep)
-	if !hasSep {
-		return nil, fmt.Errorf("job identifier is missing separator: %q", jobIdSep)
-	}
 
 	for j := range o.jobs {
 		if j.ID() == id {
@@ -180,7 +170,7 @@ type JobInfo struct {
 }
 
 func (o *Job) ID() string {
-	return o.config.Namespace + jobIdSep + strconv.FormatUint(o.jid, 10)
+	return strconv.FormatUint(o.jid, 10)
 }
 
 func (o *Job) SetPID(pid int) {

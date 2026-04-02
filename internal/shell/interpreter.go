@@ -189,7 +189,7 @@ func (o *Interpreter) execHandler(interp.ExecHandlerFunc) interp.ExecHandlerFunc
 		err := o.cmdHand.Run(ctx, apicompat.RunCommandConfig{
 			Argv:   argv,
 			Env:    execEnv(handlerCtx.Env),
-			Cwd:    "",
+			Cwd:    handlerCtx.Dir,
 			Stdin:  handlerCtx.Stdin,
 			Stdout: handlerCtx.Stdout,
 			Stderr: handlerCtx.Stderr,

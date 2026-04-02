@@ -31,7 +31,7 @@ func NewWriteCommand(config apicompat.NewCommandConfig) *fx.Command {
 		Description: "Specify the `datatype` of the value to write (refer to \"help datatypes\")",
 	})
 
-	root.FlagSet.StringFlag(&cmd.datatype, rawEncoding, fx.ArgConfig{
+	root.FlagSet.StringFlag(&cmd.inputFormat, rawEncoding, fx.ArgConfig{
 		Name:        "input-format",
 		Description: "Specify the input `format` of the value to write (refer to \"help formats\")",
 	})

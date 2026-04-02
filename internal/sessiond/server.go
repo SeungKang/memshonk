@@ -190,9 +190,9 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 				Output: stdSplitterWriter{conn: stdErrAndOutConn},
 			}),
 		},
-		OptID:         apiConn.RemoteAddr().String(),
-		ClientConn:    cm,
-		clientApiConn: apiConn,
+		ClientMainConn: cm,
+		ClientApiConn:  apiConn,
+		OptID:          apiConn.RemoteAddr().String(),
 	})
 	if err != nil {
 		_ = cm.Close()
@@ -203,12 +203,11 @@ func (o *Server) acceptClient(ctx context.Context, conn net.Conn) error {
 }
 
 type SessionConfig struct {
-	IO         apicompat.SessionIO
-	IsDefault  bool
-	ClientConn io.Closer
-	OptID      string
+	IO             apicompat.SessionIO
+	ClientMainConn io.Closer
+	OptID          string
 
-	clientApiConn net.Conn
+	ClientApiConn net.Conn
 }
 
 func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session, error) {
@@ -275,14 +274,13 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 			ID:        id,
 			StartedAt: time.Now(),
 		},
-		isDefault: config.IsDefault,
-		jobs:      jobsctl.New(),
-		shared:    o.config.SharedState,
-		io:        config.IO,
-		cmdStore:  &apicompat.CommandStorage{},
-		ctx:       sessionCtx,
-		cancelFn:  cancelSessionFn,
-		apiConn:   config.clientApiConn,
+		jobs:     jobsctl.New(),
+		shared:   o.config.SharedState,
+		io:       config.IO,
+		cmdStore: &apicompat.CommandStorage{},
+		ctx:      sessionCtx,
+		cancelFn: cancelSessionFn,
+		apiConn:  config.ClientApiConn,
 	}
 
 	sh, err := o.config.NewShellFn(session)
@@ -307,7 +305,7 @@ func (o *Server) newSession(ctx context.Context, config SessionConfig) (*Session
 
 	o.sessions[id] = sessionWrapper{
 		session:    session,
-		clientConn: newFromClient(sessionCtx, config.clientApiConn, session),
+		clientConn: newFromClient(sessionCtx, config.ClientApiConn, session),
 	}
 
 	return session, nil

@@ -20,17 +20,16 @@ const (
 )
 
 type Session struct {
-	shared    apicompat.SharedState
-	info      apicompat.SessionInfo
-	isDefault bool
-	jobs      *jobsctl.Ctl
-	io        apicompat.SessionIO
-	cmdStore  *apicompat.CommandStorage
-	shell     Shell
-	ctx       context.Context
-	once      sync.Once
-	cancelFn  func()
-	apiConn   net.Conn
+	shared   apicompat.SharedState
+	info     apicompat.SessionInfo
+	jobs     *jobsctl.Ctl
+	io       apicompat.SessionIO
+	cmdStore *apicompat.CommandStorage
+	shell    Shell
+	ctx      context.Context
+	once     sync.Once
+	cancelFn func()
+	apiConn  net.Conn
 
 	cancelCmdMu  sync.Mutex
 	cancelCmdCtx context.CancelFunc

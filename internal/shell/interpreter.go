@@ -74,7 +74,18 @@ type Interpreter struct {
 // builtinHandler overrides some broken builtins in the sh library.
 func (o *Interpreter) builtinHandler(ctx context.Context, argv []string) ([]string, error) {
 	switch argv[0] {
+	case "help":
+		// Unfortunately, the sh library added "help" as
+		// a builtin that always fails, so we need to
+		// override it here.
+		err := o.internalExec(ctx, argv)
+		if err != nil {
+			return argv, err
+		}
+
+		return argv, errHandledBuiltin
 	case "cd":
+		// Refer to the handleCd Go doc for context.
 		handlerCtx := interp.HandlerCtx(ctx)
 
 		_, err := o.handleCd(handlerCtx, argv[1:])
@@ -176,30 +187,34 @@ func (o *Interpreter) Execute(ctx context.Context, line string) error {
 // or external programs.
 func (o *Interpreter) execHandler(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 	return func(ctx context.Context, argv []string) error {
-		// interp.HandlerCtx is the prescribed mechanism
-		// for accesing the stdin/out pipes managed by
-		// the sh library.
-		handlerCtx := interp.HandlerCtx(ctx)
+		return o.internalExec(ctx, argv)
+	}
+}
 
-		err := o.cmdHand.Run(ctx, apicompat.RunCommandConfig{
-			Argv:   argv,
-			Env:    execEnv(handlerCtx.Env),
-			Cwd:    handlerCtx.Dir,
-			Stdin:  handlerCtx.Stdin,
-			Stdout: handlerCtx.Stdout,
-			Stderr: handlerCtx.Stderr,
-		})
-		if err != nil {
-			exitStatus, hasIt := err.HasExitStatus()
-			if !hasIt {
-				exitStatus = 1
-			}
+func (o *Interpreter) internalExec(ctx context.Context, argv []string) error {
+	// interp.HandlerCtx is the prescribed mechanism
+	// for accesing the stdin/out pipes managed by
+	// the sh library.
+	handlerCtx := interp.HandlerCtx(ctx)
 
-			return interp.NewExitStatus(exitStatus)
+	err := o.cmdHand.Run(ctx, apicompat.RunCommandConfig{
+		Argv:   argv,
+		Env:    execEnv(handlerCtx.Env),
+		Cwd:    handlerCtx.Dir,
+		Stdin:  handlerCtx.Stdin,
+		Stdout: handlerCtx.Stdout,
+		Stderr: handlerCtx.Stderr,
+	})
+	if err != nil {
+		exitStatus, hasIt := err.HasExitStatus()
+		if !hasIt {
+			exitStatus = 1
 		}
 
-		return nil
+		return interp.NewExitStatus(exitStatus)
 	}
+
+	return nil
 }
 
 // execEnv is a copy of the private function of the same name from

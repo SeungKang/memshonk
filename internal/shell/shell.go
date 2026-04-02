@@ -2,6 +2,7 @@ package shell
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -132,15 +133,16 @@ func (o *Shell) Run(ctx context.Context) error {
 		o.rl.SetPrompt(prompt)
 
 		line, err := o.rl.Readline()
-		if err != nil {
-			if err == readline.ErrInterrupt {
-				// Handle Ctrl+C - just continue to next prompt
-				continue
-			}
-			if err == io.EOF {
-				// Handle Ctrl+D - exit gracefully
-				return nil
-			}
+		switch {
+		case err == nil:
+			// Keep going.
+		case errors.Is(err, readline.ErrInterrupt):
+			// Ctrl+C.
+			continue
+		case errors.Is(err, io.EOF):
+			// Ctrl+D.
+			return nil
+		default:
 			return err
 		}
 
@@ -166,7 +168,17 @@ func (o *Shell) Run(ctx context.Context) error {
 		o.cancelCmdCtxFnMu.Unlock()
 
 		// Execute through interpreter
-		_ = o.interp.Execute(cmdCtx, line)
+		err = o.interp.Execute(cmdCtx, line)
+		switch {
+		case err == nil || errors.Is(err, errHandledBuiltin):
+			// Keep going.
+		default:
+			// TODO: At this point, the error message
+			// will be "exit status 1" or something
+			// vague. Should we write it to the session's
+			// stderr? Unsure... maybe it provides more
+			// context?
+		}
 	}
 }
 

@@ -41,11 +41,11 @@ func (o *randomStringer) String() string {
 
 func adjectives() []string {
 	return []string{
-		"big", "small", "happy", "sad", "tall", "short", "old", "new", "fast", "slow",
-		"colorful", "bright", "dark", "light", "loud", "quiet", "strong", "weak",
+		"big", "small", "happy", "tall", "short", "new", "fast",
+		"colorful", "bright", "loud", "quiet", "strong",
 		"amazing", "awesome", "beautiful", "bizarre", "calm", "crazy", "curious", "delightful",
 		"elegant", "exotic", "fantastic", "fascinating", "fierce", "friendly", "funny", "gorgeous",
-		"harmless", "intelligent", "intriguing", "kind", "lively", "lovely", "magnificent", "mysterious",
+		"intelligent", "intriguing", "kind", "lively", "lovely", "magnificent", "mysterious",
 		"playful", "quaint", "quirky", "remarkable", "sophisticated", "spectacular", "spunky", "stunning",
 		"unusual", "vibrant", "wonderful", "youthful", "zany",
 	}

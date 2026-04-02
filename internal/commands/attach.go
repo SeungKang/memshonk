@@ -23,7 +23,7 @@ func NewAttachCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.IntFlag(&cmd.pid, 0, fx.ArgConfig{
 		Name:        "pid",
-		Description: "Optional: Specify the process' PID",
+		Description: "Attach to a process by its PID instead of executable name",
 	})
 
 	return root

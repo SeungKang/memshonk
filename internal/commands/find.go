@@ -29,7 +29,12 @@ func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.datatype, "pattern", fx.ArgConfig{
 		Name:        "datatype",
-		Description: "Optional: Specify encoding format of the search string (refer to \"help datatypes\" for possible values)",
+		Description: "Specify datatype of the search string (refer to \"help datatypes\" for possible values)",
+	})
+
+	root.FlagSet.StringFlag(&cmd.inputFormat, rawEncoding, fx.ArgConfig{
+		Name:        "input-format",
+		Description: "Specify the input `format` of the search string (refer to \"help formats\")",
 	})
 
 	root.FlagSet.StringSliceNf(&cmd.pattern, fx.ArgConfig{
@@ -42,10 +47,11 @@ func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
 }
 
 type FindCommand struct {
-	session  apicompat.Session
-	datatype string
-	pattern  []string
-	stderr   io.Writer
+	session     apicompat.Session
+	datatype    string
+	inputFormat string
+	pattern     []string
+	stderr      io.Writer
 }
 
 func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
@@ -53,20 +59,27 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	var err error
 	stringList := strings.Join(o.pattern, " ")
 
+	data, err := decodeDataStr(o.inputFormat, stringList)
+	if err != nil {
+		return nil, err
+	}
+
+	searchStr := string(data)
+
 	switch o.datatype {
-	case stringDataType, stringleDataType, utf8DataType, utf8leDataType:
-		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
+	case rawDataType, stringDataType, stringleDataType, utf8DataType, utf8leDataType:
+		parsedPattern, err = memory.ParsePatternFromUtf8(searchStr)
 	case stringbeDataType, utf8beDataType, cstringbeDataType:
 		return nil, fmt.Errorf("TODO: %q needs to be implemented", o.datatype)
 	case wstringleDataType, utf16leDataType, wstringDataType, utf16DataType:
-		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.LittleEndian)
+		parsedPattern, err = memory.ParsePatternFromUtf16(searchStr, binary.LittleEndian)
 	case wstringbeDataType, utf16beDataType:
-		parsedPattern, err = memory.ParsePatternFromUtf16(stringList, binary.BigEndian)
+		parsedPattern, err = memory.ParsePatternFromUtf16(searchStr, binary.BigEndian)
 	case cstringDataType, cstringleDataType:
 		// This is kind of half-ass, but whatever.
-		stringList += "\x00"
+		searchStr += "\x00"
 
-		parsedPattern, err = memory.ParsePatternFromUtf8(stringList)
+		parsedPattern, err = memory.ParsePatternFromUtf8(searchStr)
 	case uint16DataType, uint16leDataType, uint16beDataType:
 		var endian binary.ByteOrder = binary.LittleEndian
 
@@ -194,7 +207,7 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 		parsedPattern = memory.PatternForRawBytes(buf.Bytes())
 	case patternDataType:
-		parsedPattern, err = memory.ParsePattern(stringList)
+		parsedPattern, err = memory.ParsePattern(searchStr)
 	default:
 		return nil, fmt.Errorf("unknown data type: %q", o.datatype)
 	}

@@ -136,7 +136,7 @@ COMMANDS
   This format is heavily inspired by video game modding tools which employ
   a similar pattern format.
 
-  Users can specify a pattern as a hexadecimal string optional separated
+  Users can specify a pattern as a hexadecimal string optionally separated
   by space characters. For example, to match four "A" characters, the
   string would be:
     41 41 41 41

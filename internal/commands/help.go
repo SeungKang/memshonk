@@ -110,15 +110,15 @@ COMMANDS
   ` + rawDataType + `       - Raw data (i.e., no parsing or validation)
   ` + utf8leDataType + `    - UTF-8 string in little endian byte order
   ` + utf8DataType + `      - Alias to ` + utf8leDataType + `
-  ` + stringDataType + `    - Alias to ` + utf8leDataType + `
-  ` + stringleDataType + `  - Alias to ` + utf8leDataType + `
   ` + utf8beDataType + `    - UTF-8 string in big endian byte order
+  ` + stringleDataType + `  - Alias to ` + utf8leDataType + `
+  ` + stringDataType + `    - Alias to ` + utf8leDataType + `
   ` + stringbeDataType + `  - Alias to ` + utf8beDataType + `
   ` + utf16leDataType + `   - UTF-16 string in little endian byte order
   ` + utf16DataType + `     - Alias to ` + utf16leDataType + `
+  ` + utf16beDataType + `   - UTF-16 string in big endian byte order
   ` + wstringleDataType + ` - Alias to ` + utf16leDataType + `
   ` + wstringDataType + `   - Alias to ` + utf16leDataType + `
-  ` + utf16beDataType + `   - UTF-16 string in big endian byte order
   ` + wstringbeDataType + ` - Alias to ` + utf16beDataType + `
   ` + cstringleDataType + ` - Null-terminated string in little endian byte order
   ` + cstringDataType + `   - Alias to ` + cstringleDataType + `

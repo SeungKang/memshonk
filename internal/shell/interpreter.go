@@ -87,11 +87,6 @@ func (o *Interpreter) builtinHandler(ctx context.Context, argv []string) ([]stri
 		// code I guess :/
 
 		return argv, nil
-	case "wait":
-		// TODO: The sh library's "wait" implementation
-		// seems to hang forever and also has hard-coded
-		// panic code.
-		return argv, errHandledBuiltin
 	default:
 		return argv, nil
 	}

@@ -2,7 +2,9 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/fx"
@@ -17,6 +19,7 @@ const (
 func NewAttachCommand(config apicompat.NewCommandConfig) *fx.Command {
 	cmd := &AttachCommand{
 		progctl: config.Session.SharedState().Progctl,
+		stderr:  config.Stderr,
 	}
 
 	root := fx.NewCommand(AttachCommandName, "attach to the process", cmd.attach)
@@ -31,12 +34,19 @@ func NewAttachCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 type AttachCommand struct {
 	progctl *progctl.Ctl
+	stderr  io.Writer
 	pid     int
 }
 
 func (o *AttachCommand) attach(ctx context.Context) (fx.CommandResult, error) {
 	pid, err := o.progctl.Attach(ctx, progctl.AttachConfig{OptPID: o.pid})
-	if err != nil {
+	switch {
+	case err == nil:
+		// Keep going.
+	case errors.Is(err, progctl.ErrAlreadyAttached):
+		fmt.Fprintf(o.stderr, "note: already attached to process with pid: %d\n",
+			pid)
+	default:
 		return nil, err
 	}
 

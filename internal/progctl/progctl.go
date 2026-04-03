@@ -24,9 +24,10 @@ const (
 var _ Process = (*Ctl)(nil)
 
 var (
-	ErrNotAttached    = errors.New("not attached")
-	ErrDetached       = errors.New("detached")
-	ErrExitedNormally = errors.New("process exited without error")
+	ErrNotAttached     = errors.New("not attached")
+	ErrAlreadyAttached = errors.New("already attached to a process")
+	ErrDetached        = errors.New("detached")
+	ErrExitedNormally  = errors.New("process exited without error")
 )
 
 type AttachConfig struct {
@@ -149,8 +150,7 @@ func (o *Ctl) Attach(ctx context.Context, cfg AttachConfig) (int, error) {
 		case <-o.current.config.exitMon.Done():
 			// Go ahead with reattach.
 		default:
-			return 0, fmt.Errorf("already attached to pid: %d",
-				o.current.config.pid)
+			return o.current.config.pid, ErrAlreadyAttached
 		}
 	}
 

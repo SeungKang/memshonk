@@ -168,7 +168,7 @@ func (o *Shell) Run(ctx context.Context) error {
 		o.cancelCmdCtxFnMu.Unlock()
 
 		// Execute through interpreter
-		err = o.interp.Execute(cmdCtx, line)
+		err = o.interp.Execute(cmdCtx, strings.NewReader(line), "")
 		switch {
 		case err == nil || errors.Is(err, errHandledBuiltin):
 			// Keep going.

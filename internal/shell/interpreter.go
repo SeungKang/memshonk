@@ -1,10 +1,12 @@
 package shell
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
@@ -87,10 +89,38 @@ func (o *Interpreter) builtinHandler(ctx context.Context, argv []string) ([]stri
 	}
 }
 
+// ExecuteScript parses and executes a shell script.
+func (o *Interpreter) ExecuteScript(ctx context.Context, src io.Reader, name string) error {
+	r := bufio.NewReader(src)
+
+	header, err := r.ReadBytes('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read script header (first line of script) - %w", err)
+	}
+
+	header = bytes.TrimRight(header, "\r\n")
+
+	if !bytes.HasPrefix(header, []byte{'#', '!'}) {
+		return fmt.Errorf("script header line should start with '#!', found: %q",
+			header)
+	}
+
+	if !bytes.HasSuffix(header, []byte("/memshonk")) {
+		return fmt.Errorf("first line of script must be '#!/<path>/memshonk', got %q",
+			header)
+	}
+
+	err = o.Execute(ctx, r, name)
+	if err != nil {
+		return fmt.Errorf("script error - %w", err)
+	}
+
+	return nil
+}
+
 // Execute parses and executes a shell command line.
-func (o *Interpreter) Execute(ctx context.Context, line string) error {
-	// Parse the input
-	file, err := o.parser.Parse(strings.NewReader(line), "")
+func (o *Interpreter) Execute(ctx context.Context, src io.Reader, optName string) error {
+	file, err := o.parser.Parse(src, optName)
 	if err != nil {
 		return fmt.Errorf("parse error - %w", err)
 	}

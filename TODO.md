@@ -2,6 +2,8 @@
 
 ## next stopping point
 
+- make procfs default on linux
+- export the documentation from the app into markdown files (need documentation for procfs)
 - readme
 - command output support (access the result of previous commands)
 - allow overwriting of executable mapped object name

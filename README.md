@@ -1,18 +1,22 @@
 # memshonk
 
-memshonk is a command-line debugger for dynamic analysis of process memory.
-Useful for reverse engineering, debugging closed-source software, and similar
-tasks. Using a client-daemon architecture, it provides an interactive shell
-with POSIX shell syntax, pipes, job control, and execution of both external
-programs and built-in memshonk commands.
+TODO: needs to reflect more of it being a companion tool and fix some grammer stuff
 
-`TODO INTRODUCE WHAT DAEMON MEANS. MODEL OF CLIENT AND DAEMON, BACKGROUND PROCESS THAT IS ACTUALLY DOING THE WORK.`
-Multiple clients can connect to the same daemon simultaneously, each with their own I/O and command history.
+memshonk is a command-line debugger for dynamic analysis of process memory.
+Using a client-daemon architecture, it provides an interactive shell
+with POSIX shell syntax, pipes, job control, and execution of both external
+programs and built-in memshonk commands. The daemon is a background process
+that does the actual memory analysis work, while clients act as interactive
+frontends that send commands and display results.
+
+memshonk is like Wireshark, but for process memory. It provides
+an interactive shell that supports POSIX shell syntax, pipes,
+job control, and execution of external programs and internal
+memshonk commands.
 
 ## Features
 
 - Read, write, and watch memory
-`TODO CHANGE THE NAME OF FIND, TO SCAN OR SOMETHING ELSE`
 - Search memory based on data type or byte patterns with the `find` command
 - Client-daemon architecture for long-running debugging sessions
 - Plugin support for additional functionality
@@ -20,6 +24,7 @@ Multiple clients can connect to the same daemon simultaneously, each with their 
 - Switchable between ptrace and procfs memory management modes (Linux only)
 - Attach to a program by PID, file path, or configuration file
 - Full shell with access to external programs (e.g. grep, cat, echo), shell history, reverse search, and tab completion
+- Run automation scripts with `mrun`, using the same shell syntax and built-in commands as the interactive shell
 
 ## Installation
 
@@ -27,37 +32,8 @@ To build from source, see the [Development document](./docs/development/README.m
 
 ## Commands
 
-Type `help` in memshonk to list all commands, or `help [TOPIC]` for details on a specific topic.
-
-TOPICS
-
-```
-datatypes - Data types usable with various memory manipulation commands
-formats   - Supported data formatting (encoding) options
-pattern   - Pattern string format used in the "find" command and other commands
-```
-
-Use `[COMMAND] -h` to list full options for a specific command.
-
-COMMANDS
-
-> Note: `readm` and `writem` are named to avoid shadowing the POSIX shell
-> built-in `read` command.
-
-```
-attach   - attach to the process
-daemon   - manage the server daemon
-detach   - detach from the process
-find     - find data in a process's memory
-help     - list available commands and help topics
-plugins  - manage plugins
-readm    - read data from an address
-session  - manage session (list, inspect, or remove sessions)
-shonkset - set configuration options
-vmmap    - view the process's memory regions
-watch    - watch data at an address for changes
-writem   - write value to an address
-```
+See the [Commands document](./docs/commands/commands.md) for a full list of commands and topics.
+Within memshonk, type `help` or `help [TOPIC]` for reference.
 
 ## Supported Systems
 
@@ -77,43 +53,57 @@ Refer to the [Example configuration file](./examples/vim-windows.txt).
 
 > Note: Running with `winpty` can help with terminal rendering on Windows.
 
-```
+View usage:
+
+```console
+$ winpty ./memshonk.exe -h
 SYNOPSIS
   memshonk -h
-  memshonk [options] EXECUTABLE-PATH
+  memshonk [options] -e EXECUTABLE-FILE-PATH
   memshonk [options] -p PROJECT-FILE-PATH
 
+DESCRIPTION
+
 OPTIONS
-  -h          display help
-  -p PATH     use a project file instead of specifying an executable path
-  -S ID       use a custom session ID
+  -S id
+        Use a custom session id
+  -e path
+        Load the specified executable by its path and use an empty project
+  -h    Display this information
+  -p path
+        Load a project file by its path
 ```
 
-```sh
-# Run memshonk with configuration file vim-windows.txt and session ID short-seal
-winpty ./memshonk.exe -p examples/vim-windows.txt -S short-seal
+Start a session using a configuration file and a custom session ID:
 
-# attach to program vim
+```console
+$ winpty ./memshonk.exe -p examples/vim-windows.txt -S short-seal
+```
+
+Attach to the target program. The PID appears in the shell prompt once attached:
+
+```console
 (short-seal) $ attach
 attached to "vim.exe", pid: 49564, base addr: 0x100400000
-
-# pid shows in shell prompt
 (short-seal) [49564] $
+```
 
-# search for string hello in program
-# 0x10079ed7c is the address of the result
+Search for a string in memory. The result is the address where it was found:
+
+```console
 (short-seal) [49564] $ find -d string hello
 searching..............................................................
 0x10079ed7c
+```
 
-# read 5 bytes of data from address 0x10079ed7c
+Read and overwrite memory at that address:
+
+```console
 (short-seal) [49564] $ readm -s 5 -d raw 0x10079ed7c
 000000010079ed81   68 65 6c 6c  6f                                      |hello           |
 
-# overwrite the string at that address with "world"
 (short-seal) [49564] $ writem -addr 0x10079ed7c -data world
 
-# confirm the write
 (short-seal) [49564] $ readm -s 5 -d raw 0x10079ed7c
 000000010079ed81   77 6f 72 6c  64                                      |world           |
 ```

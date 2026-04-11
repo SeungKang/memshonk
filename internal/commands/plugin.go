@@ -10,20 +10,20 @@ import (
 )
 
 const (
-	PluginsCommandName = "plugins"
+	PluginCommandName = "plugin"
 )
 
-func NewPluginsCommand(config apicompat.NewCommandConfig) *fx.Command {
+func NewPluginCommand(config apicompat.NewCommandConfig) *fx.Command {
 	pluginsCtl, pluginsEnabled := config.Session.SharedState().HasPlugins()
 
-	pluginsCmd := PluginsCommand{
+	pluginsCmd := PluginCommand{
 		Session: config.Session,
 		Stderr:  config.Stderr,
 		Stdout:  config.Stdout,
 		Ctl:     pluginsCtl,
 	}
 
-	root := fx.NewCommand(PluginsCommandName, "manage plugins", pluginsCmd.list)
+	root := fx.NewCommand(PluginCommandName, "manage plugins", pluginsCmd.list)
 
 	root.OptPreRunFn = func(context.Context) error {
 		if pluginsEnabled {
@@ -58,7 +58,7 @@ func NewPluginsCommand(config apicompat.NewCommandConfig) *fx.Command {
 	return root
 }
 
-type PluginsCommand struct {
+type PluginCommand struct {
 	Session              apicompat.Session
 	Stderr               io.Writer
 	Stdout               io.Writer
@@ -66,7 +66,7 @@ type PluginsCommand struct {
 	Ctl                  plugins.Ctl
 }
 
-func (o *PluginsCommand) list(_ context.Context) (fx.CommandResult, error) {
+func (o *PluginCommand) list(_ context.Context) (fx.CommandResult, error) {
 	if o.PluginNameOrFilePath != "" {
 		plugin, err := o.Ctl.Plugin(o.PluginNameOrFilePath)
 		if err != nil {
@@ -79,7 +79,7 @@ func (o *PluginsCommand) list(_ context.Context) (fx.CommandResult, error) {
 	return fx.NewHumanCommandResult(o.Ctl.PrettyString("")), nil
 }
 
-func (o *PluginsCommand) load(_ context.Context) (fx.CommandResult, error) {
+func (o *PluginCommand) load(_ context.Context) (fx.CommandResult, error) {
 	plugin, err := o.Ctl.Load(plugins.PluginConfig{
 		FilePath: o.PluginNameOrFilePath,
 	})
@@ -92,7 +92,7 @@ func (o *PluginsCommand) load(_ context.Context) (fx.CommandResult, error) {
 	return fx.NewHumanCommandResult(plugin.PrettyString("")), nil
 }
 
-func (o *PluginsCommand) reload(ctx context.Context) (fx.CommandResult, error) {
+func (o *PluginCommand) reload(ctx context.Context) (fx.CommandResult, error) {
 	o.Session.SharedState().Commands.Unregister(o.PluginNameOrFilePath)
 
 	err := o.Ctl.Reload(ctx, plugins.ReloadPluginArgs{
@@ -114,7 +114,7 @@ func (o *PluginsCommand) reload(ctx context.Context) (fx.CommandResult, error) {
 	return nil, nil
 }
 
-func (o *PluginsCommand) unload(_ context.Context) (fx.CommandResult, error) {
+func (o *PluginCommand) unload(_ context.Context) (fx.CommandResult, error) {
 	plugToUnload, err := o.Ctl.Plugin(o.PluginNameOrFilePath)
 	if err != nil {
 		return nil, err

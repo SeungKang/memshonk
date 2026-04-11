@@ -5,6 +5,8 @@
 - command output support (access the result of previous commands)
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
+- processWriter needs to offset itself automatically like os.File
+- Need to document Pointer string in help (and maybe README?)
 
 ## documentation
 - export in-app documentation to Markdown files
@@ -27,6 +29,7 @@
   (i.e., be able to load a previously-unloaded plugin using
   only its name - maybe we can have a name -> plugin info
   cache?)
+- add ResolvePointer function (i.e., allow plugins to resolve pointer strings)
 
 ## mskit
 
@@ -86,6 +89,9 @@
 - disable color (needs to be a Session-level setting)
 - allow execution of external programs to be disabled
 - support stdin reading for each command including supporting io.closer for cancellation
+- tab completion should add a space (" ") character if it completes
+  and there are no other options (e.g., tab completing "foob" when
+  nothing else matches should become "foobar " and not "foobar")
 
 ## projects
 

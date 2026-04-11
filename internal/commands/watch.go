@@ -25,10 +25,11 @@ func NewWatchCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root := fx.NewCommand(WatchCommandName, "watch data at an address for changes", cmd.run)
 
-	root.FlagSet.Uint64Nf(&cmd.sizeBytes, fx.ArgConfig{
-		Name:        "size",
-		Description: "number of bytes to read",
-		Required:    true,
+	root.FlagSet.Uint64Flag(&cmd.sizeBytes, 0, fx.ArgConfig{
+		Name:         "size",
+		Description:  "number of bytes to read",
+		Required:     true,
+		OptShortName: "s",
 	})
 
 	root.FlagSet.StringSliceNf(&cmd.addrStrs, fx.ArgConfig{

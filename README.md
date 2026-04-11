@@ -1,86 +1,69 @@
 # memshonk
 
-TODO: needs to reflect more of it being a companion tool and fix some grammer stuff
+memshonk is an experimental command-line debugger companion that tries to
+fill the functionality gaps between debuggers. Think of it as a cross
+between `gdb`, `rizin`, and CheatEngine. It is not meant to replace
+a debugger, but supplement it.
 
-memshonk is a command-line debugger for dynamic analysis of process memory.
-Using a client-daemon architecture, it provides an interactive shell
-with POSIX shell syntax, pipes, job control, and execution of both external
-programs and built-in memshonk commands. The daemon is a background process
-that does the actual memory analysis work, while clients act as interactive
-frontends that send commands and display results.
-
-memshonk is like Wireshark, but for process memory. It provides
-an interactive shell that supports POSIX shell syntax, pipes,
-job control, and execution of external programs and internal
-memshonk commands.
+Please note that memshonk is in its very early stages of development.
+There are bugs and missing functionality.
 
 ## Features
 
-- Read, write, and watch memory
-- Search memory based on data type or byte patterns with the `find` command
-- Client-daemon architecture for long-running debugging sessions
-- Plugin support for additional functionality
-- Multi-session support (multiple clients connecting to the same daemon)
-- Switchable between ptrace and procfs memory management modes (Linux only)
-- Attach to a program by PID, file path, or configuration file
-- Full shell with access to external programs (e.g. grep, cat, echo), shell history, reverse search, and tab completion
-- Run automation scripts with `mrun`, using the same shell syntax and built-in commands as the interactive shell
+- Read, write, and watch memory in real time
+- View process memory mappings and permissions
+- Search memory based on data type or byte patterns
+- Run side-by-side with your favorite debugger on Linux and Windows
+  - Supports switching between `ptrace` and `procfs` memory management modes
+    on Linux to allow side-by-side use with tools like `gdb` and `pwndbg`
+- Text-based UI
+- Full sh-like shell with access to external programs (e.g. grep, cat, ls),
+  pipes, shell history, reverse search, and tab completion
+- Multi-session support allows multiple clients. Great for providing
+  multiple windows or debugging with friends
+- Client-daemon architecture allows for long-running debugging sessions and
+  protection against accidental exits or lack of tools like tmux
+- Project files make it easy to attach to a program by its executable file
+  name, set pre-defined variables, and automatically load plugins
+- Plugin support via dynamically-loaded libraries
+  - A Rust library named [`mskit`](plugin-api/mskit) is provided as
+    a building block. Refer to the [examples](examples/plugins) for
+    details
+  - Users can specify optional automation to run when reloading plugins,
+    making it easy to, for example, recompile a plugin from source
+- Scripting interface via `mrun` command provides access to memshonk
+  commands using a POSIX shell syntax
+
+## Supported systems
+
+memshonk supports the following operating systems:
+
+- FreeBSD
+- Linux
+- Windows
+
+Support for other Unix-like OSes is definitely possible. We just have not
+had time to work on that.
 
 ## Installation
 
-To build from source, see the [Development document](./docs/development/README.md).
+Prebuilt executables are not currently provided. To build from source,
+refer to the [Development document](./docs/development/README.md).
 
-## Commands
+## Demo
 
-See the [Commands document](./docs/commands/commands.md) for a full list of commands and topics.
-Within memshonk, type `help` or `help [TOPIC]` for reference.
+> Note: In git-bash shell on Windows, running memshonk using
+> `winpty memshonk ARGS...` improves terminal rendering.
 
-## Supported Systems
-
-- Windows
-- Linux
-- FreeBSD
-
-## Development and Building from Source
-
-Refer to the [Development document](./docs/development/README.md).
-
-## Example Configuration File
-
-Refer to the [Example configuration file](./examples/vim-windows.txt).
-
-## Example: Running Memshonk
-
-> Note: Running with `winpty` can help with terminal rendering on Windows.
-
-View usage:
+Start a session using a project file:
 
 ```console
-$ winpty ./memshonk.exe -h
-SYNOPSIS
-  memshonk -h
-  memshonk [options] -e EXECUTABLE-FILE-PATH
-  memshonk [options] -p PROJECT-FILE-PATH
-
-DESCRIPTION
-
-OPTIONS
-  -S id
-        Use a custom session id
-  -e path
-        Load the specified executable by its path and use an empty project
-  -h    Display this information
-  -p path
-        Load a project file by its path
+$ memshonk -p examples/vim.txt
+(short-seal) $
 ```
 
-Start a session using a configuration file and a custom session ID:
-
-```console
-$ winpty ./memshonk.exe -p examples/vim-windows.txt -S short-seal
-```
-
-Attach to the target program. The PID appears in the shell prompt once attached:
+Attach to the target program identified by the project file. The process'
+PID appears in the shell prompt once attached:
 
 ```console
 (short-seal) $ attach
@@ -99,11 +82,24 @@ searching..............................................................
 Read and overwrite memory at that address:
 
 ```console
-(short-seal) [49564] $ readm -s 5 -d raw 0x10079ed7c
+(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
 000000010079ed81   68 65 6c 6c  6f                                      |hello           |
 
-(short-seal) [49564] $ writem -addr 0x10079ed7c -data world
+(short-seal) [49564] $ writem -a 0x10079ed7c -d world
 
-(short-seal) [49564] $ readm -s 5 -d raw 0x10079ed7c
+(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
 000000010079ed81   77 6f 72 6c  64                                      |world           |
 ```
+
+## Commands
+
+Refer to the [Commands document](./docs/commands/README.md) for a full
+list of commands and topics. Within memshonk, type `help` or `help [TOPIC]`.
+
+## Project file syntax
+
+Refer to the [example configuration files](./examples/).
+
+## Development documentation
+
+Refer to the [Development document](./docs/development/README.md).

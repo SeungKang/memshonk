@@ -16,16 +16,16 @@ import (
 )
 
 const (
-	FindCommandName = "find"
+	ScanCommandName = "scan"
 )
 
-func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
-	cmd := &FindCommand{
+func NewScanCommand(config apicompat.NewCommandConfig) *fx.Command {
+	cmd := &ScanCommand{
 		session: config.Session,
 		stderr:  config.Stderr,
 	}
 
-	root := fx.NewCommand(FindCommandName, "find data in a process' memory", cmd.run)
+	root := fx.NewCommand(ScanCommandName, "search process memory for values or byte patterns", cmd.run)
 
 	root.FlagSet.StringFlag(&cmd.datatype, "pattern", fx.ArgConfig{
 		Name:        "datatype",
@@ -46,7 +46,7 @@ func NewFindCommand(config apicompat.NewCommandConfig) *fx.Command {
 	return root
 }
 
-type FindCommand struct {
+type ScanCommand struct {
 	session     apicompat.Session
 	datatype    string
 	inputFormat string
@@ -54,7 +54,7 @@ type FindCommand struct {
 	stderr      io.Writer
 }
 
-func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
+func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	var parsedPattern memory.ParsedPattern
 	var err error
 	stringList := strings.Join(o.pattern, " ")
@@ -222,7 +222,7 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 	process := o.session.SharedState().Progctl
 
-	var matches FindCommandResult
+	var matches ScanCommandResult
 
 	fmt.Fprint(o.stderr, "searching")
 
@@ -263,7 +263,7 @@ func (o *FindCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	return fx.NewSerialCommandResult(matches), nil
 }
 
-func (o *FindCommand) searchRegion(ctx context.Context, parsedPattern memory.ParsedPattern, region memory.Region, process progctl.Process) ([]memory.FindResult, error) {
+func (o *ScanCommand) searchRegion(ctx context.Context, parsedPattern memory.ParsedPattern, region memory.Region, process progctl.Process) ([]memory.ScanResult, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -292,11 +292,11 @@ func (o *FindCommand) searchRegion(ctx context.Context, parsedPattern memory.Par
 	return nil, nil
 }
 
-type FindCommandResult struct {
-	results []memory.FindResult
+type ScanCommandResult struct {
+	results []memory.ScanResult
 }
 
-func (o FindCommandResult) Serialize() []byte {
+func (o ScanCommandResult) Serialize() []byte {
 	buf := bytes.Buffer{}
 
 	for i, u := range o.results {

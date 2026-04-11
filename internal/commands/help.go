@@ -52,7 +52,7 @@ func (o *HelpCommand) run(_ context.Context) (fx.CommandResult, error) {
 TOPICS
   datatypes - Data types usable with various memory manipulation commands
   formats   - Supported data formatting (encoding) options
-  pattern   - Pattern string format used in the "find" command and
+  pattern   - Pattern string format used in the "scan" command and
               potentially other commands
 
 COMMANDS

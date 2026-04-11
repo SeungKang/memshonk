@@ -10,22 +10,22 @@ import (
 	"unicode/utf16"
 )
 
-type FindResult struct {
+type ScanResult struct {
 	Size uint64
 	Addr Pointer
 }
 
-func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *BufferedReader) ([]FindResult, error) {
+func FindAllReader(ctx context.Context, parsedPattern ParsedPattern, reader *BufferedReader) ([]ScanResult, error) {
 	needLength := uint64(parsedPattern.length)
 	reader.SetAdvanceBy(1)
 
-	var matches []FindResult
+	var matches []ScanResult
 
 	for reader.Next(ctx, needLength) {
 		chunk := reader.Bytes()
 
 		if parsedPattern.Matches(chunk) {
-			matches = append(matches, FindResult{
+			matches = append(matches, ScanResult{
 				Size: uint64(len(chunk)),
 				Addr: reader.Addr(),
 			})

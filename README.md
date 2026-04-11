@@ -26,9 +26,9 @@ There are bugs and missing functionality.
 - Project files make it easy to attach to a program by its executable file
   name, set pre-defined variables, and automatically load plugins
 - Plugin support via dynamically-loaded libraries
-  - A Rust library named [`mskit`](plugin-api/mskit) is provided as
-    a building block. Refer to the [examples](examples/plugins) for
-    details
+  - A Rust library named [`mskit`](plugin-api/mskit) is provided
+    as a building block. Example plugins can be found in
+    [examples/plugins](examples/plugins)
   - Users can specify optional automation to run when reloading plugins,
     making it easy to, for example, recompile a plugin from source
 - Scripting interface via `mrun` command provides access to memshonk
@@ -85,7 +85,7 @@ Read and overwrite memory at that address:
 (short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
 000000010079ed81   68 65 6c 6c  6f                                      |hello           |
 
-(short-seal) [49564] $ writem -a 0x10079ed7c -d world
+(short-seal) [49564] $ writem -a 0x10079ed7c -d raw -v world
 
 (short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
 000000010079ed81   77 6f 72 6c  64                                      |world           |
@@ -102,7 +102,7 @@ Refer to the [example configuration files](./examples/).
 
 ## Plugins
 
-Refer to the [Plugin document](./docs/plugins/README.md).
+Refer to the [Plugins document](./docs/plugins/README.md).
 
 ## Development documentation
 

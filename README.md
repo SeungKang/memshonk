@@ -100,6 +100,10 @@ list of commands and topics. Within memshonk, type `help` or `help [TOPIC]`.
 
 Refer to the [example configuration files](./examples/).
 
+## Plugins
+
+Refer to the [Plugin document](./docs/plugins/README.md).
+
 ## Development documentation
 
 Refer to the [Development document](./docs/development/README.md).

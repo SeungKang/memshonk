@@ -34,7 +34,7 @@ type Plugin interface {
 
 	FilePath() string
 
-	Version() uint16
+	Version() uint32
 
 	Description() string
 

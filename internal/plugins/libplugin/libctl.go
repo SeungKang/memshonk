@@ -24,7 +24,6 @@ const (
 
 // Required functions for library-based plugins.
 const (
-	versionFnName         = "version"
 	allocFnName           = "alloc_v0"
 	freeFnName            = "free_v0"
 	setReadFromProcFnName = "set_read_from_process_v0"
@@ -33,6 +32,7 @@ const (
 
 // Optional functions for library-based plugins.
 const (
+	versionFnName     = "version"
 	unloadFnName      = "unload"
 	debugFnName       = "debug"
 	descriptionFnName = "description_v0"
@@ -329,8 +329,8 @@ type setupPluginArgs struct {
 }
 
 func (o *Ctl) setupPlugin(args setupPluginArgs) (*Plugin, error) {
-	var versionFn func() uint16
-	var version uint16
+	var versionFn func() uint32
+	var version uint32
 
 	_ = args.lib.Func(versionFnName, &versionFn)
 

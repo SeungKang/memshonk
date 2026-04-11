@@ -7,8 +7,8 @@ use std::error::Error;
 use std::str::FromStr;
 
 #[no_mangle]
-extern "C" fn version() -> u16 {
-    0
+extern "C" fn version() -> u32 {
+    0x00_00_01_00
 }
 
 #[no_mangle]

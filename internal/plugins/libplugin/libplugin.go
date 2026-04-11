@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,7 @@ type Plugin struct {
 	filePath    string
 	name        string
 	loadedAt    time.Time
-	version     uint16
+	version     uint32
 	desc        string
 	callbacks   *goCallbacks
 	allocFn     func(uint32) uintptr
@@ -114,7 +115,7 @@ func (o *Plugin) PrettyString(indent string) string {
 	if indent != "" {
 		buf.WriteString(indent)
 	}
-	buf.WriteString(fmt.Sprintf("version: %d\n", o.version))
+	buf.WriteString(fmt.Sprintf("version: %s\n", o.versionStr()))
 
 	if indent != "" {
 		buf.WriteString(indent)
@@ -172,6 +173,22 @@ func (o *Plugin) PrettyString(indent string) string {
 	return buf.String()
 }
 
+func (o *Plugin) versionStr() string {
+	if o.version == 0 {
+		return "0.0.0"
+	}
+
+	major := strconv.FormatUint(uint64(o.version>>24), 10)
+
+	minor := strconv.FormatUint(uint64((o.version>>16)&0xFF), 10)
+
+	patch := strconv.FormatUint(uint64((o.version>>8)&0xFF), 10)
+
+	//idk := strconv.FormatUint(uint64(o.version&0xFF), 10)
+
+	return major + "." + minor + "." + patch
+}
+
 func (o *Plugin) ParsersPrettyString(indent string) string {
 	if len(o.parsers) == 0 {
 		return ""
@@ -224,7 +241,7 @@ func (o *Plugin) Name() string {
 	return o.name
 }
 
-func (o *Plugin) Version() uint16 {
+func (o *Plugin) Version() uint32 {
 	return o.version
 }
 

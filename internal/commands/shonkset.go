@@ -28,7 +28,6 @@ func NewShonksetCommand(config apicompat.NewCommandConfig) *fx.Command {
 	root.FlagSet.StringNf(&cmd.confValue, fx.ArgConfig{
 		Name:        "configuration-value",
 		Description: "",
-		Required:    true,
 	})
 
 	return root
@@ -43,6 +42,9 @@ type ShonksetCommand struct {
 func (o *ShonksetCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	switch o.confItem {
 	case "memmode":
+		if o.confValue == "" {
+			return fx.NewHumanCommandResult(o.session.SharedState().Progctl.MemoryMode()), nil
+		}
 		err := o.session.SharedState().Progctl.SetMemoryMode(o.confValue)
 		return nil, err
 	default:

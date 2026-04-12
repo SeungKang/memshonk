@@ -36,7 +36,7 @@ attached to "vim.exe", pid: 49564, base addr: 0x100400000
 Search for a string in memory. The result is the address where it was found:
 
 ```console
-(short-seal) [49564] $ find -d string hello
+(short-seal) [49564] $ scan -d string hello
 searching..............................................................
 0x10079ed7c
 ```

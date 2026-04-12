@@ -117,3 +117,33 @@ Refer to the [Development document](./docs/development/README.md).
 ## Future plans, limitations, and known issues
 
 Refer to the [TODO document](./TODO.md).
+
+## Special thanks
+
+We would like to acknowledge and thank the following people and projects
+for their work on various libraries and code that memshonk depends on.
+memshonk would not be possible without their awesome work:
+
+- [awgh](https://github.com/awgh) for their work on a Go-based PE file
+  parser which enabled us to parse PE file symbols using the Go standard
+  library. Our plugin system relies on exported library symbols. Without
+  awgh's code, we would not be able to parse plugin symbols on Windows
+- [ChenYe](https://github.com/chzyer) and
+  [Daniel Martí](https://github.com/mvdan) for respectively developing the
+  `github.com/chzyer/readline` and `github.com/mvdan/sh` libraries, which
+  enabled us to build a very powerful shell with minimal dependencies
+- [Grumble project](https://github.com/desertbit/grumble) for providing
+  an easy-to-use shell / TUI library that allowed us to get memshonk
+  started. memshonk would not be where it is today without grumble
+- [Igor Café](https://github.com/igorcafe) for their `xx` library
+  which became the basis for our `internal/hexdump` library
+- [Leonid Bugaev](https://github.com/buger) for their `goterm` library
+  which we have forked into `internal/vendored/goterm`
+- [Mahmud "hjr265" Ridwan](https://github.com/hjr265) for their `ptrace`
+  Go library work which served as the basis for our `internal/ptrace`
+  library
+- [Nominal Animal](https://stackoverflow.com/a/18603766) for their very
+  detailed explanation of `ptrace(2)` and its many byzantine rules
+- [purego project](https://github.com/ebitengine/purego) for enabling
+  use of shared libraries in Go and giving us an opportunity to build
+  a really neat plugin system

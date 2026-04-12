@@ -80,12 +80,17 @@ func unsupportedMemoryModeError(memoryMode string) error {
 }
 
 func NewCtl(exePath string, eventGroups *events.Groups) *Ctl {
-	return &Ctl{
+	ctl := &Ctl{
 		exePath:       exePath,
 		attachEvents:  events.NewPublisher[AttachedEvent](eventGroups),
 		detachEvents:  events.NewPublisher[DetachedEvent](eventGroups),
 		processExited: events.NewPublisher[ProcessExitedEvent](eventGroups),
 	}
+
+	// Initialize to the platform default so MemoryMode() is never empty.
+	_ = ctl.setMemoryMode("")
+
+	return ctl
 }
 
 type Ctl struct {
@@ -115,6 +120,16 @@ func (o *Ctl) setMemoryMode(modeName string) error {
 			return fmt.Errorf("unsupported memory mode: %q - supported options are: %q",
 				modeName, kernel32MemoryMode)
 		}
+	case "linux":
+		switch modeName {
+		case "", procfsMemoryMode:
+			o.memMode = procfsMemoryMode
+		case ptraceMemoryMode:
+			o.memMode = ptraceMemoryMode
+		default:
+			return fmt.Errorf("unsupported memory mode: %q - supported options are: %q or %q",
+				modeName, procfsMemoryMode, ptraceMemoryMode)
+		}
 	default:
 		switch modeName {
 		case "", ptraceMemoryMode:
@@ -123,7 +138,7 @@ func (o *Ctl) setMemoryMode(modeName string) error {
 			o.memMode = procfsMemoryMode
 		default:
 			return fmt.Errorf("unsupported memory mode: %q - supported options are: %q or %q",
-				modeName, procfsMemoryMode, procfsMemoryMode)
+				modeName, procfsMemoryMode, ptraceMemoryMode)
 		}
 	}
 

@@ -8,6 +8,51 @@ a debugger, but supplement it.
 Please note that memshonk is in its very early stages of development.
 There are bugs and missing functionality.
 
+## Demo
+
+Here is a demo of memshonk in video form: https://youtu.be/Z5twBlVa9R4
+
+Please find a text-based demo of memshonk below:
+
+> Note: In git-bash shell on Windows, running memshonk using
+> `winpty memshonk ARGS...` improves terminal rendering.
+
+Start a session using a project file:
+
+```console
+$ memshonk -p examples/vim.txt
+(short-seal) $
+```
+
+Attach to the target program identified by the project file. The process'
+PID appears in the shell prompt once attached:
+
+```console
+(short-seal) $ attach
+attached to "vim.exe", pid: 49564, base addr: 0x100400000
+(short-seal) [49564] $
+```
+
+Search for a string in memory. The result is the address where it was found:
+
+```console
+(short-seal) [49564] $ find -d string hello
+searching..............................................................
+0x10079ed7c
+```
+
+Read and overwrite memory at that address:
+
+```console
+(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
+000000010079ed81   68 65 6c 6c  6f                                      |hello           |
+
+(short-seal) [49564] $ writem -a 0x10079ed7c -d raw -v world
+
+(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
+000000010079ed81   77 6f 72 6c  64                                      |world           |
+```
+
 ## Features
 
 - Read, write, and watch memory in real time
@@ -49,47 +94,6 @@ had time to work on that.
 
 Prebuilt executables are not currently provided. To build from source,
 refer to the [Development document](./docs/development/README.md).
-
-## Demo
-
-> Note: In git-bash shell on Windows, running memshonk using
-> `winpty memshonk ARGS...` improves terminal rendering.
-
-Start a session using a project file:
-
-```console
-$ memshonk -p examples/vim.txt
-(short-seal) $
-```
-
-Attach to the target program identified by the project file. The process'
-PID appears in the shell prompt once attached:
-
-```console
-(short-seal) $ attach
-attached to "vim.exe", pid: 49564, base addr: 0x100400000
-(short-seal) [49564] $
-```
-
-Search for a string in memory. The result is the address where it was found:
-
-```console
-(short-seal) [49564] $ find -d string hello
-searching..............................................................
-0x10079ed7c
-```
-
-Read and overwrite memory at that address:
-
-```console
-(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
-000000010079ed81   68 65 6c 6c  6f                                      |hello           |
-
-(short-seal) [49564] $ writem -a 0x10079ed7c -d raw -v world
-
-(short-seal) [49564] $ readm -a 0x10079ed7c -s 5 -d raw
-000000010079ed81   77 6f 72 6c  64                                      |world           |
-```
 
 ## Commands
 

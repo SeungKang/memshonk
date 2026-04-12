@@ -8,6 +8,7 @@
 - processWriter needs to offset itself automatically like os.File
 
 ## documentation
+
 - export in-app documentation to Markdown files
 - add documentation for procfs mode
 - write and polish README
@@ -18,7 +19,6 @@
 
 ## multi session support
 
-- figure out better way of doing copyAndAddBackslashRLoop()
 - instant messaging :)
 
 ## plugin
@@ -59,6 +59,8 @@
   this addr
 - outputs command
 - command performance measuring
+- From [Amy](https://github.com/tobert/): memory-map a process' region / object
+  to a file so things outside of memshonk can play with it
 
 ## readm command
 
@@ -69,6 +71,7 @@
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
 - improve find performance (increase size read, or with start/end address)
+- pattern: add ability to specify n `??` (like: `??x10`)
 
 ## kernel32
 
@@ -96,12 +99,28 @@
 - Create project file based on current settings (i.e., serialize current
   project.Project object to ini)
 
-## bugs
+## limitations
 
-- hanging when running "winpty go run -tags plugins_execonreload main.go -p examples/mass-effect-3.txt" stuck at "connecting to daemon..."
-- Handling of terminal cursor when it wraps on to the next line (there needs to be ~half the terminal rows filled for this to happen)
+- No breakpoints or disassembly (we would like to implement this though!
+  Refer to the `dissect` branch for our initial work towards that)
+
+## known issues (bugs)
+
+- hanging at "connecting to daemon..." when running:
+
+  ```
+  winpty go run -tags plugins_execonreload main.go -p examples/mass-effect-3.txt
+  ```
+
+- Handling of terminal cursor when it wraps on to the next line (there
+  needs to be ~half the terminal rows filled for this to happen)
+- Shell reverse search (ctrl+r) does not save the selected item to shell
+  history (this is likely a limitation of the `readline` library)
+- Interactive programs like `vim` and `less` do not currently work (this
+  may be a simple fix, but we have not looked into it deeply as of yet)
 
 ## hacks / workarounds
 
 - Try to remove Unix socket startup workaround in main.go
   - Everything but color works :/
+- figure out better way of doing copyAndAddBackslashRLoop() (adding `\r\n`)

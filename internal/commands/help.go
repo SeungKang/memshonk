@@ -20,6 +20,11 @@ const (
 	formatsTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + formatsTopicName + `")`
 	patternTopicName       = "pattern"
 	patternTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + patternTopicName + `")`
+
+	AppDescription = `  memshonk is an experimental command-line debugger companion that tries to
+  fill the functionality gaps between debuggers. Think of it as a cross
+  between gdb, rizin, and Cheat Engine. It is not meant to replace
+  a debugger, but supplement it.`
 )
 
 func NewHelpCommand(config apicompat.NewCommandConfig) *fx.Command {
@@ -53,10 +58,7 @@ func (o *HelpCommand) run(_ context.Context) (fx.CommandResult, error) {
 		// infinite recursive calls to the PrintUsage
 		// method... and yeah, no bueno.
 		sb.WriteString(`OVERVIEW
-  memshonk is an experimental command-line debugger companion that tries to
-  fill the functionality gaps between debuggers. Think of it as a cross
-  between gdb, rizin, and CheatEngine. It is not meant to replace
-  a debugger, but supplement it.
+` + AppDescription + `
 
 TOPICS
   ` + addressTopicName + `   - How memshonk handles memory addresses (pointer chains)
@@ -139,7 +141,7 @@ COMMANDS
   ` + float64leDataType + ` - A 64-bit float in little endian byte order
   ` + float64DataType + `   - Alias to ` + float64leDataType + `
   ` + float64beDataType + ` - A 64-bit float in big endian byte order
-  ` + patternDataType + `   - Pattern string (refer to "help pattern" for details)`), nil
+  ` + patternDataType + `   - Pattern string ` + patternTopicReferStr), nil
 	case patternTopicName:
 		return fx.NewHumanCommandResult(`PATTERN STRING
   memshonk supports a pattern string format for searching for byte sequences.

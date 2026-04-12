@@ -6,7 +6,6 @@
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
 - processWriter needs to offset itself automatically like os.File
-- Need to document Pointer string in help (and maybe README?)
 
 ## documentation
 - export in-app documentation to Markdown files
@@ -65,12 +64,11 @@
 
 - Get input data from a file / pipe
 
-## find
+## scan
 
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
 - improve find performance (increase size read, or with start/end address)
-- rename find command → scan, search, or similar
 
 ## kernel32
 

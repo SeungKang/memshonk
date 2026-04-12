@@ -36,12 +36,16 @@ import (
 const (
 	appName = "memshonk"
 
+	version = "v0.0.1"
+
 	usage = `SYNOPSIS
   ` + appName + ` -` + helpArg + `
   ` + appName + ` [options] -` + exePathArg + ` EXECUTABLE-FILE-PATH
   ` + appName + ` [options] -` + projectPathArg + ` PROJECT-FILE-PATH
+  ` + appName + ` version
 
 DESCRIPTION
+` + commands.AppDescription + `
 
 OPTIONS
 `
@@ -111,6 +115,12 @@ func mainWithError() error {
 
 		os.Exit(1)
 
+		return nil
+	}
+
+	switch flag.Arg(0) {
+	case "version":
+		fmt.Println(version)
 		return nil
 	}
 

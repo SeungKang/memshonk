@@ -34,7 +34,7 @@ func NewWatchCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringSliceNf(&cmd.addrStrs, fx.ArgConfig{
 		Name:        "addrs",
-		Description: "one or more addresses to watch",
+		Description: "one or more addresses to watch " + addressTopicReferStr,
 		Required:    true,
 	})
 

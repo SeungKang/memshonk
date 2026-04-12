@@ -28,12 +28,12 @@ func NewWriteCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.datatype, rawDataType, fx.ArgConfig{
 		Name:        "datatype",
-		Description: "Specify the `datatype` of the value to write (refer to \"help datatypes\")",
+		Description: "Specify the `datatype` of the value to write " + datatypesTopicReferStr,
 	})
 
 	root.FlagSet.StringFlag(&cmd.inputFormat, rawEncoding, fx.ArgConfig{
 		Name:        "input-format",
-		Description: "Specify the input `format` of the value to write (refer to \"help formats\")",
+		Description: "Specify the input `format` of the value to write " + formatsTopicReferStr,
 	})
 
 	root.FlagSet.Uint64Flag(&cmd.numInstances, 1, fx.ArgConfig{
@@ -49,7 +49,7 @@ func NewWriteCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.addrStr, "", fx.ArgConfig{
 		Name:        "addr",
-		Description: "`address` to write to",
+		Description: "`address` to write to " + addressTopicReferStr,
 		Required:    true,
 	})
 

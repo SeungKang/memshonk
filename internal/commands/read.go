@@ -32,7 +32,7 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.dataType, rawDataType, fx.ArgConfig{
 		Name:        "datatype",
-		Description: "The `datatype` to read (refer to \"help datatypes\")",
+		Description: "The `datatype` to read " + datatypesTopicReferStr,
 	})
 
 	root.FlagSet.Uint64Flag(&cmd.sizeBytes, 0, fx.ArgConfig{
@@ -47,12 +47,12 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.outputFormat, "", fx.ArgConfig{
 		Name:        "output-format",
-		Description: "The output `format` of the data (refer to \"help formats\")",
+		Description: "The output `format` of the data " + formatsTopicReferStr,
 	})
 
 	root.FlagSet.StringFlag(&cmd.addrStr, "", fx.ArgConfig{
 		Name:        "addr",
-		Description: "`address` to read from",
+		Description: "`address` to read from " + addressTopicReferStr,
 		Required:    true,
 	})
 

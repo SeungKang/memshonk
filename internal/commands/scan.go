@@ -29,12 +29,12 @@ func NewScanCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root.FlagSet.StringFlag(&cmd.datatype, "pattern", fx.ArgConfig{
 		Name:        "datatype",
-		Description: "Specify datatype of the search string (refer to \"help datatypes\" for possible values)",
+		Description: "Specify datatype of the search string " + datatypesTopicReferStr,
 	})
 
 	root.FlagSet.StringFlag(&cmd.inputFormat, rawEncoding, fx.ArgConfig{
 		Name:        "input-format",
-		Description: "Specify the input `format` of the search string (refer to \"help formats\")",
+		Description: "Specify the input `format` of the search string " + formatsTopicReferStr,
 	})
 
 	root.FlagSet.StringSliceNf(&cmd.pattern, fx.ArgConfig{

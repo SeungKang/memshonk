@@ -2,7 +2,7 @@
 
 memshonk is an experimental command-line debugger companion that tries to
 fill the functionality gaps between debuggers. Think of it as a cross
-between `gdb`, `rizin`, and CheatEngine. It is not meant to replace
+between `gdb`, `rizin`, and Cheat Engine. It is not meant to replace
 a debugger, but supplement it.
 
 Please note that memshonk is in its very early stages of development.

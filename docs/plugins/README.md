@@ -36,9 +36,14 @@ memshonk requires plugins to implement a handful of building blocks.
 `mskit` implements these functions for you, but if you would like to
 do it yourself, please use the following source files as a reference:
 
-- `plugin-api/mskit/src/lib.rs` - Plugin-side implementation reference
-- `internal/plugins/libplugin/libctl.go` - Refer to the constants at the
-  top of the file for a list of library functions that memshonk looks for
+- [`plugin-api/mskit/src/lib.rs`][mskit-librs] - Plugin-side implementation
+  reference
+- [`internal/plugins/libplugin/libctl.go`][plugins-libctl] - Refer to the
+  constants at the top of the file for a list of library functions that
+  memshonk looks for
+
+[mskit-librs]: ../../plugin-api/mskit/src/lib.rs
+[plugins-libctl]: ../../internal/plugins/libplugin/libctl.go
 
 ### Unloading
 

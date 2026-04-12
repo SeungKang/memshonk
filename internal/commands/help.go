@@ -11,6 +11,15 @@ import (
 
 const (
 	HelpCommandName = "help"
+
+	addressTopicName       = "address"
+	addressTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + addressTopicName + `")`
+	datatypesTopicName     = "datatypes"
+	datatypesTopicReferStr = `(refer to "` + HelpCommandName + ` ` + datatypesTopicName + `")`
+	formatsTopicName       = "formats"
+	formatsTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + formatsTopicName + `")`
+	patternTopicName       = "pattern"
+	patternTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + patternTopicName + `")`
 )
 
 func NewHelpCommand(config apicompat.NewCommandConfig) *fx.Command {
@@ -44,16 +53,17 @@ func (o *HelpCommand) run(_ context.Context) (fx.CommandResult, error) {
 		// infinite recursive calls to the PrintUsage
 		// method... and yeah, no bueno.
 		sb.WriteString(`OVERVIEW
-  memshonk is like Wireshark, but for process memory. It provides
-  an interactive shell that supports POSIX shell syntax, pipes,
-  job control, and execution of external programs and internal
-  memshonk commands.
+  memshonk is an experimental command-line debugger companion that tries to
+  fill the functionality gaps between debuggers. Think of it as a cross
+  between gdb, rizin, and CheatEngine. It is not meant to replace
+  a debugger, but supplement it.
 
 TOPICS
-  datatypes - Data types usable with various memory manipulation commands
-  formats   - Supported data formatting (encoding) options
-  pattern   - Pattern string format used in the "scan" command and
-              potentially other commands
+  ` + addressTopicName + `   - How memshonk handles memory addresses (pointer chains)
+  ` + datatypesTopicName + ` - Data types usable with various memory manipulation commands
+  ` + formatsTopicName + `   - Supported data formatting (encoding) options
+  ` + patternTopicName + `   - Pattern string format used in the ` + ScanCommandName + ` command and potentially
+              other commands
 
 COMMANDS
 `)
@@ -96,7 +106,7 @@ COMMANDS
 	}
 
 	switch o.optTopic {
-	case "formats":
+	case formatsTopicName:
 		return fx.NewHumanCommandResult(`FORMATS
   ` + rawEncoding + `     - Raw data (i.e., no parsing or validation)
   ` + binaryEncoding + `  - Binary string
@@ -105,7 +115,7 @@ COMMANDS
   ` + base64Encoding + `  - Base64-encoded string
   ` + b64Encoding + `     - Alias to ` + base64Encoding), nil
 
-	case "datatypes":
+	case datatypesTopicName:
 		return fx.NewHumanCommandResult(`DATA TYPES
   ` + rawDataType + `       - Raw data (i.e., no parsing or validation)
   ` + utf8leDataType + `    - UTF-8 string in little endian byte order
@@ -130,8 +140,8 @@ COMMANDS
   ` + float64DataType + `   - Alias to ` + float64leDataType + `
   ` + float64beDataType + ` - A 64-bit float in big endian byte order
   ` + patternDataType + `   - Pattern string (refer to "help pattern" for details)`), nil
-	case "pattern":
-		return fx.NewHumanCommandResult(`PATTERN STRINGS
+	case patternTopicName:
+		return fx.NewHumanCommandResult(`PATTERN STRING
   memshonk supports a pattern string format for searching for byte sequences.
   This format is heavily inspired by video game modding tools which employ
   a similar pattern format.
@@ -148,6 +158,55 @@ COMMANDS
   "A" followed by two bytes of any value and then a "B" the string would
   look like this:
     41 ?? ?? 42`), nil
+	case addressTopicName:
+		return fx.NewHumanCommandResult(`MEMORY ADDRESSES
+  memshonk has a special representation of memory addresses inspired by
+  Cheat Engine which are referred to as pointer chains.
+
+  A pointer chain is a way to express navigation to a memory address and can
+  be used anywhere memshonk accepts an address (e.g. ` + ReadCommandName + `, ` + WriteCommandName + `).
+
+  This is useful for targeting dynamic addresses that change each time
+  a process starts, such as those found with tools like Cheat Engine.
+  Instead of an address that shifts around, you provide a stable base and
+  a series of offsets that lead to the final address.
+
+FORMAT
+  [module:]base[,offset1,offset2,...]
+
+  Note: All values are hexadecimal. The 0x prefix is optional.
+
+COMPONENTS
+  module                    optional name of a loaded object (e.g. a DLL or
+                            shared library) to use as the base. If omitted,
+                            the executable itself is used as the base. Module
+                            names can be found using ` + VmmapCommandName + `
+
+  base                      the first address or offset (relative to the
+                            module/executable base for a chain, or an absolute
+                            address when used alone)
+
+  offset1, offset2, ...     each offset is added to the pointer read from the
+                            previous step to arrive at the next address
+
+HOW IT WORKS
+  1. Resolve the base address (module/executable base + first offset, or the
+     absolute address if no offsets follow)
+  2. Read the pointer value stored at that address
+  3. Add the next offset to get the next address
+  4. Repeat until all offsets are consumed, the result is the final address
+
+EXAMPLES
+  0xd5a351                            Absolute address 0xd5a351
+
+  0xd5a351,0x20,0x5,0xC0              Pointer chain starting at offset
+                                      0xd5a351 from the executable base
+
+  buh.dll:0x20,0x5,0xC0               Pointer chain starting at offset 0x20
+                                      from buh.dll's base
+
+  MassEffect3.exe:0158439C,28,3C,2E8  Pointer chain starting at offset
+                                      0x0158439C from MassEffect3.exe's base`), nil
 	default:
 		cmdFn, found := o.session.SharedState().Commands.Lookup(o.optTopic)
 		if !found {

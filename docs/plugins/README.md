@@ -114,8 +114,8 @@ Arguments:
   required. If you do not plan to use it, you can use `_: usize` in its place
 - `addr` is an optional address to read from (a value of `0` indicates
   the user did not pass an address to the parser command)
-- `str_ptr` is double pointer that the found should update to point at
-  a `mskit::SharedBuf` containing a JSON blob representing the object
+- `str_ptr` is double pointer that the function should update to point at
+  a `mskit::SharedBuf` containing a JSON string representing the object
   it parsed
 
 Return value:

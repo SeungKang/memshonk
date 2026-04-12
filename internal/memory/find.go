@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -117,6 +118,47 @@ func splitByStrLen(s string, chunkSize int) []string {
 	chunks = append(chunks, s[currentStart:])
 
 	return chunks
+}
+
+// HasWildcards reports whether the pattern contains any wildcard bytes.
+func (o ParsedPattern) HasWildcards() bool {
+	for _, part := range o.parts {
+		if part.wildcard {
+			return true
+		}
+	}
+	return false
+}
+
+// RawBytes returns the pattern as a flat byte slice.
+// Only valid when HasWildcards returns false.
+func (o ParsedPattern) RawBytes() []byte {
+	b := make([]byte, o.length)
+	for i, part := range o.parts {
+		b[i] = part.b
+	}
+	return b
+}
+
+// FindAllBytes searches data for all occurrences of needle and returns
+// ScanResults anchored to baseAddr. It advances by one byte after each
+// match to detect overlapping occurrences, matching FindAllReader's behavior.
+func FindAllBytes(data []byte, needle []byte, baseAddr uintptr) []ScanResult {
+	var matches []ScanResult
+	offset := 0
+	for {
+		idx := bytes.Index(data[offset:], needle)
+		if idx < 0 {
+			break
+		}
+		absOffset := offset + idx
+		matches = append(matches, ScanResult{
+			Size: uint64(len(needle)),
+			Addr: AbsoluteAddrPointer(baseAddr + uintptr(absOffset)),
+		})
+		offset = absOffset + 1
+	}
+	return matches
 }
 
 func PatternForRawBytes(b []byte) ParsedPattern {

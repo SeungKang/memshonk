@@ -6,8 +6,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/apicompat"
 	"github.com/SeungKang/memshonk/internal/fx"
@@ -55,6 +58,8 @@ type ScanCommand struct {
 }
 
 func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
+	start := time.Now()
+
 	var parsedPattern memory.ParsedPattern
 	var err error
 	stringList := strings.Join(o.pattern, " ")
@@ -224,40 +229,110 @@ func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 	var matches ScanCommandResult
 
-	fmt.Fprint(o.stderr, "searching")
-
-	err = regions.Iter(func(i int, region memory.Region) error {
-		if !region.Readable {
-			return nil
+	numReadable := 0
+	regions.Iter(func(_ int, region memory.Region) error {
+		if region.Readable {
+			numReadable++
 		}
-
-		matchedAddrs, err := o.searchRegion(ctx, parsedPattern, region, process)
-		if err != nil {
-			return err
-		}
-
-		// print 70 "." to show search progress
-		step := regions.Len() / 70
-		if step == 0 {
-			step = 1
-		}
-
-		if i%step == 0 {
-			_, err = fmt.Fprint(o.stderr, ".")
-			if err != nil {
-				return err
-			}
-		}
-
-		matches.results = append(matches.results, matchedAddrs...)
-
 		return nil
 	})
 
-	fmt.Fprintln(o.stderr, "")
+	const barWidth = 25
+	printProgress := func(processed int) {
+		var pct, filled int
+		if numReadable > 0 {
+			pct = processed * 100 / numReadable
+			filled = processed * barWidth / numReadable
+		}
+		bar := strings.Repeat("=", filled)
+		if filled < barWidth {
+			bar += ">"
+			bar += strings.Repeat(" ", barWidth-filled-1)
+		}
+		fmt.Fprintf(o.stderr, "\rscanning [%s] %3d%% (%d/%d)",
+			bar, pct, processed, numReadable)
+	}
 
+	printProgress(0)
+
+	type workerResult struct {
+		matches []memory.ScanResult
+		err     error
+	}
+
+	numWorkers := runtime.NumCPU()
+	regionCh := make(chan memory.Region)
+	resultCh := make(chan workerResult, numWorkers)
+
+	scanCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for region := range regionCh {
+				m, err := o.searchRegion(scanCtx, parsedPattern, region, process)
+				resultCh <- workerResult{matches: m, err: err}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(regionCh)
+
+		regions.Iter(func(_ int, region memory.Region) error {
+			if !region.Readable {
+				return nil
+			}
+
+			select {
+			case regionCh <- region:
+				return nil
+			case <-scanCtx.Done():
+				return scanCtx.Err()
+			}
+		})
+	}()
+
+	var firstErr error
+	var collectWg sync.WaitGroup
+	collectWg.Add(1)
+
+	go func() {
+		defer collectWg.Done()
+		processed := 0
+
+		for result := range resultCh {
+			if result.err != nil && firstErr == nil {
+				firstErr = result.err
+				cancel()
+			}
+
+			matches.results = append(matches.results, result.matches...)
+			processed++
+			printProgress(processed)
+		}
+	}()
+
+	wg.Wait()
+	close(resultCh)
+	collectWg.Wait()
+
+	fmt.Fprintln(o.stderr, "")
+	fmt.Fprintf(o.stderr, "found: %d | total: %s\n",
+		len(matches.results), time.Since(start).Round(time.Millisecond))
+
+	err = firstErr
 	if err != nil {
 		return nil, err
+	}
+
+	if len(matches.results) == 0 {
+		return nil, nil
 	}
 
 	return fx.NewSerialCommandResult(matches), nil
@@ -269,6 +344,15 @@ func (o *ScanCommand) searchRegion(ctx context.Context, parsedPattern memory.Par
 		return nil, ctx.Err()
 	default:
 		// Keep going.
+	}
+
+	// TODO move this logic into memory.FindAllReader
+	if !parsedPattern.HasWildcards() {
+		data, _, err := process.ReadFromAddr(ctx, memory.AbsoluteAddrPointer(region.BaseAddr), region.Size)
+		if err != nil {
+			return nil, nil
+		}
+		return memory.FindAllBytes(data, parsedPattern.RawBytes(), region.BaseAddr), nil
 	}
 
 	reader, err := memory.NewBufferedReader(
@@ -285,11 +369,7 @@ func (o *ScanCommand) searchRegion(ctx context.Context, parsedPattern memory.Par
 		return nil, nil
 	}
 
-	if len(matches) > 0 {
-		return matches, nil
-	}
-
-	return nil, nil
+	return matches, nil
 }
 
 type ScanCommandResult struct {

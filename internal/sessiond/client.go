@@ -123,18 +123,17 @@ loop:
 		out = stdErr
 	}
 
+	expanded := make([]byte, 0, len(data))
 	for _, b := range data {
 		if b == '\n' {
-			_, err = out.Write([]byte{'\r'})
-			if err != nil {
-				return err
-			}
+			expanded = append(expanded, '\r')
 		}
+		expanded = append(expanded, b)
+	}
 
-		_, err = out.Write([]byte{b})
-		if err != nil {
-			return err
-		}
+	_, err = out.Write(expanded)
+	if err != nil {
+		return err
 	}
 
 	goto loop

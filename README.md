@@ -61,19 +61,17 @@ Read and overwrite memory at that address:
 - Run side-by-side with your favorite debugger on Linux and Windows
   - Supports switching between `ptrace` and `procfs` memory management modes
     on Linux to allow side-by-side use with tools like `gdb` and `pwndbg`
-- Text-based UI
-- Full sh-like shell with access to external programs (e.g. grep, cat, ls),
-  pipes, shell history, reverse search, and tab completion
+- Text-based UI via sh-like shell provides access to external programs (e.g.
+  grep, cat, ls), pipes, shell history, reverse search, and tab completion
 - Multi-session support allows multiple clients. Great for providing
   multiple windows or debugging with friends
 - Client-daemon architecture allows for long-running debugging sessions and
   protection against accidental exits or lack of tools like tmux
 - Project files make it easy to attach to a program by its executable file
   name, set pre-defined variables, and automatically load plugins
-- Plugin support via dynamically-loaded libraries
+- Plugin support via shared libraries (`.so`, `.dll` files)
   - A Rust library named [`mskit`](plugin-api/mskit) is provided
-    as a building block. Example plugins can be found in
-    [examples/plugins](examples/plugins)
+    as a building block
   - Users can specify optional automation to run when reloading plugins,
     making it easy to, for example, recompile a plugin from source
 - Scripting interface via `mrun` command provides access to memshonk
@@ -111,3 +109,7 @@ Refer to the [Plugins document](./docs/plugins/README.md).
 ## Development documentation
 
 Refer to the [Development document](./docs/development/README.md).
+
+## Future plans, limitations, and known issues
+
+Refer to the [TODO document](./TODO.md).

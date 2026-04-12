@@ -19,6 +19,22 @@ func NewShonksetCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root := fx.NewCommand(ShonksetCommandName, "set configuration options", cmd.run)
 
+	root.OptLongDesc = `CONFIGURATION ITEMS
+  memmode  - The memory reading mode to use when accessing process memory.
+             Omit the value to display the current mode.
+
+             Supported values:
+               kernel32 - Windows only
+               procfs   - Linux only
+               ptrace   - Any Unix-like OS
+
+EXAMPLES
+  $ shonkset memmode
+  procfs
+
+  $ shonkset memmode ptrace
+`
+
 	root.FlagSet.StringNf(&cmd.confItem, fx.ArgConfig{
 		Name:        "configuration-item",
 		Description: "",

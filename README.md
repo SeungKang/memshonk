@@ -106,6 +106,10 @@ Refer to the [example configuration files](./examples/).
 
 Refer to the [Plugins document](./docs/plugins/README.md).
 
+## Design and security model
+
+Refer to the [Design document](./docs/design/README.md).
+
 ## Development documentation
 
 Refer to the [Development document](./docs/development/README.md).

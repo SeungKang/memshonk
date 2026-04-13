@@ -7,31 +7,33 @@ Here is what the `help` command provides:
 
 ```
 OVERVIEW
-memshonk is like Wireshark, but for process memory. It provides
-an interactive shell that supports POSIX shell syntax, pipes,
-job control, and execution of external programs and internal
-memshonk commands.
+  memshonk is an experimental command-line debugger companion that tries to
+  fill the functionality gaps between debuggers. Think of it as a cross
+  between gdb, rizin, and Cheat Engine. It is not meant to replace
+  a debugger, but supplement it.
 
 TOPICS
-datatypes - Data types usable with various memory manipulation commands
-formats   - Supported data formatting (encoding) options
-pattern   - Pattern string format used in the "find" command and
-potentially other commands
+  address   - How memshonk handles memory addresses (pointer chains)
+  datatypes - Data types usable with various memory manipulation commands
+  formats   - Supported data formatting (encoding) options
+  pattern   - Pattern string format used in the scan command and potentially
+              other commands
 
 COMMANDS
-attach   - attach to the process
-daemon   - manage the server daemon
-detach   - detach from the process
-find     - find data in a process' memory
-help     - list available commands and help topics
-jobs     - manage background jobs
-mrun     - run a memshonk script
-plugins  - manage plugins
-quit     - exit the current memshonk session
-readm    - read data from process memory
-session  - manage session
-shonkset - set configuration options
-vmmap    - view the process's memory regions
-watch    - watch data at an address for changes
-writem   - write data to process memory
+  attach   - attach to the process
+  daemon   - manage the server daemon
+  detach   - detach from the process
+  help     - list available commands and help topics
+  jobs     - manage background jobs
+  me3      - me3 plugin
+  mrun     - run a memshonk script
+  plugin   - manage plugins
+  quit     - exit the current memshonk session
+  readm    - read data from process memory
+  scan     - search process memory for values or byte patterns
+  session  - manage session
+  shonkset - set configuration options
+  vmmap    - view the process's memory regions
+  watch    - watch data at an address for changes
+  writem   - write data to process memory
 ```

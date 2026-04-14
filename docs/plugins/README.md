@@ -25,7 +25,7 @@ memshonk exposes the following functionality to a plugin:
 We strongly recommend writing your plugin in [Rust](https://rust-lang.org/)
 which will allow you to use the [`mskit`](../../plugin-api/mskit) library
 as a foundation for your plugin. The mskit library implements several
-functions and date types required by memshonk.
+functions and data types required by memshonk.
 
 If you would like to implement your own variant of mskit in Rust or another
 language, we recommend using mskit as a design reference.

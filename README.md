@@ -10,22 +10,20 @@ There are bugs and missing functionality.
 
 ## Demo
 
-Here is a demo of memshonk in video form: https://youtu.be/Z5twBlVa9R4
+For a detailed demo of memshonk, watch
+[this video](https://youtu.be/Z5twBlVa9R4).
 
-Please find a text-based demo of memshonk below:
+Otherwise, a text-based demo of memshonk can be found below.
 
-> Note: In git-bash shell on Windows, running memshonk using
-> `winpty memshonk ARGS...` improves terminal rendering.
-
-Start a session using a project file:
+Start memshonk by pointing it at a project file:
 
 ```console
 $ memshonk -p examples/vim.txt
 (short-seal) $
 ```
 
-Attach to the target program identified by the project file. The process'
-PID appears in the shell prompt once attached:
+Attach to the target program identified by the project file (the process'
+PID appears in the shell prompt once attached):
 
 ```console
 (short-seal) $ attach
@@ -59,12 +57,11 @@ Read and overwrite memory at that address:
 - View process memory mappings and permissions
 - Search memory based on data type or byte patterns
 - Run side-by-side with your favorite debugger on Linux and Windows
-  - Supports switching between `ptrace` and `procfs` memory management modes
-    on Linux to allow side-by-side use with tools like `gdb` and `pwndbg`
-- Text-based UI via sh-like shell provides access to external programs (e.g.
-  grep, cat, ls), pipes, shell history, reverse search, and tab completion
+- Text-based UI via sh-like shell provides access to external programs
+  (e.g. grep, cat, ls), pipes, job control / backgrounding, shell history,
+  reverse search, and tab completion
 - Multi-session support allows multiple clients. Great for providing
-  multiple windows or debugging with friends
+  multiple windows or for debugging with friends
 - Client-daemon architecture allows for long-running debugging sessions and
   protection against accidental exits or lack of tools like tmux
 - Project files make it easy to attach to a program by its executable file

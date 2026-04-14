@@ -80,6 +80,6 @@ not sandboxed, so it will always present an easy sandbox escape.
 
 Now, if memshonk develops its own disassembler (i.e., is no longer a pure
 debugger / dynamic analysis tool), this problem changes quite a bit since
-the debugger code may not be needed if the users is doing only static
+the debugger code may not be needed if the user is doing only static
 analysis work. While we have started that work, it is nowhere near being
 usable... which brings us back to the time trade off of doing this work.

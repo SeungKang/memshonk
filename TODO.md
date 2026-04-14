@@ -106,7 +106,7 @@
 
 ## known issues (bugs)
 
-- hanging at "connecting to daemon..." when running:
+- intermittent hanging at "connecting to daemon..." when running:
 
   ```
   winpty go run -tags plugins_execonreload main.go -p examples/mass-effect-3.txt

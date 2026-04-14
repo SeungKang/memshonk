@@ -93,30 +93,16 @@ had time to work on that.
 Prebuilt executables are not currently provided. To build from source,
 refer to the [Development document](./docs/development/README.md).
 
-## Commands
+## Documentation
 
-Refer to the [Commands document](./docs/commands/README.md) for a full
-list of commands and topics. Within memshonk, type `help` or `help [TOPIC]`.
-
-## Project file syntax
-
-Refer to the [example configuration files](./examples/).
-
-## Plugins
-
-Refer to the [Plugins document](./docs/plugins/README.md).
-
-## Design and security model
-
-Refer to the [Design document](./docs/design/README.md).
-
-## Development documentation
-
-Refer to the [Development document](./docs/development/README.md).
-
-## Future plans, limitations, and known issues
-
-Refer to the [TODO document](./TODO.md).
+- [Commands](./docs/commands/README.md)
+  - For a full list of commands and help topics, run `help` or `help [TOPIC]`
+    in memshonk
+- [Configuration file examples](./examples/)
+- [Plugins](./docs/plugins/README.md)
+- [Design and security model](./docs/design/README.md)
+- [Development documentation](./docs/development/README.md)
+- [Future plans, limitations, and known issues](./TODO.md)
 
 ## Special thanks
 

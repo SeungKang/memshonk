@@ -102,6 +102,10 @@
 - No breakpoints or disassembly (we would like to implement this though!
   Refer to the `dissect` branch for our initial work towards that)
 
+## hexdump
+
+- Switch hexdump styles via shonkset and/or main configuration file
+
 ## known issues (bugs)
 
 - intermittent hanging at "connecting to daemon..." when running:

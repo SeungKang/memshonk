@@ -6,12 +6,12 @@
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
 - processWriter needs to offset itself automatically like os.File
+- Provide short usage explanation (how project files work w/ daemon)
 
 ## documentation
 
 - export in-app documentation to Markdown files
 - add documentation for procfs mode
-- write and polish README
 
 ## diff
 
@@ -38,7 +38,7 @@
 
 ## progctl
 
-- Need to implement Suspend and Resume methods for WindowsProcess
+- Need to implement Suspend and Resume methods for Windows
 - Search for process using its path (we are currently limited to
   searching by its name)
 - Switch `Read*` methods to behave more like io.Reader (pass in
@@ -46,7 +46,6 @@
 
 ## memory
 
-- Make procfs default on linux
 - Implement a Reader object for a process that knows its bounds based on
   mapped objects
 - BufferedReader: Implement constructor-like functions that either constrain
@@ -70,7 +69,6 @@
 
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
-- improve find performance (increase size read, or with start/end address)
 - pattern: add ability to specify n `??` (like: `??x10`)
 
 ## kernel32

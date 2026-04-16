@@ -51,6 +51,11 @@ func NewShell(session apicompat.Session) (*Shell, error) {
 		return nil, fmt.Errorf("failed to create interpreter - %w", err)
 	}
 
+	// Force color output regardless of TTY detection. The daemon's stdout is
+	// a pipe, so fatih/color would disable colors by default. The ANSI codes
+	// are forwarded through the socket to the client's actual terminal.
+	color.NoColor = false
+
 	return &Shell{
 		session: session,
 		rl:      readLine,

@@ -25,9 +25,9 @@ COMMANDS
   detach   - detach from the process
   help     - list available commands and help topics
   jobs     - manage background jobs
-  me3      - me3 plugin
   mrun     - run a memshonk script
   plugin   - manage plugins
+  prev     - list and retrieve outputs of previously-run commands
   quit     - exit the current memshonk session
   readm    - read data from process memory
   scan     - search process memory for values or byte patterns

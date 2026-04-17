@@ -2,7 +2,6 @@
 
 ## next stopping point
 
-- command output support (access the result of previous commands)
 - allow overwriting of executable mapped object name
   - error: failed to attach to process 220785 ("vim") - attach failure - failed to get mapped object for exe - failed to find a match for an object named: "vim" (searched through: ["vim.basic" "locale-archive" "libpthread.so.0" "libpcre2-8.so.0.11.2" "libc.so.6" "libgpm.so.2" "libacl.so.1.1.2301" "libsodium.so.23.3.0" "libselinux.so.1" "libtinfo.so.6.4" "libm.so.6" "ld-linux-x86-64.so.2"])
 - processWriter needs to offset itself automatically like os.File
@@ -56,7 +55,6 @@
 
 - `command addr number_of_pointers` tries to determine if there are pointers at
   this addr
-- outputs command
 - command performance measuring
 - From [Amy](https://github.com/tobert/): memory-map a process' region / object
   to a file so things outside of memshonk can play with it
@@ -81,7 +79,6 @@
 
 ## shell
 
-- support command output piping / referencing (access results of previous commands)
 - memshonk exec mode to run a memshonk command (allow you to run memshonk from shell script)
 - test scripting within memshonk shell
 - need to consider tab completion for external program

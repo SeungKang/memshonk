@@ -10,9 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/SeungKang/memshonk/internal/fx"
 	"github.com/SeungKang/memshonk/internal/jobsctl"
@@ -152,7 +154,15 @@ type CommandStorage struct {
 	namesToOutputs map[string]*list.List
 }
 
-func (o *CommandStorage) AddOutput(output fx.CommandResultWrapper) {
+type CommandOutput struct {
+	Argv []string
+
+	Result fx.CommandResultWrapper
+
+	RanAt time.Time
+}
+
+func (o *CommandStorage) AddOutput(output CommandOutput) {
 	o.rwMu.Lock()
 	defer o.rwMu.Unlock()
 
@@ -160,7 +170,7 @@ func (o *CommandStorage) AddOutput(output fx.CommandResultWrapper) {
 		o.namesToOutputs = make(map[string]*list.List)
 	}
 
-	id := serializeCommandID(output.Commands)
+	id := serializeCommandID(output.Result.Commands)
 
 	outputs, hasIt := o.namesToOutputs[id]
 	if !hasIt {
@@ -176,6 +186,44 @@ func (o *CommandStorage) AddOutput(output fx.CommandResultWrapper) {
 	outputs.PushFront(output)
 }
 
+func (o *CommandStorage) Available() []string {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	if len(o.namesToOutputs) == 0 {
+		return nil
+	}
+
+	idsWithOutputNums := make([]string, len(o.namesToOutputs))
+
+	i := 0
+
+	for id, outputs := range o.namesToOutputs {
+		str := id
+
+		var outputsI uint64
+
+		for e := outputs.Front(); e != nil; e = e.Next() {
+			v := e.Value.(CommandOutput)
+
+			str += "\n    " +
+				strconv.FormatUint(outputsI, 10) +
+				" " + strings.Join(v.Argv, " ") +
+				" (" + v.RanAt.Format(time.Stamp) + ")"
+
+			outputsI++
+		}
+
+		idsWithOutputNums[i] = str
+
+		i++
+	}
+
+	sort.Strings(idsWithOutputNums)
+
+	return idsWithOutputNums
+}
+
 func (o *CommandStorage) PreviousOutput(commandID []string) (fx.CommandResultWrapper, bool) {
 	o.rwMu.RLock()
 	defer o.rwMu.RUnlock()
@@ -187,9 +235,44 @@ func (o *CommandStorage) PreviousOutput(commandID []string) (fx.CommandResultWra
 		return fx.CommandResultWrapper{}, false
 	}
 
-	output := outputs.Front().Value.(fx.CommandResultWrapper)
+	output := outputs.Front().Value.(CommandOutput)
 
-	return output, true
+	return output.Result, true
+}
+
+func (o *CommandStorage) OutputFor(commandID string, targetIndex uint64) (*fx.CommandResultWrapper, error) {
+	o.rwMu.RLock()
+	defer o.rwMu.RUnlock()
+
+	outputs, hasAny := o.namesToOutputs[commandID]
+	if !hasAny {
+		return nil, fmt.Errorf("unknown command id")
+	}
+
+	outputsLen := uint64(outputs.Len())
+
+	if outputsLen == 0 {
+		return nil, fmt.Errorf("no outputs available for this command")
+	}
+
+	if targetIndex > outputsLen-1 {
+		return nil, fmt.Errorf("no such index (max index is: %d)",
+			outputsLen-1)
+	}
+
+	var i uint64
+
+	for e := outputs.Front(); e != nil; e = e.Next() {
+		if i == targetIndex {
+			v := e.Value.(CommandOutput)
+
+			return &v.Result, nil
+		}
+
+		i++
+	}
+
+	return nil, fmt.Errorf("failed to find index %d in outputs", targetIndex)
 }
 
 func serializeCommandID(eachCmd []string) string {
@@ -283,12 +366,18 @@ func (o *CommandHandler) runInternalCommand(ctx context.Context, config RunComma
 		c.FlagSet.Actual().SetOutput(usageWriter)
 	})
 
+	start := time.Now()
+
 	result, err := cmd.Run(ctx, config.Argv[1:])
 	if err != nil {
 		return true, NewCommandHandlerError(1, fmt.Errorf("%s failed: %w", cmd.Name(), err))
 	}
 
-	o.session.CommandStorage().AddOutput(result)
+	o.session.CommandStorage().AddOutput(CommandOutput{
+		Argv:   config.Argv,
+		RanAt:  start,
+		Result: result,
+	})
 
 	if result.Result != nil {
 		config.Stdout.Write([]byte(result.Result.Human()))

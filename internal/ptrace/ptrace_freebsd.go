@@ -19,14 +19,14 @@ import (
 // we can just skip straight to Go's unix.PtraceIO wrapper
 // and specify our own sizes.
 
-func (o *Tracer) WaitStopped() (unix.WaitStatus, unix.Rusage, error) {
+func (o *Tracer) waitStoppedOs() (unix.WaitStatus, unix.Rusage, error) {
 	return o.Wait(syscall.WSTOPPED)
 }
 
-func (o *Tracer) PeekData(addr uintptr, out []byte) (int, error) {
+func (o *Tracer) peekDataOs(addr uintptr, out []byte) (int, error) {
 	return unix.PtraceIO(unix.PIOD_READ_D, o.pid, addr, out, len(out))
 }
 
-func (o *Tracer) PokeData(addr uintptr, data []byte) (int, error) {
+func (o *Tracer) pokeDataOs(addr uintptr, data []byte) (int, error) {
 	return unix.PtraceIO(unix.PIOD_WRITE_D, o.pid, addr, data, len(data))
 }

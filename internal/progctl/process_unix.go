@@ -76,7 +76,6 @@ func attach(config attachConfig) (*process, error) {
 
 type process struct {
 	pid     int
-	stopped bool
 	endian  binary.ByteOrder
 	exeInfo ExeInfo
 	exitMon *ExitMonitor
@@ -127,27 +126,9 @@ func (o *process) readBytesPtrace(addr uintptr, sizeBytes uint64) ([]byte, error
 		return nil, errPtraceNotEnabled
 	}
 
-	needToResume := false
-
-	if !o.stopped {
-		needToResume = true
-
-		err := o.Suspend()
-		if err != nil {
-			return nil, fmt.Errorf("failed to suspend process prior to peek data - %w", err)
-		}
-	}
-
 	b := make([]byte, sizeBytes)
 
 	_, peakErr := o.optPtrace.PeekData(context.Background(), addr, b)
-
-	if needToResume {
-		err := o.Resume()
-		if err != nil {
-			return nil, fmt.Errorf("failed to resume process after peek data - %w", err)
-		}
-	}
 
 	return b, peakErr
 }
@@ -183,25 +164,7 @@ func (o *process) writeBytesPtrace(data []byte, addr uintptr) error {
 		return errPtraceNotEnabled
 	}
 
-	needToResume := false
-
-	if !o.stopped {
-		needToResume = true
-
-		err := o.Suspend()
-		if err != nil {
-			return fmt.Errorf("failed to suspend process prior to poke data - %w", err)
-		}
-	}
-
 	_, pokeErr := o.optPtrace.PokeData(context.Background(), addr, data)
-
-	if needToResume {
-		err := o.Resume()
-		if err != nil {
-			return fmt.Errorf("failed to resume process after poke data - %w", err)
-		}
-	}
 
 	return pokeErr
 }
@@ -253,8 +216,6 @@ func (o *process) Suspend() error {
 		return fmt.Errorf("failed to attach to process - %w", err)
 	}
 
-	o.stopped = true
-
 	return nil
 }
 
@@ -267,8 +228,6 @@ func (o *process) Resume() error {
 	if err != nil {
 		return fmt.Errorf("failed to ptrace detach - %w", err)
 	}
-
-	o.stopped = false
 
 	return nil
 }
@@ -284,16 +243,6 @@ func (o *process) Close() error {
 		return nil
 	}
 	defer o.optPtrace.Close()
-
-	// TODO: on linux the process needs to be stopped according to the
-	// PTRACE_DETACH section in the linux manual page unsure what other
-	// unix-like operating systems require
-	if !o.stopped {
-		err := o.Suspend()
-		if err != nil {
-			return fmt.Errorf("failed to suspend process prior to ptrace detach - %w", err)
-		}
-	}
 
 	err := o.optPtrace.Detach(context.Background())
 	if err != nil {

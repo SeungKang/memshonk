@@ -127,32 +127,29 @@ func (o *process) Regions() (memory.Regions, error) {
 		return memory.Regions{}, errPtraceNotEnabled
 	}
 
-	needToResume := false
-
-	if !o.stopped {
-		needToResume = true
-
-		err := o.Suspend()
-		if err != nil {
-			return memory.Regions{}, fmt.Errorf("failed to suspend process prior to getting regions - %w", err)
-		}
-	}
-
 	var regions memory.Regions
 
 	regionsErr := o.optPtrace.Do(context.Background(), func(_ context.Context, pt *ptrace.Tracer) error {
+		resume := false
+
+		if !pt.Stopped() {
+			resume = true
+
+			err := pt.AttachAndWaitStopped()
+			if err != nil {
+				return fmt.Errorf("failed to attach and stop prior to getting regions - %w", err)
+			}
+		}
+
 		var err error
 		regions, err = fbsdmaps.Vmmap(pt)
+
+		if resume {
+			_ = pt.Detach()
+		}
+
 		return err
 	})
-
-	if needToResume {
-		err := o.Resume()
-		if err != nil {
-			return memory.Regions{}, fmt.Errorf("failed to resume process after getting regions - %w",
-				err)
-		}
-	}
 
 	return regions, regionsErr
 }

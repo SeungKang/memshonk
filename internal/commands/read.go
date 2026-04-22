@@ -56,6 +56,11 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 		Required:    true,
 	})
 
+	root.FlagSet.StringFlag(&cmd.params, "", fx.ArgConfig{
+		Name:        "params",
+		Description: "comma-separated key=value output parameters " + paramsTopicReferStr,
+	})
+
 	return root
 }
 
@@ -66,6 +71,7 @@ type ReadCommand struct {
 	sizeBytes    uint64
 	numInstances uint64
 	addrStr      string
+	params       string
 	delim        byte
 }
 
@@ -142,10 +148,14 @@ func (o *ReadCommand) doRaw(ctx context.Context, procReader *processReader, info
 		case rawEncoding:
 			sb.Write(v)
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            bytes.NewReader(v),
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -199,10 +209,14 @@ func (o *ReadCommand) doUtf8String(ctx context.Context, procReader *processReade
 		case rawEncoding:
 			sb.Write(v)
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            bytes.NewReader(v),
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -262,10 +276,14 @@ func (o *ReadCommand) doUtf16String(ctx context.Context, procReader *processRead
 		case rawEncoding:
 			sb.WriteString(string(str))
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -353,10 +371,14 @@ func (o *ReadCommand) readOneCstring(ctx context.Context, procReader *processRea
 	case rawEncoding:
 		sb.Write(v)
 	case hexdumpEncoding:
+		style, err := hexdumpStyle(o.params)
+		if err != nil {
+			return err
+		}
 		err = hexdump.Dump(ctx, hexdump.Config{
 			Src:            bytes.NewReader(v),
 			Dst:            sb,
-			OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+			OptStyle:       style,
 			OptStartOffset: uint64(procReader.LastReadAddr()),
 			OptOffsetBits:  info.Bits,
 		})
@@ -400,10 +422,14 @@ func (o *ReadCommand) doUnit16(ctx context.Context, procReader *processReader, i
 		case rawEncoding:
 			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -454,10 +480,14 @@ func (o *ReadCommand) doUint32(ctx context.Context, procReader *processReader, i
 		case rawEncoding:
 			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -508,10 +538,14 @@ func (o *ReadCommand) doUint64(ctx context.Context, procReader *processReader, i
 		case rawEncoding:
 			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -562,10 +596,14 @@ func (o *ReadCommand) doFloat32(ctx context.Context, procReader *processReader, 
 		case rawEncoding:
 			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})
@@ -616,10 +654,14 @@ func (o *ReadCommand) doFloat64(ctx context.Context, procReader *processReader, 
 		case rawEncoding:
 			sb.Write(buf.Bytes())
 		case hexdumpEncoding:
+			style, err := hexdumpStyle(o.params)
+			if err != nil {
+				return err
+			}
 			err = hexdump.Dump(ctx, hexdump.Config{
 				Src:            &buf,
 				Dst:            sb,
-				OptStyle:       hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+				OptStyle:       style,
 				OptStartOffset: uint64(procReader.LastReadAddr()),
 				OptOffsetBits:  info.Bits,
 			})

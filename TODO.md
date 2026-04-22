@@ -68,6 +68,7 @@
 - "*" support for super wildcard pattern search, maybe not at the end
 - add configurable logging for when error occurs
 - pattern: add ability to specify n `??` (like: `??x10`)
+- filter results with more scans, like cheat engine
 
 ## kernel32
 

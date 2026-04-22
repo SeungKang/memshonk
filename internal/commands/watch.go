@@ -38,6 +38,11 @@ func NewWatchCommand(config apicompat.NewCommandConfig) *fx.Command {
 		Required:    true,
 	})
 
+	root.FlagSet.StringFlag(&cmd.params, "", fx.ArgConfig{
+		Name:        "params",
+		Description: "comma-separated key=value output parameters " + paramsTopicReferStr,
+	})
+
 	return root
 }
 
@@ -45,6 +50,7 @@ type WatchCommand struct {
 	session   apicompat.Session
 	sizeBytes uint64
 	addrStrs  []string
+	params    string
 }
 
 func (o *WatchCommand) run(ctx context.Context) (fx.CommandResult, error) {
@@ -102,6 +108,11 @@ func (o *WatchCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		}()
 	}
 
+	style, err := hexdumpStyle(o.params)
+	if err != nil {
+		return nil, err
+	}
+
 	var src bytes.Buffer
 
 	var dst bytes.Buffer
@@ -109,7 +120,7 @@ func (o *WatchCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	hexdumpConfig := hexdump.Config{
 		Src:           &src,
 		Dst:           &dst,
-		OptStyle:      hexdump.DefaultStyle{Colors: hexdump.NewByteColors()},
+		OptStyle:      style,
 		OptTitle:      "placeholder",
 		OptOffsetBits: exeInfo.Bits,
 	}

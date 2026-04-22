@@ -20,6 +20,8 @@ const (
 	formatsTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + formatsTopicName + `")`
 	patternTopicName       = "pattern"
 	patternTopicReferStr   = `(refer to "` + HelpCommandName + ` ` + patternTopicName + `")`
+	paramsTopicName        = "params"
+	paramsTopicReferStr    = `(refer to "` + HelpCommandName + ` ` + paramsTopicName + `")`
 
 	AppDescription = `  memshonk is an experimental command-line debugger companion that tries to
   fill the functionality gaps between debuggers. Think of it as a cross
@@ -61,11 +63,12 @@ func (o *HelpCommand) run(_ context.Context) (fx.CommandResult, error) {
 ` + AppDescription + `
 
 TOPICS
-  ` + addressTopicName + `   - How memshonk handles memory addresses (pointer chains)
-  ` + datatypesTopicName + ` - Data types usable with various memory manipulation commands
-  ` + formatsTopicName + `   - Supported data formatting (encoding) options
-  ` + patternTopicName + `   - Pattern string format used in the ` + ScanCommandName + ` command and potentially
-              other commands
+  ` + addressTopicName + `    - How memshonk handles memory addresses (pointer chains)
+  ` + datatypesTopicName + `  - Data types usable with various memory manipulation commands
+  ` + formatsTopicName + `    - Supported data formatting (encoding) options
+  ` + paramsTopicName + `     - Output parameters for the ` + ReadCommandName + ` and ` + WatchCommandName + ` commands
+  ` + patternTopicName + `    - Pattern string format used in the ` + ScanCommandName + ` command and potentially
+               other commands
 
 COMMANDS
 `)
@@ -169,6 +172,29 @@ COMMANDS
   "A" followed by two bytes of any value and then a "B" the string would
   look like this:
     41 ?? ?? 42`), nil
+	case paramsTopicName:
+		return fx.NewHumanCommandResult(`PARAMS
+  The -p / --params flag accepts comma-separated key=value pairs that control
+  output rendering. It is supported by the ` + ReadCommandName + ` and ` + WatchCommandName + ` commands and only
+  applies when the output format is hexdump.
+
+FORMAT
+  -p key=value[,key2=value2,...]
+
+KEYS
+  s - hexdump style
+
+    (omitted) - Default style: bytes separated by spaces, grouped in
+                4-byte chunks
+    heap      - Heap style: bytes are grouped by pointer-width chunks
+                with swapped endianness to reflect how heap allocators
+                lay out pointers in memory
+
+EXAMPLES
+  readm -d raw -s 16 -o hexdump -a 0x000000010079ed78 -p s=heap
+
+  watch -s 16 -p s=heap 0x000000010079ed78`), nil
+
 	case addressTopicName:
 		return fx.NewHumanCommandResult(`MEMORY ADDRESSES
   memshonk has a special representation of memory addresses inspired by

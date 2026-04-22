@@ -2,6 +2,11 @@ package commands
 
 import (
 	"errors"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/SeungKang/memshonk/internal/hexdump"
 )
 
 // Various encoding formats.
@@ -62,3 +67,42 @@ const (
 var (
 	errCommandNeedsTerminal = errors.New("this command requires a terminal, but the session does not provide a terminal")
 )
+
+func hexdumpStyle(paramStr string) (hexdump.Style, error) {
+	params := parseOutputParams(paramStr)
+
+	var unknownKeyErrs []string
+	for k, v := range params {
+		switch k {
+		case "s":
+		default:
+			unknownKeyErrs = append(unknownKeyErrs, fmt.Sprintf("unknown key %q (from %s=%s)", k, k, v))
+		}
+	}
+	if len(unknownKeyErrs) > 0 {
+		sort.Strings(unknownKeyErrs)
+		return nil, fmt.Errorf("%s", strings.Join(unknownKeyErrs, ", "))
+	}
+
+	s, ok := params["s"]
+	if !ok || s == "" {
+		return hexdump.DefaultStyle{Colors: hexdump.NewByteColors()}, nil
+	}
+	switch s {
+	case "heap":
+		return hexdump.HeapStyle{Colors: hexdump.NewByteColors()}, nil
+	default:
+		return nil, fmt.Errorf("unknown style %q (from -p s=%s)", s, s)
+	}
+}
+
+func parseOutputParams(raw string) map[string]string {
+	result := make(map[string]string)
+	for _, pair := range strings.Split(raw, ",") {
+		kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+		if len(kv) == 2 {
+			result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
+	}
+	return result
+}

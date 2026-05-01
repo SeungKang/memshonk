@@ -193,14 +193,6 @@ func (o *VmmapCommand) listProperties(ctx context.Context, regions memory.Region
 		props[i] = strings.TrimSpace(strings.ToLower(p))
 	}
 
-	for _, p := range props {
-		switch p {
-		case "base", "end", "size", "perm", "region", "state", "name", "alloc-base":
-		default:
-			return nil, fmt.Errorf("unknown property %q (valid: base, end, size, perm, region, state, name, alloc-base)", p)
-		}
-	}
-
 	regionFilter := strings.ToLower(o.region)
 	matchFilter := strings.ToLower(o.match)
 
@@ -265,6 +257,8 @@ func (o *VmmapCommand) listProperties(ctx context.Context, regions memory.Region
 				out.WriteString(r.NameOrPath())
 			case "alloc-base":
 				fmt.Fprintf(&out, "%#012x", r.AllocBase)
+			default:
+				return fmt.Errorf("unknown property: %q", prop)
 			}
 		}
 

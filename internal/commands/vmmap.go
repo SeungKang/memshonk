@@ -22,12 +22,27 @@ func NewVmmapCommand(config apicompat.NewCommandConfig) *fx.Command {
 
 	root := fx.NewCommand(VmmapCommandName, "view the process's memory regions", cmd.run)
 
-	root.FlagSet.StringNf(&cmd.searchStr, fx.ArgConfig{
-		Name:        "search-str",
-		Description: "address or name to filter regions",
+	root.FlagSet.StringFlag(&cmd.match, "", fx.ArgConfig{
+		Name:        "match",
+		Description: "filter regions by name/path",
 	})
 
-	root.FlagSet.BoolFlag(&cmd.showWindowsInaccesible, false, fx.ArgConfig{
+	root.FlagSet.StringFlag(&cmd.addr, "", fx.ArgConfig{
+		Name:        "addr",
+		Description: "find the region containing the given address",
+	})
+
+	root.FlagSet.StringFlag(&cmd.region, "", fx.ArgConfig{
+		Name:        "region",
+		Description: "filter regions by name (e.g. heap, stack, or filename)",
+	})
+
+	root.FlagSet.StringFlag(&cmd.property, "", fx.ArgConfig{
+		Name:        "property",
+		Description: "comma-separated columns to display (name, base, end, alloc-base, perm, size, type, state)",
+	})
+
+	root.FlagSet.BoolFlag(&cmd.showWindowsInaccessible, false, fx.ArgConfig{
 		Name:        "show-windows-inaccessible",
 		Description: "include Windows regions with no access protections (e.g. reserved, free)",
 	})
@@ -41,10 +56,13 @@ func NewVmmapCommand(config apicompat.NewCommandConfig) *fx.Command {
 }
 
 type VmmapCommand struct {
-	session                apicompat.Session
-	searchStr              string
-	showWindowsInaccesible bool
-	flat                   bool
+	session                 apicompat.Session
+	match                   string
+	addr                    string
+	region                  string
+	property                string
+	showWindowsInaccessible bool
+	flat                    bool
 }
 
 func (o *VmmapCommand) run(ctx context.Context) (fx.CommandResult, error) {
@@ -55,8 +73,20 @@ func (o *VmmapCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		return nil, err
 	}
 
-	if o.searchStr != "" {
-		return o.search(ctx, regions)
+	if o.addr != "" {
+		return o.searchAddr(ctx, regions)
+	}
+
+	if o.property != "" {
+		return o.listProperties(ctx, regions)
+	}
+
+	if o.match != "" {
+		return o.searchMatch(ctx, regions)
+	}
+
+	if o.region != "" {
+		return o.searchFilter(ctx, regions)
 	}
 
 	if o.flat {
@@ -66,30 +96,30 @@ func (o *VmmapCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	return o.list(ctx, regions)
 }
 
-func (o *VmmapCommand) search(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
-	if strings.HasPrefix(o.searchStr, "0x") {
-		ptr, err := memory.CreatePointerFromString(o.searchStr)
-		if err != nil {
-			return nil, err
-		}
-
-		resolvedPtr, err := o.session.SharedState().Progctl.ResolvePointer(ctx, ptr)
-		if err != nil {
-			return nil, err
-		}
-
-		region, foundRegion := regions.HasAddr(resolvedPtr)
-		if foundRegion {
-			return fx.NewHumanCommandResult(region.String()), nil
-		}
-
-		return nil, fmt.Errorf("address not found for %s", o.searchStr)
+func (o *VmmapCommand) searchAddr(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
+	ptr, err := memory.CreatePointerFromString(o.addr)
+	if err != nil {
+		return nil, err
 	}
 
+	resolvedPtr, err := o.session.SharedState().Progctl.ResolvePointer(ctx, ptr)
+	if err != nil {
+		return nil, err
+	}
+
+	region, foundRegion := regions.HasAddr(resolvedPtr)
+	if foundRegion {
+		return fx.NewHumanCommandResult(region.String()), nil
+	}
+
+	return nil, fmt.Errorf("address not found for %s", o.addr)
+}
+
+func (o *VmmapCommand) searchMatch(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
 	var out bytes.Buffer
 
 	err := regions.IterObjects(func(object memory.Object) error {
-		if !object.NameOrPathContains(o.searchStr) {
+		if !object.NameOrPathContains(o.match) {
 			return nil
 		}
 
@@ -106,7 +136,146 @@ func (o *VmmapCommand) search(ctx context.Context, regions memory.Regions) (fx.C
 	}
 
 	if out.Len() == 0 {
-		return nil, fmt.Errorf("failed to find object matching: %q", o.searchStr)
+		return nil, fmt.Errorf("failed to find object matching: %q", o.match)
+	}
+
+	return fx.NewHumanCommandResult(out.String()), nil
+}
+
+func (o *VmmapCommand) searchFilter(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
+	region := strings.ToLower(o.region)
+	var out bytes.Buffer
+
+	err := regions.IterObjects(func(object memory.Object) error {
+		if !strings.Contains(strings.ToLower(object.Name), region) {
+			return nil
+		}
+
+		if out.Len() > 0 {
+			out.WriteByte('\n')
+		}
+
+		out.WriteString(object.String())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = regions.IterNonObjects(func(r *memory.Region) error {
+		if !strings.Contains(strings.ToLower(r.Type.String()), region) {
+			return nil
+		}
+
+		if out.Len() > 0 {
+			out.WriteByte('\n')
+		}
+
+		out.WriteString(r.String())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if out.Len() == 0 {
+		return nil, fmt.Errorf("failed to find region matching: %q", o.region)
+	}
+
+	return fx.NewHumanCommandResult(out.String()), nil
+}
+
+func (o *VmmapCommand) listProperties(ctx context.Context, regions memory.Regions) (fx.CommandResult, error) {
+	props := strings.Split(o.property, ",")
+	for i, p := range props {
+		props[i] = strings.TrimSpace(strings.ToLower(p))
+	}
+
+	for _, p := range props {
+		switch p {
+		case "base", "end", "size", "perm", "region", "state", "name", "alloc-base":
+		default:
+			return nil, fmt.Errorf("unknown property %q (valid: base, end, size, perm, region, state, name, alloc-base)", p)
+		}
+	}
+
+	regionFilter := strings.ToLower(o.region)
+	matchFilter := strings.ToLower(o.match)
+
+	var out bytes.Buffer
+
+	err := regions.Iter(func(_ int, r memory.Region) error {
+		if r.NoPermissions() && !o.showWindowsInaccessible {
+			return nil
+		}
+
+		if regionFilter != "" {
+			fileName := strings.ToLower(r.Parent.FileName)
+			typeName := strings.ToLower(r.Type.String())
+			if !strings.Contains(fileName, regionFilter) && !strings.Contains(typeName, regionFilter) {
+				return nil
+			}
+		}
+
+		if matchFilter != "" {
+			nameOrPath := strings.ToLower(r.NameOrPath())
+			if !strings.Contains(nameOrPath, matchFilter) {
+				return nil
+			}
+		}
+
+		if out.Len() > 0 {
+			out.WriteByte('\n')
+		}
+
+		writeByte := func(b bool, on, off byte) {
+			if b {
+				out.WriteByte(on)
+			} else {
+				out.WriteByte(off)
+			}
+		}
+
+		for i, prop := range props {
+			if i > 0 {
+				out.WriteByte(' ')
+			}
+
+			switch prop {
+			case "base":
+				fmt.Fprintf(&out, "%#012x", r.BaseAddr)
+			case "end":
+				fmt.Fprintf(&out, "%#012x", r.EndAddr)
+			case "size":
+				fmt.Fprintf(&out, "%#012x", r.Size)
+			case "perm":
+				writeByte(r.Readable, 'r', '-')
+				writeByte(r.Writeable, 'w', '-')
+				writeByte(r.Executable, 'x', '-')
+				out.WriteByte(' ')
+				writeByte(r.Copyable, 'C', '-')
+				writeByte(r.Shared, 'S', '-')
+			case "type":
+				out.WriteString(r.Type.String())
+			case "state":
+				out.WriteString(r.State.String())
+			case "name":
+				out.WriteString(r.NameOrPath())
+			case "alloc-base":
+				fmt.Fprintf(&out, "%#012x", r.AllocBase)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if out.Len() == 0 {
+		return nil, fmt.Errorf("no regions matched")
 	}
 
 	return fx.NewHumanCommandResult(out.String()), nil
@@ -135,7 +304,7 @@ func (o *VmmapCommand) list(ctx context.Context, regions memory.Regions) (fx.Com
 	out.WriteString("\nothers:")
 
 	err = regions.IterNonObjects(func(region *memory.Region) error {
-		if region.NoPermissions() && !o.showWindowsInaccesible {
+		if region.NoPermissions() && !o.showWindowsInaccessible {
 			return nil
 		}
 
@@ -166,7 +335,7 @@ func (o *VmmapCommand) listFlat(ctx context.Context, regions memory.Regions) (fx
 	maxTypeStateLen := 0
 
 	err := regions.Iter(func(i int, region memory.Region) error {
-		if region.NoPermissions() && !o.showWindowsInaccesible {
+		if region.NoPermissions() && !o.showWindowsInaccessible {
 			return nil
 		}
 

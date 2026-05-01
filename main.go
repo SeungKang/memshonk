@@ -36,7 +36,7 @@ import (
 const (
 	appName = "memshonk"
 
-	version = "v0.0.1"
+	version = "v0.0.2-dev"
 
 	usage = `SYNOPSIS
   ` + appName + ` -` + helpArg + `

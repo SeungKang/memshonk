@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,15 @@ type NewCommandConfig struct {
 	Stdin   io.Reader
 	Stdout  io.Writer
 	Stderr  io.Writer
+	Cwd     string
+}
+
+func (o NewCommandConfig) NewPath(requestedPath string) string {
+	if filepath.IsAbs(requestedPath) {
+		return requestedPath
+	}
+
+	return filepath.Join(o.Cwd, requestedPath)
 }
 
 // Register adds a command schema to the registry.
@@ -340,6 +350,7 @@ func (o *CommandHandler) runInternalCommand(ctx context.Context, config RunComma
 		Stdin:   config.Stdin,
 		Stdout:  config.Stdout,
 		Stderr:  config.Stderr,
+		Cwd:     config.Cwd,
 	})
 
 	ctx, job, err := o.session.Jobs().Register(ctx, jobsctl.RegisterConfig{

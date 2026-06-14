@@ -17,8 +17,7 @@ const (
 
 func NewMrunCommand(config apicompat.NewCommandConfig) *fx.Command {
 	cmd := MrunCommand{
-		session: config.Session,
-		stdin:   config.Stdin,
+		config: config,
 	}
 
 	root := fx.NewCommand(MrunCommandName, "run a memshonk script", cmd.run)
@@ -60,9 +59,8 @@ func NewMrunCommand(config apicompat.NewCommandConfig) *fx.Command {
 }
 
 type MrunCommand struct {
-	session    apicompat.Session
+	config     apicompat.NewCommandConfig
 	asFilePath string
-	stdin      io.Reader
 }
 
 func (o *MrunCommand) run(ctx context.Context) (fx.CommandResult, error) {
@@ -71,10 +69,10 @@ func (o *MrunCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 	switch {
 	case o.asFilePath == "-":
-		src = o.stdin
+		src = o.config.Stdin
 		name = "(from-stdin)"
 	case o.asFilePath != "":
-		f, err := os.Open(o.asFilePath)
+		f, err := os.Open(o.config.NewPath(o.asFilePath))
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +85,9 @@ func (o *MrunCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		return nil, fmt.Errorf("please specify a script to run")
 	}
 
-	interpreter, err := shell.NewInterpreter(o.session, apicompat.NewCommandHandler(o.session))
+	interpreter, err := shell.NewInterpreter(
+		o.config.Session,
+		apicompat.NewCommandHandler(o.config.Session))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new shell - %w", err)
 	}

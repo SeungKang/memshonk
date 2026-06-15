@@ -35,7 +35,7 @@ func NewReadCommand(config apicompat.NewCommandConfig) *fx.Command {
 		Description: "The `datatype` to read " + datatypesTopicReferStr,
 	})
 
-	root.FlagSet.Uint64Flag(&cmd.sizeBytes, 0, fx.ArgConfig{
+	root.FlagSet.Uint64Flag(&cmd.sizeBytes, 16, fx.ArgConfig{
 		Name:        "size",
 		Description: "number of bytes to read (only applies to data types that do not have a fixed size)",
 	})

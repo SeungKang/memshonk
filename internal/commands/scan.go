@@ -278,28 +278,55 @@ func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 	var matches ScanCommandResult
 
-	numReadable := 0
+	var regionsToSearch []memory.Region
+
 	regions.Iter(func(_ int, region memory.Region) error {
-		if region.Readable {
-			numReadable++
+		switch {
+		case !region.Readable:
+			return nil
+		case optStart > 0 && region.BaseAddr < optStart:
+			return nil
+		case optEnd > 0 && region.EndAddr > optEnd:
+			return nil
+		case len(o.optRegions) > 0:
+			allowed := false
+
+			for _, name := range o.optRegions {
+				if filepath.Base(region.NameOrPath()) == name {
+					allowed = true
+
+					break
+				}
+			}
+
+			if !allowed {
+				return nil
+			}
 		}
+
+		regionsToSearch = append(regionsToSearch, region)
+
 		return nil
 	})
 
 	const barWidth = 25
+	numRegionsToSearch := len(regionsToSearch)
+
 	printProgress := func(processed int) {
 		var pct, filled int
-		if numReadable > 0 {
-			pct = processed * 100 / numReadable
-			filled = processed * barWidth / numReadable
+		if numRegionsToSearch > 0 {
+			pct = processed * 100 / numRegionsToSearch
+			filled = processed * barWidth / numRegionsToSearch
 		}
+
 		bar := strings.Repeat("=", filled)
 		if filled < barWidth {
 			bar += ">"
 			bar += strings.Repeat(" ", barWidth-filled-1)
 		}
+
 		fmt.Fprintf(o.stderr, "\rscanning [%s] %3d%% (%d/%d)",
-			bar, pct, processed, numReadable)
+			bar, pct, processed, numRegionsToSearch)
 	}
 
 	printProgress(0)
@@ -334,37 +361,14 @@ func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	go func() {
 		defer close(regionCh)
 
-		regions.Iter(func(_ int, region memory.Region) error {
-			switch {
-			case !region.Readable:
-				return nil
-			case optStart > 0 && region.BaseAddr < optStart:
-				return nil
-			case optEnd > 0 && region.EndAddr > optEnd:
-				return nil
-			case len(o.optRegions) > 0:
-				allowed := false
-
-				for _, name := range o.optRegions {
-					if filepath.Base(region.NameOrPath()) == name {
-						allowed = true
-
-						break
-					}
-				}
-
-				if !allowed {
-					return nil
-				}
-			}
-
+		for _, region := range regionsToSearch {
 			select {
 			case regionCh <- region:
-				return nil
+				// Keep going.
 			case <-scanCtx.Done():
-				return scanCtx.Err()
+				return
 			}
-		})
+		}
 	}()
 
 	var firstErr error

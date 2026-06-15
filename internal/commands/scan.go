@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -40,6 +41,21 @@ func NewScanCommand(config apicompat.NewCommandConfig) *fx.Command {
 		Description: "Specify the input `format` of the search string " + formatsTopicReferStr,
 	})
 
+	root.FlagSet.StringFlag(&cmd.optStart, "", fx.ArgConfig{
+		Name:        "start-pointer",
+		Description: "Start searching at this pointer",
+	})
+
+	root.FlagSet.StringFlag(&cmd.optEnd, "", fx.ArgConfig{
+		Name:        "end-pointer",
+		Description: "Search up until this pointer",
+	})
+
+	root.FlagSet.StringSliceFlag(&cmd.optRegions, fx.ArgConfig{
+		Name:        "region",
+		Description: "Only search these region names (can be specified more than once)",
+	})
+
 	root.FlagSet.StringSliceNf(&cmd.pattern, fx.ArgConfig{
 		Name:        "search-value",
 		Description: "Value to search for",
@@ -53,12 +69,45 @@ type ScanCommand struct {
 	session     apicompat.Session
 	datatype    string
 	inputFormat string
+	optStart    string
+	optEnd      string
+	optRegions  []string
 	pattern     []string
 	stderr      io.Writer
 }
 
 func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 	start := time.Now()
+
+	var optStart uintptr
+	if o.optStart != "" {
+		ptr, err := memory.CreatePointerFromString(o.optStart)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse start pointer: %q - %w",
+				o.optStart, err)
+		}
+
+		optStart, err = o.session.SharedState().Progctl.ResolvePointer(ctx, ptr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve start pointer: %X - %w",
+				ptr, err)
+		}
+	}
+
+	var optEnd uintptr
+	if o.optEnd != "" {
+		ptr, err := memory.CreatePointerFromString(o.optEnd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse end pointer: %q - %w",
+				o.optStart, err)
+		}
+
+		optEnd, err = o.session.SharedState().Progctl.ResolvePointer(ctx, ptr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve end pointer: %X - %w",
+				ptr, err)
+		}
+	}
 
 	var parsedPattern memory.ParsedPattern
 	var err error
@@ -276,6 +325,7 @@ func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 
 			for region := range regionCh {
 				m, err := o.searchRegion(scanCtx, parsedPattern, region, process)
+
 				resultCh <- workerResult{matches: m, err: err}
 			}
 		}()
@@ -285,8 +335,27 @@ func (o *ScanCommand) run(ctx context.Context) (fx.CommandResult, error) {
 		defer close(regionCh)
 
 		regions.Iter(func(_ int, region memory.Region) error {
-			if !region.Readable {
+			switch {
+			case !region.Readable:
 				return nil
+			case optStart > 0 && region.BaseAddr < optStart:
+				return nil
+			case optEnd > 0 && region.EndAddr > optEnd:
+				return nil
+			case len(o.optRegions) > 0:
+				allowed := false
+
+				for _, name := range o.optRegions {
+					if filepath.Base(region.NameOrPath()) == name {
+						allowed = true
+
+						break
+					}
+				}
+
+				if !allowed {
+					return nil
+				}
 			}
 
 			select {

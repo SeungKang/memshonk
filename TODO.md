@@ -58,10 +58,18 @@
 - command performance measuring
 - From [Amy](https://github.com/tobert/): memory-map a process' region / object
   to a file so things outside of memshonk can play with it
+- Get and set project variables (with option to expire variable on process detach)
+- A command for converting between bases or dataformats (convert base10 to base16)
+- Arithmetic calculator command
+
+## address format/pointer chain syntax
+
+- allow offsets (example 0xaaaa,+0x10)
 
 ## readm command
 
 - Get input data from a file / pipe
+- multiple -a (ADDRESS) inputs
 
 ## scan
 
@@ -89,6 +97,10 @@
 - tab completion should add a space (" ") character if it completes
   and there are no other options (e.g., tab completing "foob" when
   nothing else matches should become "foobar " and not "foobar")
+
+## watch
+
+- support for exporting data over a unix socket or network connection (would need to add support for datatypes and output format)
 
 ## projects
 
@@ -118,6 +130,7 @@
   history (this is likely a limitation of the `readline` library)
 - Interactive programs like `vim` and `less` do not currently work (this
   may be a simple fix, but we have not looked into it deeply as of yet)
+- Add signed integers for datatypes
 
 ## hacks / workarounds
 
